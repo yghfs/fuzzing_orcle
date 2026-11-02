@@ -1,0 +1,82 @@
+#!/bin/busybox sh
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /sys/kernel/debug /mnt
+mount -t debugfs debugfs /sys/kernel/debug
+
+TEST=unknown
+for arg in $(cat /proc/cmdline); do
+	case "$arg" in
+		test=*) TEST=${arg#test=} ;;
+	esac
+done
+
+mount -t ext4 -o errors=continue,noatime,inode_readahead_blks=0 /dev/vda /mnt || {
+	echo 'MOUNT_FAILED'
+	exec /bin/busybox poweroff -f
+}
+
+run_paused_workload() {
+	PAUSE_ENABLE=$1
+	PAUSE_STATE=$2
+	shift 2
+	echo 1 > "/sys/module/ext4/parameters/$PAUSE_ENABLE"
+	echo "PAUSE_ARMED enable=$PAUSE_ENABLE value=$(cat "/sys/module/ext4/parameters/$PAUSE_ENABLE") state=$PAUSE_STATE"
+	"$@" &
+	WORKER_PID=$!
+	while [ "$(cat "/sys/module/ext4/parameters/$PAUSE_STATE")" != 1 ]; do
+		/bin/busybox sleep 0.01
+	done
+	echo "BLOCK_TARGET_READY test=$TEST"
+	read -r answer </dev/console
+	echo 1 > /proc/sys/vm/drop_caches
+	echo "BLOCK_CACHE_DROPPED test=$TEST"
+	read -r answer </dev/console
+	echo 0 > "/sys/module/ext4/parameters/$PAUSE_ENABLE"
+	wait "$WORKER_PID"
+}
+
+case "$TEST" in
+	mkdir)
+		cd /mnt/p || exit 1
+		stat -c 'PREP parent=%i' .
+		;;
+	rmdir)
+		stat -c 'PREP child=%i parent=%n' /mnt/p/c
+		;;
+	rename)
+		cd /mnt/p || exit 1
+		stat -c 'PREP source=%i' file
+		;;
+	group-extend|group-add)
+		;;
+	*)
+		echo "UNKNOWN_TEST=$TEST"
+		exec /bin/busybox poweroff -f
+		;;
+esac
+
+sync
+echo "QMP_READY test=$TEST"
+read -r answer </dev/console
+/bin/busybox blockdev --flushbufs /dev/vda
+echo "BLOCKDEV_FLUSHBUFS_RESULT rc=$?"
+
+echo "WORKLOAD_START test=$TEST"
+case "$TEST" in
+	mkdir) run_paused_workload ext4_checker_namespace_pause ext4_checker_namespace_paused /bin/fault-workload mkdir /mnt/p/newdir ;;
+	rmdir) /bin/fault-workload rmdir-plain /mnt/p/c ;;
+	rename) /bin/fault-workload rename-plain /mnt/p/file /mnt/p/to ;;
+	group-extend) /bin/fault-workload group-extend 20000 ;;
+	group-add) /bin/fault-workload group-add 1 32785 32786 32787 32768 ;;
+esac
+echo "WORKLOAD_DONE test=$TEST rc=$?"
+
+echo QMP_RESULT_READY
+read -r answer </dev/console
+cd /
+sync
+umount /mnt
+echo "UNMOUNT_RESULT rc=$?"
+exec /bin/busybox poweroff -f

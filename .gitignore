@@ -1,0 +1,53 @@
+# Machine-local environments, credentials, and VM state.
+/.aws/
+/.claude/
+/.codex/
+/.tmp/
+/.agents/
+/.config
+/work/
+
+# Downloaded, extracted, or generated Linux source trees.
+/kernel/
+/experiments/*/kernel/
+/experiments/*/dev/
+/experiments/*/build/
+/experiments/*/kernel/
+/experiments/*/source/*.tar.xz
+/experiments/*/source/*.tar.xz.*
+/experiments/*/source/pristine-files.sha256
+/experiments/*/source/pristine-manifest.jsonl
+
+# Local Go toolchains, dependency checkouts, and built tools.
+/tools/go/
+/tools/go126/
+/tools/src/
+/tools/syzkaller
+/tools/debs/
+/tools/*.local.cfg
+/.github-local/
+/experiments/*/config/*.local
+**/syzgen/bin/
+
+# Campaign output, per-run evidence, VM images, and generated initramfs binaries.
+/experiments/*/results/
+/experiments/*/baselines/
+/experiments/*/research/2026-10-31-single-random-fault/**/*.csv
+/experiments/*/research/2026-10-31-single-random-fault/**/*.jsonl
+/experiments/*/research/2026-10-31-single-random-fault/**/*.raw
+/experiments/*/research/2026-10-31-single-random-fault/**/*.tsv
+/experiments/*/initramfs/bin/
+/work/syzkaller/
+*.img
+*.qcow2
+*.raw
+*.cpio.gz
+*.bzImage
+
+# Python and host build output.
+__pycache__/
+*.py[cod]
+*.o
+*.a
+*.ko
+*.mod.c

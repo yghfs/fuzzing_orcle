@@ -1,0 +1,122 @@
+{
+  "campaign": "campaign-dzq91z1h",
+  "inputs": {
+    "report": "campaign-report.json",
+    "campaign": "campaign.json"
+  },
+  "campaign_status": "candidate_review_required",
+  "segments": 1019,
+  "complete_segments": 536,
+  "fault_hits": 337,
+  "fault_hits_by_kind": {
+    "bigalloc": 120,
+    "inline": 93,
+    "regular": 124
+  },
+  "fault_hits_by_admission": {
+    "experimental": 310,
+    "reviewed": 27
+  },
+  "fault_hits_by_attribution": {
+    "verified": 327,
+    "hook_only": 10
+  },
+  "trace_event_found": 337,
+  "trace_event_agrees": 337,
+  "errno_choice_verified": 337,
+  "candidate_count": 184,
+  "candidate_unique_segments": 149,
+  "candidate_source_counts": {
+    "lifecycle": 56,
+    "workload_exit": 128
+  },
+  "candidate_admission_counts": {
+    "lifecycle:experimental": 56,
+    "workload_exit:experimental": 121,
+    "workload_exit:reviewed": 7
+  },
+  "candidate_overlap_segments": 35,
+  "unverified_count": 298,
+  "stable_snapshot_status": {
+    "before:clear:stable": 337,
+    "after:unverified:concurrent_or_unhealthy": 298,
+    "after:clear:stable": 39
+  },
+  "lifecycle_classification_totals": {
+    "transient_mismatch": 59819,
+    "operation_exit_mismatch": 119,
+    "persistent_mismatch": 0,
+    "concurrent_or_ambiguous": 0,
+    "unsupported_or_unverified": 64
+  },
+  "candidate_lifecycle_persistent_mismatch": 0,
+  "candidate_lifecycle_operation_exit_mismatch": 119,
+  "lifecycle_candidate_episode_shape": {
+    "episodes": 119,
+    "streams": {
+      "R-LINK": 119
+    },
+    "onset_points": {
+      "NAMESPACE.REF.DELETE": 32,
+      "NAMESPACE.REF.REPLACE": 24,
+      "NAMESPACE.REF.REMOVE_DOT": 13,
+      "NAMESPACE.REF.REMOVE_DOTDOT": 21,
+      "NAMESPACE.NLINK.DEC": 25,
+      "NAMESPACE.REF.ADD": 4
+    },
+    "recovered_in_trace": 26,
+    "unrecovered_at_segment_end": 93,
+    "without_native_exit_evidence": 29
+  },
+  "admitted_hits": {
+    "total": 27,
+    "by_operation": {
+      "mballoc_mark": 19,
+      "unlink_inode_dirty": 3,
+      "inode_evict_final_dirty": 5
+    },
+    "candidate_rows": 7,
+    "candidate_sources": {
+      "workload_exit": 7
+    }
+  },
+  "offline_disk": {
+    "regular": {
+      "valid": true,
+      "fsck_exit": 0,
+      "matches_final_stable_snapshot": true,
+      "sha256": "504e498f58329b9d49507d2961d394f3196e488bc6e9a43bd9cf41d5e739727e",
+      "snapshot_sha256": "e2b6b08956c965bd5c11ecb50325f69fc4c26cedb423be50365d369920a80f4e",
+      "fsck_sha256": "386d02292344b24f73c3da46380127cdbf6b1e6f2d0471cce09b7190369dbeaf"
+    },
+    "bigalloc": {
+      "valid": true,
+      "fsck_exit": 0,
+      "matches_final_stable_snapshot": false,
+      "sha256": "b48b888f8df019749314ad7d36ff2977f10776b556e3c5c9a8bc2de926cb4bd6",
+      "snapshot_sha256": "20d13a624b44973f68cc9751b1875fc743ac633fc565f486a1281b60b75f6f8f",
+      "fsck_sha256": "8bb66c949641ed15b0e5b602610ad994690aadb47bc8d5c7d066eabbb697a1b8",
+      "fault_tainted": true
+    },
+    "inline": {
+      "valid": true,
+      "fsck_exit": 0,
+      "matches_final_stable_snapshot": true,
+      "sha256": "d813eb25d83712aca4c81b13c5a22a67236bab7314bca45bdeedfd90cb6a6fd4",
+      "snapshot_sha256": "c8f78101eb75c59ff852d1e2a7f0d5616347f163d11230394f10954a7471714b",
+      "fsck_sha256": "47455c8fac1c4abeac1669b5d0965aa7b2bc9f803f5c9527d5201ec9d7c23ad4"
+    }
+  },
+  "tainted_filesystems": [
+    "bigalloc"
+  ],
+  "classification_counts": {
+    "transient_mismatch": 181585,
+    "operation_exit_mismatch": 119,
+    "persistent_mismatch": 0,
+    "concurrent_or_ambiguous": 12,
+    "unsupported_or_unverified": 64
+  },
+  "source_attribution_complete": false,
+  "counter_validation_passed": false
+}

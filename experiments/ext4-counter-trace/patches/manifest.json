@@ -1,0 +1,157 @@
+{
+  "patch": "0001-counter-trace-core-and-probes.patch",
+  "sha256": "347d99fcb9b01b5f29d3d178fe7247ff0a5fc9056724f1a49727a89004ed0f36",
+  "replay_verified": true,
+  "files": [
+    {
+      "path": "fs/ext4/Kconfig",
+      "before_sha256": "6d7008b18336f23009bf997b1bfb0b8f4f9dd92ef69ef633d3268a5557db2de5",
+      "after_sha256": "07d55d8d14758d70cd70a337e6cc978b635bae79aa5e73191e8a26e24cdc689d"
+    },
+    {
+      "path": "fs/ext4/Makefile",
+      "before_sha256": "236554253e990c3d12efe453049ea68b789918c4deccf41fe693361d8ec84ba0",
+      "after_sha256": "84a4bec8ec5344d21b9d1d311dada078a8dfc5c2403cd0c63b6a357f049162b0"
+    },
+    {
+      "path": "fs/ext4/acl.c",
+      "before_sha256": "8742da7ae1629ff90567764c951a4a8381c1f6c1f0a2d43df0bb4a4a06e85e34",
+      "after_sha256": "093f250304ca05b3cc64aab7bb9ef12d4ec659f3274bea23fb5da16b247dc288"
+    },
+    {
+      "path": "fs/ext4/balloc.c",
+      "before_sha256": "bedeb9e8753b3add2edea8086aa19374f4efa192368fcfdb8ceb3b788642c55c",
+      "after_sha256": "df525cfbafd354c051cd905f925216c767a6d25a4214206ed048f3f611a15db4"
+    },
+    {
+      "path": "fs/ext4/counter_relations.c",
+      "before_sha256": null,
+      "after_sha256": "064eb43b74ab1a4689aeb5984e964244d7991e0362e6dc19540b0aaf2d3486d0"
+    },
+    {
+      "path": "fs/ext4/counter_trace.c",
+      "before_sha256": null,
+      "after_sha256": "a7e664265930d3bd51722ff10a2ab02469f243d6682490e648621089a007c566"
+    },
+    {
+      "path": "fs/ext4/counter_trace.h",
+      "before_sha256": null,
+      "after_sha256": "3f823bb73304fa2baad6026c1fe8274fe5afebff302efa3f6f120235d54d738c"
+    },
+    {
+      "path": "fs/ext4/ext4.h",
+      "before_sha256": "3a3cdc0439c0c828176bd9f6bc5f25b041f273de29ee0b53c3970716052f114e",
+      "after_sha256": "a8813bbe9d3eb3dad42886a8e76e4bb62628273cac6ded7c77f417dd0302afae"
+    },
+    {
+      "path": "fs/ext4/ext4_jbd2.c",
+      "before_sha256": "7dc3f7dca7b6410470b1c48241dbbe0a29e599c6bc2d88629697bf60c310bccc",
+      "after_sha256": "fa8cdb4d47aee6ec6cd12e4954d99d9cc54eac184203efbef42db3959add4780"
+    },
+    {
+      "path": "fs/ext4/ext4_jbd2.h",
+      "before_sha256": "537f5240ba825faac41b4f982b5c598297cf60469cfbd651ef5e77b73015497d",
+      "after_sha256": "e577d7524189847acc6cca4880eeff5a35bcee1a431f0cfddf96fc8845938845"
+    },
+    {
+      "path": "fs/ext4/extents.c",
+      "before_sha256": "ca997b4124cdfd81fe4124187ff00c8c0e325afa4f0b8926b40c17063dc6fd65",
+      "after_sha256": "5f35b8969f153374778271ef9cf0c1638a6b8b31aedc3e50a1ad4d01f8a72a8e"
+    },
+    {
+      "path": "fs/ext4/extents_status.c",
+      "before_sha256": "1e63eb6e2240bdbd90f1044816a1f5cf10eed4640a3c87875d7a30efa8f67a47",
+      "after_sha256": "757abc3c5b1cdafa8cde254d89a19c741b65b44ce5469ae9a3c98d1fe1b19207"
+    },
+    {
+      "path": "fs/ext4/fast_commit.c",
+      "before_sha256": "5d92519801746c587c4af6f01c0653180311a6d51e2df150995f51019fb7ffdc",
+      "after_sha256": "4127dc25dc1663258955ec4fd5b55e412eee5a25857cfc8062aecf6714527991"
+    },
+    {
+      "path": "fs/ext4/fault_errno_catalog.h",
+      "before_sha256": null,
+      "after_sha256": "c8200bf8ea7277e26d4a8fe62e352d05f739356f64d66c6634845d48639e027d"
+    },
+    {
+      "path": "fs/ext4/fault_inject.c",
+      "before_sha256": null,
+      "after_sha256": "d82f8e336e111b9a155c3051a225c43e9499e7612b55744f65cdfac266821d0b"
+    },
+    {
+      "path": "fs/ext4/fault_inject.h",
+      "before_sha256": null,
+      "after_sha256": "16422d2080c3f40c2c84977993e5f6c6c4777906020b06060040cd81fa239df4"
+    },
+    {
+      "path": "fs/ext4/ialloc.c",
+      "before_sha256": "117ef02067d775223e47e38117db692f827e6375756766ee8c6a29d48ccc739f",
+      "after_sha256": "b3a896e4881c53d0de56b8994dd6349b235a9e27af4d39b10a485d7b62ba2ceb"
+    },
+    {
+      "path": "fs/ext4/inline.c",
+      "before_sha256": "9891b0f71c4bd48461a0b54520448938bb8a1a6e9e00218c61e3425c25042e96",
+      "after_sha256": "d879ae5ea385511b08b501b585580e37e62b41253afd637a673576251f7bf908"
+    },
+    {
+      "path": "fs/ext4/inode.c",
+      "before_sha256": "a85d3c8a372212fabef113e9805c0101ec33dc02f7717b2f06bd6bfc40ecc4fa",
+      "after_sha256": "153cc1ec967c12d3dd761ccd9e415e07a7c62e83189fe689f7c1063cfe97360e"
+    },
+    {
+      "path": "fs/ext4/ioctl.c",
+      "before_sha256": "cd060d252d03292ad8737ee61f9801320e7384beb2430300863569609b1df8d4",
+      "after_sha256": "68bf3990a62fc9268f309da3d3016ab41e5954f47e2644da34c75cbdc7f7877a"
+    },
+    {
+      "path": "fs/ext4/mballoc.c",
+      "before_sha256": "abb18c4a4a41e7cd4b159e90736d0ccf31f39556f6468a5138e755793ca37c08",
+      "after_sha256": "8aa6a11fa208cc9306b6abbd5e0aa6422176098ecaa0f4c1ee80a8e5be65ccf7"
+    },
+    {
+      "path": "fs/ext4/migrate.c",
+      "before_sha256": "826b72a914b8527379cf05189ecf75780ecadde251388330d03b85ac1200e052",
+      "after_sha256": "785ace186ee652d2d8672193a0cac6179c5582541fc8fec9eaa7aa926a666cd2"
+    },
+    {
+      "path": "fs/ext4/namei.c",
+      "before_sha256": "5db5af62747549e38d0474ed5c34de504cf861f2d46432f46724d446b02da7e6",
+      "after_sha256": "ed7bcbe6b0a0d53179105a8ce512da9700f0728d169d36e83ce6380bae6683aa"
+    },
+    {
+      "path": "fs/ext4/orphan.c",
+      "before_sha256": "1d01da885095a3f909c208ea716bbb566df7afec06e39698e639a9d125a332c3",
+      "after_sha256": "1e409117de6968c0df1c75dcbf95fe428391284c4fb6169e7a27ed2bb7f46654"
+    },
+    {
+      "path": "fs/ext4/resize.c",
+      "before_sha256": "4c17badc08b682d9af9201727317cf6f4d50d336593652163de00742710ec2ef",
+      "after_sha256": "ef2d2a649fa9ba12b22e7a324cf6ce5ee74e6e2f8ff941030cea763ff2dd486a"
+    },
+    {
+      "path": "fs/ext4/super.c",
+      "before_sha256": "7e40a398a52482bf47cc0c12e8a4cf22f3fc9b1103841823b8e800a17fd0ef13",
+      "after_sha256": "76d7587e54b539fe7c2f5671af88ba5f1269237746523d226758dafad52841cf"
+    },
+    {
+      "path": "fs/ext4/sysfs.c",
+      "before_sha256": "47e8134c9e8e76cf933fec48183f5fef7ebeba05b59ef0fb864eba7a54adce7e",
+      "after_sha256": "b7152d559cf142da13be39f8e0eeb5970f1ca5f6224508bab190efbf1d446b5b"
+    },
+    {
+      "path": "fs/ext4/xattr.c",
+      "before_sha256": "4f3ec9ccb9dbfbe5623766705dcae02c0251b3da20c128d16372aeac19f775a7",
+      "after_sha256": "a7459f60e3536c89df33a4447ba1dea89bc1cfc087508a87548f334d89bc6d48"
+    },
+    {
+      "path": "include/trace/events/ext4_counter.h",
+      "before_sha256": null,
+      "after_sha256": "dba3255ca2de59700a77aacd18ae84f538a3c1df3fd88e4493657b10e50df311"
+    },
+    {
+      "path": "include/trace/events/ext4_fault.h",
+      "before_sha256": null,
+      "after_sha256": "896545df79dbd087302b197cd377231cde8c334c071f25027e3891e057033b83"
+    }
+  ]
+}

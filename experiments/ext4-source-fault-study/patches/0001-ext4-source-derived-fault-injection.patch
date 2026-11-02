@@ -1,0 +1,1750 @@
+--- a/fs/ext4/Kconfig
++++ b/fs/ext4/Kconfig
+@@ -102,6 +102,15 @@
+ 	  If you select Y here, then you will be able to turn on debugging
+ 	  using dynamic debug control for mb_debug() / ext_debug() msgs.
+ 
++config EXT4_SOURCE_FAULT_INJECTION
++	bool "Ext4 source-derived fault injection"
++	depends on EXT4_FS && DEBUG_FS
++	help
++	  Enable one-shot, operation-specific failures at ext4/JBD2 error
++	  boundaries selected from the Linux source. Configure one failure at
++	  /sys/kernel/debug/ext4-source-fault/control. Errno choices are limited
++	  to those returned by the helper at each injected boundary.
++
+ config EXT4_KUNIT_TESTS
+ 	tristate "KUnit tests for ext4" if !KUNIT_ALL_TESTS
+ 	depends on EXT4_FS && KUNIT
+--- a/fs/ext4/Makefile
++++ b/fs/ext4/Makefile
+@@ -14,6 +14,7 @@
+ 
+ ext4-$(CONFIG_EXT4_FS_POSIX_ACL)	+= acl.o
+ ext4-$(CONFIG_EXT4_FS_SECURITY)		+= xattr_security.o
++ext4-$(CONFIG_EXT4_SOURCE_FAULT_INJECTION) += ext4_source_fault.o
+ ext4-inode-test-objs			+= inode-test.o
+ obj-$(CONFIG_EXT4_KUNIT_TESTS)		+= ext4-inode-test.o
+ ext4-$(CONFIG_FS_VERITY)		+= verity.o
+--- a/fs/ext4/ext4.h
++++ b/fs/ext4/ext4.h
+@@ -46,6 +46,8 @@
+ #include <linux/fsverity.h>
+ 
+ #include <linux/compiler.h>
++
++#include "ext4_source_fault.h"
+ 
+ /*
+  * The fourth extended filesystem constants/structures
+@@ -3062,7 +3064,8 @@
+ 
+ /* namei.c */
+ extern int ext4_init_new_dir(handle_t *handle, struct inode *dir,
+-			     struct inode *inode);
++			     struct inode *inode,
++			     enum ext4_source_fault_op fault_op);
+ extern int ext4_dirblock_csum_verify(struct inode *inode,
+ 				     struct buffer_head *bh);
+ extern int ext4_htree_fill_tree(struct file *dir_file, __u32 start_hash,
+@@ -3628,6 +3631,10 @@
+ 					unsigned int blocksize);
+ extern int ext4_handle_dirty_dirblock(handle_t *handle, struct inode *inode,
+ 				      struct buffer_head *bh);
++extern int ext4_handle_dirty_dirblock_faultable(handle_t *handle,
++				      struct inode *inode,
++				      struct buffer_head *bh,
++				      enum ext4_source_fault_op fault_op);
+ extern int __ext4_unlink(struct inode *dir, const struct qstr *d_name,
+ 			 struct inode *inode, struct dentry *dentry);
+ extern int __ext4_link(struct inode *dir, struct inode *inode,
+--- a/fs/ext4/ext4_jbd2.c
++++ b/fs/ext4/ext4_jbd2.c
+@@ -5,6 +5,7 @@
+ 
+ #include "ext4_jbd2.h"
+ 
++#include <linux/errseq.h>
+ #include <trace/events/ext4.h>
+ 
+ int ext4_inode_journal_mode(struct inode *inode)
+@@ -229,21 +230,47 @@
+ int __ext4_journal_get_write_access(const char *where, unsigned int line,
+ 				    handle_t *handle, struct super_block *sb,
+ 				    struct buffer_head *bh,
+-				    enum ext4_journal_trigger_type trigger_type)
+-{
+-	int err;
++				    enum ext4_journal_trigger_type trigger_type,
++				    enum ext4_source_fault_op fault_op)
++{
++	enum ext4_source_fault_op actual_fault_op = fault_op;
++	bool inject_fs_dev_write_error = false;
++	int injected_error = ext4_source_fault_take(sb, fault_op);
++	int err = injected_error;
+ 
+ 	might_sleep();
+-
+-	if (ext4_handle_valid(handle)) {
++	/* Inject filesystem-device writeback errors through JBD2's native check,
++	 * so the journal is aborted before this helper returns -EIO.
++	 */
++	if (injected_error &&
++	    (fault_op == EXT4_SOURCE_FAULT_ORPHAN_DELETE_ACCESS ||
++	     fault_op == EXT4_SOURCE_FAULT_XATTR_RELEASE_ACCESS)) {
++		err = 0;
++		inject_fs_dev_write_error = true;
++	}
++	/* Compare a handle-local access failure with a true journal abort while
++	 * keeping both injections at the same write-access boundary.
++	 */
++	if (!err && fault_op == EXT4_SOURCE_FAULT_UNLINK_PARENT_RESERVE) {
++		actual_fault_op = EXT4_SOURCE_FAULT_UNLINK_PARENT_GLOBAL_ABORT;
++		inject_fs_dev_write_error =
++			ext4_source_fault_take(sb, actual_fault_op) != 0;
++	}
++	if (inject_fs_dev_write_error)
++		errseq_set(&EXT4_SB(sb)->s_journal->j_fs_dev->bd_mapping->wb_err,
++			   -EIO);
++
++	if (!err && ext4_handle_valid(handle)) {
+ 		err = jbd2_journal_get_write_access(handle, bh);
+-		if (err) {
++	} else if (!err) {
++		ext4_check_bdev_write_error(sb);
++	}
++	if (err) {
++		if (ext4_handle_valid(handle))
+ 			ext4_journal_abort_handle(where, line, __func__, bh,
+ 						  handle, err);
+-			return err;
+-		}
+-	} else
+-		ext4_check_bdev_write_error(sb);
++		return err;
++	}
+ 	if (trigger_type == EXT4_JTR_NONE || !ext4_has_metadata_csum(sb))
+ 		return 0;
+ 	BUG_ON(trigger_type >= EXT4_JOURNAL_TRIGGER_COUNT);
+@@ -341,17 +358,26 @@
+ 
+ int __ext4_handle_dirty_metadata(const char *where, unsigned int line,
+ 				 handle_t *handle, struct inode *inode,
+-				 struct buffer_head *bh)
++				 struct buffer_head *bh,
++				 enum ext4_source_fault_op fault_op)
+ {
+ 	int err = 0;
+ 
+ 	might_sleep();
++	if (fault_op != EXT4_SOURCE_FAULT_NONE) {
++		struct super_block *sb = inode ? inode->i_sb :
++			(ext4_handle_valid(handle) ?
++			 handle->h_transaction->t_journal->j_private : NULL);
++
++		err = ext4_source_fault_take(sb, fault_op);
++	}
+ 
+ 	set_buffer_meta(bh);
+ 	set_buffer_prio(bh);
+ 	set_buffer_uptodate(bh);
+ 	if (ext4_handle_valid(handle)) {
+-		err = jbd2_journal_dirty_metadata(handle, bh);
++		if (!err)
++			err = jbd2_journal_dirty_metadata(handle, bh);
+ 		/* Errors can only happen due to aborted journal or a nasty bug */
+ 		if (!is_handle_aborted(handle) && WARN_ON_ONCE(err)) {
+ 			ext4_journal_abort_handle(where, line, __func__, bh,
+@@ -378,6 +404,8 @@
+ 					 err);
+ 		}
+ 	} else {
++		if (err)
++			return err;
+ 		if (inode)
+ 			mark_buffer_dirty_inode(bh, inode);
+ 		else
+--- a/fs/ext4/ext4_jbd2.h
++++ b/fs/ext4/ext4_jbd2.h
+@@ -218,11 +218,20 @@
+ 
+ int ext4_reserve_inode_write(handle_t *handle, struct inode *inode,
+ 			struct ext4_iloc *iloc);
+-
+-#define ext4_mark_inode_dirty(__h, __i)					\
+-		__ext4_mark_inode_dirty((__h), (__i), __func__, __LINE__)
++int ext4_reserve_inode_write_faultable(handle_t *handle, struct inode *inode,
++			struct ext4_iloc *iloc,
++				       enum ext4_source_fault_op fault_op,
++				       enum ext4_source_fault_op read_fault_op);
++
+ int __ext4_mark_inode_dirty(handle_t *handle, struct inode *inode,
+-				const char *func, unsigned int line);
++				const char *func, unsigned int line,
++				enum ext4_source_fault_op fault_op);
++#define ext4_mark_inode_dirty(handle, inode) \
++	__ext4_mark_inode_dirty((handle), (inode), __func__, __LINE__, \
++				EXT4_SOURCE_FAULT_NONE)
++#define ext4_mark_inode_dirty_faultable(handle, inode, fault_op) \
++	__ext4_mark_inode_dirty((handle), (inode), __func__, __LINE__, \
++				(fault_op))
+ 
+ int ext4_expand_extra_isize(struct inode *inode,
+ 			    unsigned int new_extra_isize,
+@@ -233,7 +242,8 @@
+ int __ext4_journal_get_write_access(const char *where, unsigned int line,
+ 				    handle_t *handle, struct super_block *sb,
+ 				    struct buffer_head *bh,
+-				    enum ext4_journal_trigger_type trigger_type);
++				    enum ext4_journal_trigger_type trigger_type,
++				    enum ext4_source_fault_op fault_op);
+ 
+ int __ext4_forget(const char *where, unsigned int line, handle_t *handle,
+ 		  int is_metadata, struct inode *inode,
+@@ -246,11 +256,16 @@
+ 
+ int __ext4_handle_dirty_metadata(const char *where, unsigned int line,
+ 				 handle_t *handle, struct inode *inode,
+-				 struct buffer_head *bh);
++				 struct buffer_head *bh,
++				 enum ext4_source_fault_op fault_op);
+ 
+ #define ext4_journal_get_write_access(handle, sb, bh, trigger_type) \
+ 	__ext4_journal_get_write_access(__func__, __LINE__, (handle), (sb), \
+-					(bh), (trigger_type))
++						(bh), (trigger_type), \
++						EXT4_SOURCE_FAULT_NONE)
++#define ext4_journal_get_write_access_faultable(handle, sb, bh, trigger_type, fault_op) \
++	__ext4_journal_get_write_access(__func__, __LINE__, (handle), (sb), \
++						(bh), (trigger_type), (fault_op))
+ #define ext4_forget(handle, is_metadata, inode, bh, block_nr) \
+ 	__ext4_forget(__func__, __LINE__, (handle), (is_metadata), (inode), \
+ 		      (bh), (block_nr))
+@@ -259,7 +274,10 @@
+ 					 (bh), (trigger_type))
+ #define ext4_handle_dirty_metadata(handle, inode, bh) \
+ 	__ext4_handle_dirty_metadata(__func__, __LINE__, (handle), (inode), \
+-				     (bh))
++				     (bh), EXT4_SOURCE_FAULT_NONE)
++#define ext4_handle_dirty_metadata_faultable(handle, inode, bh, fault_op) \
++	__ext4_handle_dirty_metadata(__func__, __LINE__, (handle), (inode), \
++				     (bh), (fault_op))
+ 
+ handle_t *__ext4_journal_start_sb(struct inode *inode, struct super_block *sb,
+ 				  unsigned int line, int type, int blocks,
+--- a/fs/ext4/ext4_source_fault.c
++++ b/fs/ext4/ext4_source_fault.c
+@@ -0,0 +1,347 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/debugfs.h>
++#include <linux/errno.h>
++#include <linux/fs.h>
++#include <linux/module.h>
++#include <linux/spinlock.h>
++#include <linux/string.h>
++#include <linux/uaccess.h>
++
++#include "ext4.h"
++
++struct ext4_source_fault_state {
++	enum ext4_source_fault_op op;
++	int error;
++	u64 hits;
++	bool armed;
++};
++
++static DEFINE_SPINLOCK(ext4_source_fault_lock);
++static struct ext4_source_fault_state ext4_source_fault_state;
++static struct dentry *ext4_source_fault_dir;
++
++static const char * const ext4_source_fault_names[EXT4_SOURCE_FAULT_MAX] = {
++	[EXT4_SOURCE_FAULT_NONE] = "off",
++	[EXT4_SOURCE_FAULT_EVICT_INITIAL_DIRTY] = "evict_initial_inode_dirty",
++	[EXT4_SOURCE_FAULT_EVICT_FINAL_DIRTY] = "evict_final_inode_dirty",
++	[EXT4_SOURCE_FAULT_ORPHAN_DELETE_ACCESS] = "orphan_file_delete_access",
++	[EXT4_SOURCE_FAULT_ORPHAN_DELETE_DIRTY] = "orphan_file_delete_dirty",
++	[EXT4_SOURCE_FAULT_XATTR_RELEASE_ACCESS] = "xattr_release_access",
++	[EXT4_SOURCE_FAULT_XATTR_RELEASE_DIRTY] = "xattr_release_dirty",
++	[EXT4_SOURCE_FAULT_GROUP_EXTEND_BUDDY_LOAD] = "group_extend_buddy_load",
++	[EXT4_SOURCE_FAULT_GROUP_EXTEND_BITMAP_DIRTY] = "group_extend_bitmap_dirty",
++	[EXT4_SOURCE_FAULT_GROUP_EXTEND_DESC_DIRTY] = "group_extend_group_desc_dirty",
++	[EXT4_SOURCE_FAULT_GROUP_ADD_SUPER_DIRTY] = "group_add_super_dirty",
++	[EXT4_SOURCE_FAULT_GROUP_ADD_GROUPINFO] = "group_add_groupinfo",
++	[EXT4_SOURCE_FAULT_RMDIR_DIRENT_DIRTY] = "rmdir_dirent_dirty",
++	[EXT4_SOURCE_FAULT_RMDIR_CHILD_DIRTY] = "rmdir_child_inode_dirty",
++	[EXT4_SOURCE_FAULT_RMDIR_PARENT_DIRTY] = "rmdir_parent_inode_dirty",
++	[EXT4_SOURCE_FAULT_UNLINK_DIRENT_DIRTY] = "unlink_dirent_dirty",
++	[EXT4_SOURCE_FAULT_UNLINK_PARENT_DIRTY] = "unlink_parent_inode_dirty",
++	[EXT4_SOURCE_FAULT_UNLINK_PARENT_RESERVE] = "unlink_parent_reserve",
++	[EXT4_SOURCE_FAULT_UNLINK_PARENT_GLOBAL_ABORT] =
++		"unlink_parent_global_abort",
++	[EXT4_SOURCE_FAULT_UNLINK_PARENT_INODE_READ] =
++		"unlink_parent_inode_read",
++	[EXT4_SOURCE_FAULT_UNLINK_TARGET_DIRTY] = "unlink_target_inode_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_NEW_DIRENT_ACCESS] = "rename_new_dirent_access",
++	[EXT4_SOURCE_FAULT_RENAME_NEW_DIRENT_DIRTY] = "rename_new_dirent_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_SOURCE_DIRTY] = "rename_source_inode_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_OLD_LOOKUP] = "rename_old_entry_lookup",
++	[EXT4_SOURCE_FAULT_RENAME_OLD_DIRENT_ACCESS] = "rename_old_dirent_access",
++	[EXT4_SOURCE_FAULT_RENAME_OLD_DIRENT_DIRTY] = "rename_old_dirent_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_NEW_PARENT_DIRTY] = "rename_new_parent_inode_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_OLD_PARENT_DIRTY] = "rename_old_parent_inode_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_REPLACED_DIRTY] = "rename_replaced_inode_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_ACCESS] =
++		"rename_exchange_first_setent_access",
++	[EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_ACCESS] =
++		"rename_exchange_second_setent_access",
++	[EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_DIRTY] =
++		"rename_exchange_first_dirent_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_DIRTY] =
++		"rename_exchange_second_dirent_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_INODE_DIRTY] =
++		"rename_exchange_first_parent_inode_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_INODE_DIRTY] =
++		"rename_exchange_second_parent_inode_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_OLD_DOTDOT_ACCESS] = "rename_old_dotdot_access",
++	[EXT4_SOURCE_FAULT_RENAME_NEW_DOTDOT_ACCESS] = "rename_new_dotdot_access",
++	[EXT4_SOURCE_FAULT_RENAME_OLD_DOTDOT_DIRTY] = "rename_old_dotdot_dirty",
++	[EXT4_SOURCE_FAULT_RENAME_NEW_DOTDOT_DIRTY] = "rename_new_dotdot_dirty",
++	[EXT4_SOURCE_FAULT_RMDIR_DIRENT_ACCESS] = "rmdir_dirent_access",
++	[EXT4_SOURCE_FAULT_MKDIR_CHILD_DIRENT_DIRTY] = "mkdir_child_dirblock_dirty",
++	[EXT4_SOURCE_FAULT_MKDIR_CHILD_DIRTY] = "mkdir_child_inode_dirty",
++	[EXT4_SOURCE_FAULT_MKDIR_ADD_ENTRY_ACCESS] = "mkdir_add_entry_access",
++	[EXT4_SOURCE_FAULT_MKDIR_ADD_ENTRY_DIRTY] = "mkdir_add_entry_dirty",
++	[EXT4_SOURCE_FAULT_UNLINK_DIRENT_ACCESS] = "unlink_dirent_access",
++	[EXT4_SOURCE_FAULT_MKDIR_PARENT_DIRTY] = "mkdir_parent_inode_dirty",
++};
++
++static const char *ext4_source_fault_errno_name(int error)
++{
++	switch (-error) {
++	case EIO:
++		return "EIO";
++	case ENOMEM:
++		return "ENOMEM";
++	case ENOSPC:
++		return "ENOSPC";
++	case EROFS:
++		return "EROFS";
++	case EUCLEAN:
++		return "EUCLEAN";
++	case EINVAL:
++		return "EINVAL";
++	default:
++		return "unknown";
++	}
++}
++
++static int ext4_source_fault_parse_errno(const char *name)
++{
++	if (!strcmp(name, "EIO"))
++		return -EIO;
++	if (!strcmp(name, "ENOMEM"))
++		return -ENOMEM;
++	if (!strcmp(name, "ENOSPC"))
++		return -ENOSPC;
++	if (!strcmp(name, "EROFS"))
++		return -EROFS;
++	if (!strcmp(name, "EFSCORRUPTED"))
++		return -EFSCORRUPTED;
++	if (!strcmp(name, "EUCLEAN"))
++		return -EUCLEAN;
++	if (!strcmp(name, "EINVAL"))
++		return -EINVAL;
++	return 1;
++}
++
++static bool ext4_source_fault_errno_valid(enum ext4_source_fault_op op,
++					  int error)
++{
++	switch (op) {
++	case EXT4_SOURCE_FAULT_EVICT_INITIAL_DIRTY:
++	case EXT4_SOURCE_FAULT_EVICT_FINAL_DIRTY:
++	case EXT4_SOURCE_FAULT_RMDIR_CHILD_DIRTY:
++	case EXT4_SOURCE_FAULT_RMDIR_PARENT_DIRTY:
++	case EXT4_SOURCE_FAULT_UNLINK_PARENT_DIRTY:
++	case EXT4_SOURCE_FAULT_UNLINK_TARGET_DIRTY:
++	case EXT4_SOURCE_FAULT_RENAME_SOURCE_DIRTY:
++	case EXT4_SOURCE_FAULT_RENAME_NEW_PARENT_DIRTY:
++	case EXT4_SOURCE_FAULT_RENAME_OLD_PARENT_DIRTY:
++	case EXT4_SOURCE_FAULT_RENAME_REPLACED_DIRTY:
++	case EXT4_SOURCE_FAULT_MKDIR_CHILD_DIRTY:
++	case EXT4_SOURCE_FAULT_MKDIR_PARENT_DIRTY:
++		return error == -EIO || error == -ENOMEM ||
++		       error == -ENOSPC || error == -EROFS ||
++		       error == -EFSCORRUPTED || error == -EUCLEAN ||
++		       error == -EINVAL;
++	case EXT4_SOURCE_FAULT_UNLINK_PARENT_RESERVE:
++		/* After inode-location success, ext4_reserve_inode_write()
++		 * reaches journal write access, whose error set is EIO/EROFS.
++		 */
++		return error == -EIO || error == -EROFS;
++	case EXT4_SOURCE_FAULT_UNLINK_PARENT_GLOBAL_ABORT:
++	case EXT4_SOURCE_FAULT_UNLINK_PARENT_INODE_READ:
++		return error == -EIO;
++	case EXT4_SOURCE_FAULT_ORPHAN_DELETE_ACCESS:
++	case EXT4_SOURCE_FAULT_XATTR_RELEASE_ACCESS:
++		return error == -EIO;
++	case EXT4_SOURCE_FAULT_RMDIR_DIRENT_ACCESS:
++	case EXT4_SOURCE_FAULT_UNLINK_DIRENT_ACCESS:
++	case EXT4_SOURCE_FAULT_RENAME_NEW_DIRENT_ACCESS:
++	case EXT4_SOURCE_FAULT_RENAME_OLD_DIRENT_ACCESS:
++	case EXT4_SOURCE_FAULT_MKDIR_ADD_ENTRY_ACCESS:
++	case EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_ACCESS:
++	case EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_ACCESS:
++	case EXT4_SOURCE_FAULT_RENAME_OLD_DOTDOT_ACCESS:
++	case EXT4_SOURCE_FAULT_RENAME_NEW_DOTDOT_ACCESS:
++		return error == -EIO || error == -EROFS;
++	case EXT4_SOURCE_FAULT_ORPHAN_DELETE_DIRTY:
++	case EXT4_SOURCE_FAULT_GROUP_EXTEND_BITMAP_DIRTY:
++	case EXT4_SOURCE_FAULT_GROUP_EXTEND_DESC_DIRTY:
++	case EXT4_SOURCE_FAULT_GROUP_ADD_SUPER_DIRTY:
++		/* These hooks pass inode == NULL.  The no-journal dirtying path
++		 * cannot return EIO here; only JBD2's return set applies.
++		 */
++		return error == -ENOSPC || error == -EROFS ||
++		       error == -EUCLEAN || error == -EINVAL;
++	case EXT4_SOURCE_FAULT_XATTR_RELEASE_DIRTY:
++	case EXT4_SOURCE_FAULT_RMDIR_DIRENT_DIRTY:
++	case EXT4_SOURCE_FAULT_UNLINK_DIRENT_DIRTY:
++	case EXT4_SOURCE_FAULT_RENAME_NEW_DIRENT_DIRTY:
++	case EXT4_SOURCE_FAULT_RENAME_OLD_DIRENT_DIRTY:
++	case EXT4_SOURCE_FAULT_MKDIR_CHILD_DIRENT_DIRTY:
++	case EXT4_SOURCE_FAULT_MKDIR_ADD_ENTRY_DIRTY:
++		return error == -EIO || error == -ENOSPC || error == -EROFS ||
++		       error == -EUCLEAN || error == -EINVAL;
++	case EXT4_SOURCE_FAULT_GROUP_ADD_GROUPINFO:
++		return error == -ENOMEM;
++	case EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_DIRTY:
++	case EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_DIRTY:
++		return error == -EIO || error == -ENOSPC || error == -EROFS ||
++		       error == -EUCLEAN || error == -EINVAL;
++	case EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_INODE_DIRTY:
++	case EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_INODE_DIRTY:
++	case EXT4_SOURCE_FAULT_RENAME_OLD_DOTDOT_DIRTY:
++	case EXT4_SOURCE_FAULT_RENAME_NEW_DOTDOT_DIRTY:
++		return error == -EIO || error == -ENOMEM || error == -ENOSPC ||
++		       error == -EROFS || error == -EFSCORRUPTED ||
++		       error == -EUCLEAN || error == -EINVAL;
++	case EXT4_SOURCE_FAULT_GROUP_EXTEND_BUDDY_LOAD:
++		return error == -ENOMEM || error == -EIO ||
++		       error == -EFSCORRUPTED || error == -EINVAL;
++	case EXT4_SOURCE_FAULT_RENAME_OLD_LOOKUP:
++		return error == -ENOMEM || error == -EIO ||
++		       error == -EFSCORRUPTED;
++	case EXT4_SOURCE_FAULT_NONE:
++	case EXT4_SOURCE_FAULT_MAX:
++		return false;
++	}
++	return false;
++}
++
++static enum ext4_source_fault_op ext4_source_fault_parse_op(const char *name)
++{
++	enum ext4_source_fault_op op;
++
++	for (op = EXT4_SOURCE_FAULT_EVICT_INITIAL_DIRTY;
++	     op < EXT4_SOURCE_FAULT_MAX; op++) {
++		if (!strcmp(name, ext4_source_fault_names[op]))
++			return op;
++	}
++	return EXT4_SOURCE_FAULT_NONE;
++}
++
++int ext4_source_fault_take(struct super_block *sb,
++			   enum ext4_source_fault_op op)
++{
++	unsigned long flags;
++	int error = 0;
++
++	if (op <= EXT4_SOURCE_FAULT_NONE || op >= EXT4_SOURCE_FAULT_MAX)
++		return 0;
++
++	spin_lock_irqsave(&ext4_source_fault_lock, flags);
++	if (ext4_source_fault_state.armed && ext4_source_fault_state.op == op) {
++		error = ext4_source_fault_state.error;
++		ext4_source_fault_state.armed = false;
++		ext4_source_fault_state.hits++;
++	}
++	spin_unlock_irqrestore(&ext4_source_fault_lock, flags);
++
++	if (error)
++		pr_info_ratelimited("EXT4 source fault: dev=%s op=%s error=%s (%d)\n",
++				    sb ? sb->s_id : "unknown",
++				    ext4_source_fault_names[op],
++				    ext4_source_fault_errno_name(error), error);
++	return error;
++}
++
++static ssize_t ext4_source_fault_read(struct file *file, char __user *user_buf,
++				      size_t count, loff_t *ppos)
++{
++	char buf[160];
++	unsigned long flags;
++	enum ext4_source_fault_op op;
++	int error;
++	u64 hits;
++	bool armed;
++	int len;
++
++	spin_lock_irqsave(&ext4_source_fault_lock, flags);
++	op = ext4_source_fault_state.op;
++	error = ext4_source_fault_state.error;
++	hits = ext4_source_fault_state.hits;
++	armed = ext4_source_fault_state.armed;
++	spin_unlock_irqrestore(&ext4_source_fault_lock, flags);
++
++	if (armed)
++		len = scnprintf(buf, sizeof(buf), "%s %s armed=1 hits=%llu\n",
++				ext4_source_fault_names[op],
++				ext4_source_fault_errno_name(error), hits);
++	else
++		len = scnprintf(buf, sizeof(buf), "off hits=%llu\n", hits);
++	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
++}
++
++static ssize_t ext4_source_fault_write(struct file *file,
++				       const char __user *user_buf,
++				       size_t count, loff_t *ppos)
++{
++	char input[96], *cursor, *op_name, *errno_name;
++	enum ext4_source_fault_op op;
++	unsigned long flags;
++	int error;
++
++	if (!count || count >= sizeof(input))
++		return -EINVAL;
++	if (copy_from_user(input, user_buf, count))
++		return -EFAULT;
++	input[count] = '\0';
++	strim(input);
++
++	if (!strcmp(input, "off")) {
++		spin_lock_irqsave(&ext4_source_fault_lock, flags);
++		ext4_source_fault_state.armed = false;
++		ext4_source_fault_state.op = EXT4_SOURCE_FAULT_NONE;
++		ext4_source_fault_state.error = 0;
++		spin_unlock_irqrestore(&ext4_source_fault_lock, flags);
++		return count;
++	}
++
++	cursor = input;
++	op_name = strsep(&cursor, " \t");
++	if (!cursor)
++		return -EINVAL;
++	op_name = strim(op_name);
++	errno_name = strim(cursor);
++	if (!*op_name || !*errno_name || strpbrk(errno_name, " \t"))
++		return -EINVAL;
++
++	op = ext4_source_fault_parse_op(op_name);
++	if (op == EXT4_SOURCE_FAULT_NONE)
++		return -EINVAL;
++	error = ext4_source_fault_parse_errno(errno_name);
++	if (error > 0 || !ext4_source_fault_errno_valid(op, error))
++		return -EINVAL;
++
++	spin_lock_irqsave(&ext4_source_fault_lock, flags);
++	ext4_source_fault_state.op = op;
++	ext4_source_fault_state.error = error;
++	ext4_source_fault_state.hits = 0;
++	ext4_source_fault_state.armed = true;
++	spin_unlock_irqrestore(&ext4_source_fault_lock, flags);
++	return count;
++}
++
++static const struct file_operations ext4_source_fault_fops = {
++	.owner = THIS_MODULE,
++	.open = simple_open,
++	.read = ext4_source_fault_read,
++	.write = ext4_source_fault_write,
++	.llseek = default_llseek,
++};
++
++int ext4_source_fault_init(void)
++{
++	ext4_source_fault_dir = debugfs_create_dir("ext4-source-fault", NULL);
++	if (IS_ERR_OR_NULL(ext4_source_fault_dir))
++		return ext4_source_fault_dir ? PTR_ERR(ext4_source_fault_dir) :
++			-ENOMEM;
++	if (IS_ERR_OR_NULL(debugfs_create_file("control", 0600,
++					       ext4_source_fault_dir, NULL,
++					       &ext4_source_fault_fops))) {
++		debugfs_remove_recursive(ext4_source_fault_dir);
++		ext4_source_fault_dir = NULL;
++		return -ENOMEM;
++	}
++	return 0;
++}
++
++void ext4_source_fault_exit(void)
++{
++	debugfs_remove_recursive(ext4_source_fault_dir);
++	ext4_source_fault_dir = NULL;
++}
+--- a/fs/ext4/ext4_source_fault.h
++++ b/fs/ext4/ext4_source_fault.h
+@@ -0,0 +1,75 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _EXT4_SOURCE_FAULT_H
++#define _EXT4_SOURCE_FAULT_H
++
++#include <linux/types.h>
++
++struct super_block;
++
++enum ext4_source_fault_op {
++	EXT4_SOURCE_FAULT_NONE,
++	EXT4_SOURCE_FAULT_EVICT_INITIAL_DIRTY,
++	EXT4_SOURCE_FAULT_EVICT_FINAL_DIRTY,
++	EXT4_SOURCE_FAULT_ORPHAN_DELETE_ACCESS,
++	EXT4_SOURCE_FAULT_ORPHAN_DELETE_DIRTY,
++	EXT4_SOURCE_FAULT_XATTR_RELEASE_ACCESS,
++	EXT4_SOURCE_FAULT_XATTR_RELEASE_DIRTY,
++	EXT4_SOURCE_FAULT_GROUP_EXTEND_BUDDY_LOAD,
++	EXT4_SOURCE_FAULT_GROUP_EXTEND_BITMAP_DIRTY,
++	EXT4_SOURCE_FAULT_GROUP_EXTEND_DESC_DIRTY,
++	EXT4_SOURCE_FAULT_GROUP_ADD_SUPER_DIRTY,
++	EXT4_SOURCE_FAULT_GROUP_ADD_GROUPINFO,
++	EXT4_SOURCE_FAULT_RMDIR_DIRENT_DIRTY,
++	EXT4_SOURCE_FAULT_RMDIR_CHILD_DIRTY,
++	EXT4_SOURCE_FAULT_RMDIR_PARENT_DIRTY,
++	EXT4_SOURCE_FAULT_UNLINK_DIRENT_DIRTY,
++	EXT4_SOURCE_FAULT_UNLINK_PARENT_DIRTY,
++	EXT4_SOURCE_FAULT_UNLINK_PARENT_RESERVE,
++	EXT4_SOURCE_FAULT_UNLINK_PARENT_GLOBAL_ABORT,
++	EXT4_SOURCE_FAULT_UNLINK_PARENT_INODE_READ,
++	EXT4_SOURCE_FAULT_UNLINK_TARGET_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_NEW_DIRENT_ACCESS,
++	EXT4_SOURCE_FAULT_RENAME_NEW_DIRENT_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_SOURCE_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_OLD_LOOKUP,
++	EXT4_SOURCE_FAULT_RENAME_OLD_DIRENT_ACCESS,
++	EXT4_SOURCE_FAULT_RENAME_OLD_DIRENT_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_NEW_PARENT_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_OLD_PARENT_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_REPLACED_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_ACCESS,
++	EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_ACCESS,
++	EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_INODE_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_INODE_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_OLD_DOTDOT_ACCESS,
++	EXT4_SOURCE_FAULT_RENAME_NEW_DOTDOT_ACCESS,
++	EXT4_SOURCE_FAULT_RENAME_OLD_DOTDOT_DIRTY,
++	EXT4_SOURCE_FAULT_RENAME_NEW_DOTDOT_DIRTY,
++	EXT4_SOURCE_FAULT_RMDIR_DIRENT_ACCESS,
++	EXT4_SOURCE_FAULT_MKDIR_CHILD_DIRENT_DIRTY,
++	EXT4_SOURCE_FAULT_MKDIR_CHILD_DIRTY,
++	EXT4_SOURCE_FAULT_MKDIR_ADD_ENTRY_ACCESS,
++	EXT4_SOURCE_FAULT_MKDIR_ADD_ENTRY_DIRTY,
++	EXT4_SOURCE_FAULT_UNLINK_DIRENT_ACCESS,
++	EXT4_SOURCE_FAULT_MKDIR_PARENT_DIRTY,
++	EXT4_SOURCE_FAULT_MAX,
++};
++
++#ifdef CONFIG_EXT4_SOURCE_FAULT_INJECTION
++int ext4_source_fault_take(struct super_block *sb,
++			   enum ext4_source_fault_op op);
++int ext4_source_fault_init(void);
++void ext4_source_fault_exit(void);
++#else
++static inline int ext4_source_fault_take(struct super_block *sb,
++					 enum ext4_source_fault_op op)
++{
++	return 0;
++}
++static inline int ext4_source_fault_init(void) { return 0; }
++static inline void ext4_source_fault_exit(void) { }
++#endif
++
++#endif /* _EXT4_SOURCE_FAULT_H */
+--- a/fs/ext4/extents.c
++++ b/fs/ext4/extents.c
+@@ -198,7 +198,8 @@
+ 		ext4_extent_block_csum_set(inode, ext_block_hdr(path->p_bh));
+ 		/* path points to block */
+ 		err = __ext4_handle_dirty_metadata(where, line, handle,
+-						   inode, path->p_bh);
++						   inode, path->p_bh,
++						   EXT4_SOURCE_FAULT_NONE);
+ 		/* Extents updating done, re-set verified flag */
+ 		if (!err)
+ 			set_buffer_verified(path->p_bh);
+--- a/fs/ext4/fast_commit.c
++++ b/fs/ext4/fast_commit.c
+@@ -1682,7 +1682,8 @@
+ 			ext4_debug("Dir %d not found.", darg.ino);
+ 			goto out;
+ 		}
+-		ret = ext4_init_new_dir(NULL, dir, inode);
++		ret = ext4_init_new_dir(NULL, dir, inode,
++					EXT4_SOURCE_FAULT_NONE);
+ 		iput(dir);
+ 		if (ret) {
+ 			ret = 0;
+--- a/fs/ext4/inode.c
++++ b/fs/ext4/inode.c
+@@ -253,7 +253,8 @@
+ 	if (ext4_inode_is_fast_symlink(inode))
+ 		memset(EXT4_I(inode)->i_data, 0, sizeof(EXT4_I(inode)->i_data));
+ 	inode->i_size = 0;
+-	err = ext4_mark_inode_dirty(handle, inode);
++	err = ext4_mark_inode_dirty_faultable(handle, inode,
++					     EXT4_SOURCE_FAULT_EVICT_INITIAL_DIRTY);
+ 	if (err) {
+ 		ext4_warning(inode->i_sb,
+ 			     "couldn't mark inode dirty (err %d)", err);
+@@ -301,7 +302,8 @@
+ 	 * having errors), but we can't free the inode if the mark_dirty
+ 	 * fails.
+ 	 */
+-	if (ext4_mark_inode_dirty(handle, inode))
++	if (ext4_mark_inode_dirty_faultable(handle, inode,
++					    EXT4_SOURCE_FAULT_EVICT_FINAL_DIRTY))
+ 		/* If that failed, just do the required in-core inode clear. */
+ 		ext4_clear_inode(inode);
+ 	else
+@@ -4370,7 +4372,8 @@
+  */
+ static int __ext4_get_inode_loc(struct super_block *sb, unsigned long ino,
+ 				struct inode *inode, struct ext4_iloc *iloc,
+-				ext4_fsblk_t *ret_block)
++				ext4_fsblk_t *ret_block,
++				enum ext4_source_fault_op fault_op)
+ {
+ 	struct ext4_group_desc	*gdp;
+ 	struct buffer_head	*bh;
+@@ -4408,6 +4411,16 @@
+ 	bh = sb_getblk(sb, block);
+ 	if (unlikely(!bh))
+ 		return -ENOMEM;
++	/* Inject a failed inode-table lookup at this read-result boundary without
++	 * clearing BH_Uptodate or forcing a read over a valid cached buffer. Wait
++	 * for any in-flight buffer I/O, then use the same cleanup as a failed read.
++	 */
++	if (fault_op == EXT4_SOURCE_FAULT_UNLINK_PARENT_INODE_READ &&
++	    ext4_source_fault_take(sb, fault_op)) {
++		lock_buffer(bh);
++		unlock_buffer(bh);
++		goto read_error;
++	}
+ 	if (ext4_buffer_uptodate(bh))
+ 		goto has_buffer;
+ 
+@@ -4501,15 +4514,17 @@
+ 	blk_finish_plug(&plug);
+ 	wait_on_buffer(bh);
+ 	ext4_simulate_fail_bh(sb, bh, EXT4_SIM_INODE_EIO);
+-	if (!buffer_uptodate(bh)) {
+-		if (ret_block)
+-			*ret_block = block;
+-		brelse(bh);
+-		return -EIO;
+-	}
++	if (!buffer_uptodate(bh))
++		goto read_error;
+ has_buffer:
+ 	iloc->bh = bh;
+ 	return 0;
++
++read_error:
++	if (ret_block)
++		*ret_block = block;
++	brelse(bh);
++	return -EIO;
+ }
+ 
+ static int __ext4_get_inode_loc_noinmem(struct inode *inode,
+@@ -4519,7 +4534,7 @@
+ 	int ret;
+ 
+ 	ret = __ext4_get_inode_loc(inode->i_sb, inode->i_ino, NULL, iloc,
+-					&err_blk);
++					&err_blk, EXT4_SOURCE_FAULT_NONE);
+ 
+ 	if (ret == -EIO)
+ 		ext4_error_inode_block(inode, err_blk, EIO,
+@@ -4528,13 +4543,15 @@
+ 	return ret;
+ }
+ 
+-int ext4_get_inode_loc(struct inode *inode, struct ext4_iloc *iloc)
++static int ext4_get_inode_loc_faultable(struct inode *inode,
++					struct ext4_iloc *iloc,
++					enum ext4_source_fault_op fault_op)
+ {
+ 	ext4_fsblk_t err_blk = 0;
+ 	int ret;
+ 
+ 	ret = __ext4_get_inode_loc(inode->i_sb, inode->i_ino, inode, iloc,
+-					&err_blk);
++					&err_blk, fault_op);
+ 
+ 	if (ret == -EIO)
+ 		ext4_error_inode_block(inode, err_blk, EIO,
+@@ -4543,11 +4560,18 @@
+ 	return ret;
+ }
+ 
++int ext4_get_inode_loc(struct inode *inode, struct ext4_iloc *iloc)
++{
++	return ext4_get_inode_loc_faultable(inode, iloc,
++					    EXT4_SOURCE_FAULT_NONE);
++}
++
+ 
+ int ext4_get_fc_inode_loc(struct super_block *sb, unsigned long ino,
+ 			  struct ext4_iloc *iloc)
+ {
+-	return __ext4_get_inode_loc(sb, ino, NULL, iloc, NULL);
++	return __ext4_get_inode_loc(sb, ino, NULL, iloc, NULL,
++				    EXT4_SOURCE_FAULT_NONE);
+ }
+ 
+ static bool ext4_should_enable_dax(struct inode *inode)
+@@ -5759,19 +5783,22 @@
+  */
+ 
+ int
+-ext4_reserve_inode_write(handle_t *handle, struct inode *inode,
+-			 struct ext4_iloc *iloc)
++ext4_reserve_inode_write_faultable(handle_t *handle, struct inode *inode,
++				   struct ext4_iloc *iloc,
++				   enum ext4_source_fault_op fault_op,
++				   enum ext4_source_fault_op read_fault_op)
+ {
+ 	int err;
+ 
+ 	if (unlikely(ext4_forced_shutdown(inode->i_sb)))
+ 		return -EIO;
+ 
+-	err = ext4_get_inode_loc(inode, iloc);
++	err = ext4_get_inode_loc_faultable(inode, iloc, read_fault_op);
+ 	if (!err) {
+ 		BUFFER_TRACE(iloc->bh, "get_write_access");
+-		err = ext4_journal_get_write_access(handle, inode->i_sb,
+-						    iloc->bh, EXT4_JTR_NONE);
++		err = ext4_journal_get_write_access_faultable(handle, inode->i_sb,
++							       iloc->bh, EXT4_JTR_NONE,
++							       fault_op);
+ 		if (err) {
+ 			brelse(iloc->bh);
+ 			iloc->bh = NULL;
+@@ -5779,6 +5806,15 @@
+ 	}
+ 	ext4_std_error(inode->i_sb, err);
+ 	return err;
++}
++
++int
++ext4_reserve_inode_write(handle_t *handle, struct inode *inode,
++			 struct ext4_iloc *iloc)
++{
++	return ext4_reserve_inode_write_faultable(handle, inode, iloc,
++						  EXT4_SOURCE_FAULT_NONE,
++						  EXT4_SOURCE_FAULT_NONE);
+ }
+ 
+ static int __ext4_expand_extra_isize(struct inode *inode,
+@@ -5936,7 +5972,8 @@
+  * we start and wait on commits.
+  */
+ int __ext4_mark_inode_dirty(handle_t *handle, struct inode *inode,
+-				const char *func, unsigned int line)
++				const char *func, unsigned int line,
++				enum ext4_source_fault_op fault_op)
+ {
+ 	struct ext4_iloc iloc;
+ 	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
+@@ -5944,7 +5981,21 @@
+ 
+ 	might_sleep();
+ 	trace_ext4_mark_inode_dirty(inode, _RET_IP_);
+-	err = ext4_reserve_inode_write(handle, inode, &iloc);
++	if (fault_op == EXT4_SOURCE_FAULT_UNLINK_PARENT_DIRTY) {
++		/* Keep the original unlink-parent dirty boundary available, while
++		 * allowing the deeper reserve boundary to be selected independently.
++		 */
++		err = ext4_source_fault_take(inode->i_sb, fault_op);
++		if (err)
++			goto out;
++		err = ext4_reserve_inode_write_faultable(handle, inode, &iloc,
++							 EXT4_SOURCE_FAULT_UNLINK_PARENT_RESERVE,
++							 EXT4_SOURCE_FAULT_UNLINK_PARENT_INODE_READ);
++	} else {
++		err = ext4_source_fault_take(inode->i_sb, fault_op);
++		if (!err)
++			err = ext4_reserve_inode_write(handle, inode, &iloc);
++	}
+ 	if (err)
+ 		goto out;
+ 
+--- a/fs/ext4/mballoc.c
++++ b/fs/ext4/mballoc.c
+@@ -3977,9 +3977,12 @@
+ #define EXT4_MB_BITMAP_MARKED_CHECK 0x0001
+ #define EXT4_MB_SYNC_UPDATE 0x0002
+ static int
+-ext4_mb_mark_context(handle_t *handle, struct super_block *sb, bool state,
+-		     ext4_group_t group, ext4_grpblk_t blkoff,
+-		     ext4_grpblk_t len, int flags, ext4_grpblk_t *ret_changed)
++ext4_mb_mark_context_internal(handle_t *handle, struct super_block *sb,
++			      bool state, ext4_group_t group,
++			      ext4_grpblk_t blkoff, ext4_grpblk_t len,
++			      int flags, ext4_grpblk_t *ret_changed,
++			      enum ext4_source_fault_op bitmap_dirty_fault_op,
++			      enum ext4_source_fault_op desc_dirty_fault_op)
+ {
+ 	struct ext4_sb_info *sbi = EXT4_SB(sb);
+ 	struct buffer_head *bitmap_bh = NULL;
+@@ -3987,10 +3990,6 @@
+ 	struct buffer_head *gdp_bh;
+ 	int err;
+ 	unsigned int i, already, changed = len;
+-
+-	KUNIT_STATIC_STUB_REDIRECT(ext4_mb_mark_context,
+-				   handle, sb, state, group, blkoff, len,
+-				   flags, ret_changed);
+ 
+ 	if (ret_changed)
+ 		*ret_changed = 0;
+@@ -4063,10 +4062,12 @@
+ 			atomic64_add(changed, &fg->free_clusters);
+ 	}
+ 
+-	err = ext4_handle_dirty_metadata(handle, NULL, bitmap_bh);
++	err = ext4_handle_dirty_metadata_faultable(handle, NULL, bitmap_bh,
++						  bitmap_dirty_fault_op);
+ 	if (err)
+ 		goto out_err;
+-	err = ext4_handle_dirty_metadata(handle, NULL, gdp_bh);
++	err = ext4_handle_dirty_metadata_faultable(handle, NULL, gdp_bh,
++						  desc_dirty_fault_op);
+ 	if (err)
+ 		goto out_err;
+ 
+@@ -4078,6 +4079,21 @@
+ out_err:
+ 	brelse(bitmap_bh);
+ 	return err;
++}
++
++static int
++ext4_mb_mark_context(handle_t *handle, struct super_block *sb, bool state,
++		     ext4_group_t group, ext4_grpblk_t blkoff,
++		     ext4_grpblk_t len, int flags, ext4_grpblk_t *ret_changed)
++{
++	KUNIT_STATIC_STUB_REDIRECT(ext4_mb_mark_context,
++				   handle, sb, state, group, blkoff, len,
++				   flags, ret_changed);
++
++	return ext4_mb_mark_context_internal(handle, sb, state, group,
++					     blkoff, len, flags, ret_changed,
++					     EXT4_SOURCE_FAULT_NONE,
++					     EXT4_SOURCE_FAULT_NONE);
+ }
+ 
+ /*
+@@ -6691,7 +6707,10 @@
+ 		goto error_out;
+ 	}
+ 
+-	err = ext4_mb_load_buddy(sb, block_group, &e4b);
++	err = ext4_source_fault_take(sb,
++				     EXT4_SOURCE_FAULT_GROUP_EXTEND_BUDDY_LOAD);
++	if (!err)
++		err = ext4_mb_load_buddy(sb, block_group, &e4b);
+ 	if (err)
+ 		goto error_out;
+ 
+@@ -6703,9 +6722,12 @@
+ 		goto error_clean;
+ 	}
+ 
+-	err = ext4_mb_mark_context(handle, sb, false, block_group, bit,
+-				   cluster_count, EXT4_MB_BITMAP_MARKED_CHECK,
+-				   &changed);
++	err = ext4_mb_mark_context_internal(handle, sb, false, block_group,
++					    bit, cluster_count,
++					    EXT4_MB_BITMAP_MARKED_CHECK,
++					    &changed,
++					    EXT4_SOURCE_FAULT_GROUP_EXTEND_BITMAP_DIRTY,
++					    EXT4_SOURCE_FAULT_GROUP_EXTEND_DESC_DIRTY);
+ 	if (err && changed == 0)
+ 		goto error_clean;
+ 
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -325,7 +325,9 @@
+ 		struct ext4_filename *fname,
+ 		struct ext4_dir_entry_2 **res_dir);
+ static int ext4_dx_add_entry(handle_t *handle, struct ext4_filename *fname,
+-			     struct inode *dir, struct inode *inode);
++			     struct inode *dir, struct inode *inode,
++			     enum ext4_source_fault_op access_fault_op,
++			     enum ext4_source_fault_op dirty_fault_op);
+ 
+ /* checksumming functions */
+ void ext4_initialize_dirent_tail(struct buffer_head *bh,
+@@ -432,12 +434,22 @@
+ 					     (char *)t - bh->b_data);
+ }
+ 
++int ext4_handle_dirty_dirblock_faultable(handle_t *handle,
++					 struct inode *inode,
++					 struct buffer_head *bh,
++					 enum ext4_source_fault_op fault_op)
++{
++	ext4_dirblock_csum_set(inode, bh);
++	return ext4_handle_dirty_metadata_faultable(handle, inode, bh,
++						    fault_op);
++}
++
+ int ext4_handle_dirty_dirblock(handle_t *handle,
+ 			       struct inode *inode,
+ 			       struct buffer_head *bh)
+ {
+-	ext4_dirblock_csum_set(inode, bh);
+-	return ext4_handle_dirty_metadata(handle, inode, bh);
++	return ext4_handle_dirty_dirblock_faultable(handle, inode, bh,
++						    EXT4_SOURCE_FAULT_NONE);
+ }
+ 
+ static struct dx_countlimit *get_dx_countlimit(struct inode *inode,
+@@ -2127,7 +2139,9 @@
+ static int add_dirent_to_buf(handle_t *handle, struct ext4_filename *fname,
+ 			     struct inode *dir,
+ 			     struct inode *inode, struct ext4_dir_entry_2 *de,
+-			     struct buffer_head *bh)
++			     struct buffer_head *bh,
++			     enum ext4_source_fault_op access_fault_op,
++			     enum ext4_source_fault_op dirty_fault_op)
+ {
+ 	unsigned int	blocksize = dir->i_sb->s_blocksize;
+ 	int		csum_size = 0;
+@@ -2143,8 +2157,8 @@
+ 			return err;
+ 	}
+ 	BUFFER_TRACE(bh, "get_write_access");
+-	err = ext4_journal_get_write_access(handle, dir->i_sb, bh,
+-					    EXT4_JTR_NONE);
++	err = ext4_journal_get_write_access_faultable(handle, dir->i_sb, bh,
++					    EXT4_JTR_NONE, access_fault_op);
+ 	if (err) {
+ 		ext4_std_error(dir->i_sb, err);
+ 		return err;
+@@ -2169,7 +2183,8 @@
+ 	inode_inc_iversion(dir);
+ 	err2 = ext4_mark_inode_dirty(handle, dir);
+ 	BUFFER_TRACE(bh, "call ext4_handle_dirty_metadata");
+-	err = ext4_handle_dirty_dirblock(handle, dir, bh);
++	err = ext4_handle_dirty_dirblock_faultable(handle, dir, bh,
++						   dirty_fault_op);
+ 	if (err)
+ 		ext4_std_error(dir->i_sb, err);
+ 	return err ? err : err2;
+@@ -2227,7 +2242,9 @@
+  */
+ static int make_indexed_dir(handle_t *handle, struct ext4_filename *fname,
+ 			    struct inode *dir,
+-			    struct inode *inode, struct buffer_head *bh)
++			    struct inode *inode, struct buffer_head *bh,
++			    enum ext4_source_fault_op access_fault_op,
++			    enum ext4_source_fault_op dirty_fault_op)
+ {
+ 	struct buffer_head *bh2;
+ 	struct dx_root	*root;
+@@ -2348,7 +2365,8 @@
+ 		goto out_frames;
+ 	}
+ 
+-	retval = add_dirent_to_buf(handle, fname, dir, inode, de, bh2);
++	retval = add_dirent_to_buf(handle, fname, dir, inode, de, bh2,
++				   access_fault_op, dirty_fault_op);
+ out_frames:
+ 	/*
+ 	 * Even if the block split failed, we have to properly write
+@@ -2373,7 +2391,9 @@
+  * the entry, as someone else might have used it while you slept.
+  */
+ static int ext4_add_entry(handle_t *handle, struct dentry *dentry,
+-			  struct inode *inode)
++			  struct inode *inode,
++			  enum ext4_source_fault_op access_fault_op,
++			  enum ext4_source_fault_op dirty_fault_op)
+ {
+ 	struct inode *dir = d_inode(dentry->d_parent);
+ 	struct buffer_head *bh = NULL;
+@@ -2416,7 +2436,8 @@
+ 	}
+ 
+ 	if (is_dx(dir)) {
+-		retval = ext4_dx_add_entry(handle, &fname, dir, inode);
++		retval = ext4_dx_add_entry(handle, &fname, dir, inode,
++					   access_fault_op, dirty_fault_op);
+ 		if (!retval || (retval != ERR_BAD_DX_DIR))
+ 			goto out;
+ 		/* Can we just ignore htree data? */
+@@ -2446,14 +2467,16 @@
+ 			goto out;
+ 		}
+ 		retval = add_dirent_to_buf(handle, &fname, dir, inode,
+-					   NULL, bh);
++					   NULL, bh, access_fault_op,
++					   dirty_fault_op);
+ 		if (retval != -ENOSPC)
+ 			goto out;
+ 
+ 		if (blocks == 1 && !dx_fallback &&
+ 		    ext4_has_feature_dir_index(sb)) {
+ 			retval = make_indexed_dir(handle, &fname, dir,
+-						  inode, bh);
++						  inode, bh, access_fault_op,
++						  dirty_fault_op);
+ 			bh = NULL; /* make_indexed_dir releases bh */
+ 			goto out;
+ 		}
+@@ -2473,7 +2496,8 @@
+ 	if (csum_size)
+ 		ext4_initialize_dirent_tail(bh, blocksize);
+ 
+-	retval = add_dirent_to_buf(handle, &fname, dir, inode, de, bh);
++	retval = add_dirent_to_buf(handle, &fname, dir, inode, de, bh,
++				   access_fault_op, dirty_fault_op);
+ out:
+ 	ext4_fname_free_filename(&fname);
+ 	brelse(bh);
+@@ -2486,7 +2510,9 @@
+  * Returns 0 for success, or a negative error value
+  */
+ static int ext4_dx_add_entry(handle_t *handle, struct ext4_filename *fname,
+-			     struct inode *dir, struct inode *inode)
++			     struct inode *dir, struct inode *inode,
++			     enum ext4_source_fault_op access_fault_op,
++			     enum ext4_source_fault_op dirty_fault_op)
+ {
+ 	struct dx_frame frames[EXT4_HTREE_LEVEL], *frame;
+ 	struct dx_entry *entries, *at;
+@@ -2515,7 +2541,8 @@
+ 	if (err)
+ 		goto journal_error;
+ 
+-	err = add_dirent_to_buf(handle, fname, dir, inode, NULL, bh);
++	err = add_dirent_to_buf(handle, fname, dir, inode, NULL, bh,
++				access_fault_op, dirty_fault_op);
+ 	if (err != -ENOSPC)
+ 		goto cleanup;
+ 
+@@ -2641,7 +2668,8 @@
+ 		err = PTR_ERR(de);
+ 		goto cleanup;
+ 	}
+-	err = add_dirent_to_buf(handle, fname, dir, inode, de, bh);
++	err = add_dirent_to_buf(handle, fname, dir, inode, de, bh,
++				access_fault_op, dirty_fault_op);
+ 	goto cleanup;
+ 
+ journal_error:
+@@ -2714,7 +2742,9 @@
+ static int ext4_delete_entry(handle_t *handle,
+ 			     struct inode *dir,
+ 			     struct ext4_dir_entry_2 *de_del,
+-			     struct buffer_head *bh)
++			     struct buffer_head *bh,
++			     enum ext4_source_fault_op access_fault_op,
++			     enum ext4_source_fault_op dirty_fault_op)
+ {
+ 	int err, csum_size = 0;
+ 
+@@ -2730,8 +2760,8 @@
+ 		csum_size = sizeof(struct ext4_dir_entry_tail);
+ 
+ 	BUFFER_TRACE(bh, "get_write_access");
+-	err = ext4_journal_get_write_access(handle, dir->i_sb, bh,
+-					    EXT4_JTR_NONE);
++	err = ext4_journal_get_write_access_faultable(handle, dir->i_sb, bh,
++					    EXT4_JTR_NONE, access_fault_op);
+ 	if (unlikely(err))
+ 		goto out;
+ 
+@@ -2741,7 +2771,8 @@
+ 		goto out;
+ 
+ 	BUFFER_TRACE(bh, "call ext4_handle_dirty_metadata");
+-	err = ext4_handle_dirty_dirblock(handle, dir, bh);
++	err = ext4_handle_dirty_dirblock_faultable(handle, dir, bh,
++						   dirty_fault_op);
+ 	if (unlikely(err))
+ 		goto out;
+ 
+@@ -2793,7 +2824,9 @@
+ {
+ 	struct inode *dir = d_inode(dentry->d_parent);
+ 	struct inode *inode = *inodep;
+-	int err = ext4_add_entry(handle, dentry, inode);
++	int err = ext4_add_entry(handle, dentry, inode,
++				 EXT4_SOURCE_FAULT_NONE,
++				 EXT4_SOURCE_FAULT_NONE);
+ 	if (!err) {
+ 		err = ext4_mark_inode_dirty(handle, inode);
+ 		if (IS_DIRSYNC(dir))
+@@ -2957,7 +2990,8 @@
+ }
+ 
+ int ext4_init_new_dir(handle_t *handle, struct inode *dir,
+-			     struct inode *inode)
++			     struct inode *inode,
++			     enum ext4_source_fault_op fault_op)
+ {
+ 	struct buffer_head *dir_block = NULL;
+ 	struct ext4_dir_entry_2 *de;
+@@ -2988,7 +3022,8 @@
+ 		ext4_initialize_dirent_tail(dir_block, blocksize);
+ 
+ 	BUFFER_TRACE(dir_block, "call ext4_handle_dirty_metadata");
+-	err = ext4_handle_dirty_dirblock(handle, inode, dir_block);
++	err = ext4_handle_dirty_dirblock_faultable(handle, inode, dir_block,
++						   fault_op);
+ 	if (err)
+ 		goto out;
+ 	set_buffer_verified(dir_block);
+@@ -3024,12 +3059,16 @@
+ 
+ 	inode->i_op = &ext4_dir_inode_operations;
+ 	inode->i_fop = &ext4_dir_operations;
+-	err = ext4_init_new_dir(handle, dir, inode);
++	err = ext4_init_new_dir(handle, dir, inode,
++				EXT4_SOURCE_FAULT_MKDIR_CHILD_DIRENT_DIRTY);
+ 	if (err)
+ 		goto out_clear_inode;
+-	err = ext4_mark_inode_dirty(handle, inode);
++	err = ext4_mark_inode_dirty_faultable(handle, inode,
++					     EXT4_SOURCE_FAULT_MKDIR_CHILD_DIRTY);
+ 	if (!err)
+-		err = ext4_add_entry(handle, dentry, inode);
++		err = ext4_add_entry(handle, dentry, inode,
++				     EXT4_SOURCE_FAULT_MKDIR_ADD_ENTRY_ACCESS,
++				     EXT4_SOURCE_FAULT_MKDIR_ADD_ENTRY_DIRTY);
+ 	if (err) {
+ out_clear_inode:
+ 		clear_nlink(inode);
+@@ -3045,7 +3084,8 @@
+ 	ext4_inc_count(dir);
+ 
+ 	ext4_update_dx_flag(dir);
+-	err = ext4_mark_inode_dirty(handle, dir);
++	err = ext4_mark_inode_dirty_faultable(handle, dir,
++					     EXT4_SOURCE_FAULT_MKDIR_PARENT_DIRTY);
+ 	if (err)
+ 		goto out_clear_inode;
+ 	d_instantiate_new(dentry, inode);
+@@ -3184,7 +3224,9 @@
+ 	if (IS_DIRSYNC(dir))
+ 		ext4_handle_sync(handle);
+ 
+-	retval = ext4_delete_entry(handle, dir, de, bh);
++	retval = ext4_delete_entry(handle, dir, de, bh,
++				   EXT4_SOURCE_FAULT_RMDIR_DIRENT_ACCESS,
++				   EXT4_SOURCE_FAULT_RMDIR_DIRENT_DIRTY);
+ 	if (retval)
+ 		goto end_rmdir;
+ 	if (!EXT4_DIR_LINK_EMPTY(inode))
+@@ -3201,13 +3243,15 @@
+ 	ext4_orphan_add(handle, inode);
+ 	inode_set_mtime_to_ts(dir, inode_set_ctime_current(dir));
+ 	inode_set_ctime_current(inode);
+-	retval = ext4_mark_inode_dirty(handle, inode);
++	retval = ext4_mark_inode_dirty_faultable(handle, inode,
++						 EXT4_SOURCE_FAULT_RMDIR_CHILD_DIRTY);
+ 	if (retval)
+ 		goto end_rmdir;
+ 	ext4_dec_count(dir);
+ 	ext4_update_dx_flag(dir);
+ 	ext4_fc_track_unlink(handle, dentry);
+-	retval = ext4_mark_inode_dirty(handle, dir);
++	retval = ext4_mark_inode_dirty_faultable(handle, dir,
++						 EXT4_SOURCE_FAULT_RMDIR_PARENT_DIRTY);
+ 
+ 	/* VFS negative dentries are incompatible with Encoding and
+ 	 * Case-insensitiveness. Eventually we'll want avoid
+@@ -3269,12 +3313,15 @@
+ 		ext4_handle_sync(handle);
+ 
+ 	if (!skip_remove_dentry) {
+-		retval = ext4_delete_entry(handle, dir, de, bh);
++		retval = ext4_delete_entry(handle, dir, de, bh,
++					   EXT4_SOURCE_FAULT_UNLINK_DIRENT_ACCESS,
++					   EXT4_SOURCE_FAULT_UNLINK_DIRENT_DIRTY);
+ 		if (retval)
+ 			goto out_handle;
+ 		inode_set_mtime_to_ts(dir, inode_set_ctime_current(dir));
+ 		ext4_update_dx_flag(dir);
+-		retval = ext4_mark_inode_dirty(handle, dir);
++		retval = ext4_mark_inode_dirty_faultable(handle, dir,
++							 EXT4_SOURCE_FAULT_UNLINK_PARENT_DIRTY);
+ 		if (retval)
+ 			goto out_handle;
+ 	} else {
+@@ -3288,7 +3335,8 @@
+ 	if (!inode->i_nlink)
+ 		ext4_orphan_add(handle, inode);
+ 	inode_set_ctime_current(inode);
+-	retval = ext4_mark_inode_dirty(handle, inode);
++	retval = ext4_mark_inode_dirty_faultable(handle, inode,
++						 EXT4_SOURCE_FAULT_UNLINK_TARGET_DIRTY);
+ 	if (dentry && !retval)
+ 		ext4_fc_track_unlink(handle, dentry);
+ out_handle:
+@@ -3468,7 +3516,9 @@
+ 	ext4_inc_count(inode);
+ 	ihold(inode);
+ 
+-	err = ext4_add_entry(handle, dentry, inode);
++	err = ext4_add_entry(handle, dentry, inode,
++			     EXT4_SOURCE_FAULT_NONE,
++			     EXT4_SOURCE_FAULT_NONE);
+ 	if (!err) {
+ 		err = ext4_mark_inode_dirty(handle, inode);
+ 		/* this can happen only for tmpfile being
+@@ -3583,7 +3633,9 @@
+ 	int dir_inlined;
+ };
+ 
+-static int ext4_rename_dir_prepare(handle_t *handle, struct ext4_renament *ent, bool is_cross)
++static int ext4_rename_dir_prepare(handle_t *handle,
++				   struct ext4_renament *ent, bool is_cross,
++				   enum ext4_source_fault_op access_fault_op)
+ {
+ 	int retval;
+ 
+@@ -3599,12 +3651,14 @@
+ 	if (le32_to_cpu(ent->parent_de->inode) != ent->dir->i_ino)
+ 		return -EFSCORRUPTED;
+ 	BUFFER_TRACE(ent->dir_bh, "get_write_access");
+-	return ext4_journal_get_write_access(handle, ent->dir->i_sb,
+-					     ent->dir_bh, EXT4_JTR_NONE);
++	return ext4_journal_get_write_access_faultable(handle, ent->dir->i_sb,
++					     ent->dir_bh, EXT4_JTR_NONE,
++					     access_fault_op);
+ }
+ 
+ static int ext4_rename_dir_finish(handle_t *handle, struct ext4_renament *ent,
+-				  unsigned dir_ino)
++				  unsigned dir_ino,
++				  enum ext4_source_fault_op dirty_fault_op)
+ {
+ 	int retval;
+ 
+@@ -3619,11 +3673,13 @@
+ 							   ent->inode,
+ 							   ent->dir_bh);
+ 		} else {
+-			retval = ext4_handle_dirty_dirblock(handle, ent->inode,
+-							    ent->dir_bh);
++			retval = ext4_handle_dirty_dirblock_faultable(handle, ent->inode,
++							       ent->dir_bh,
++							       dirty_fault_op);
+ 		}
+ 	} else {
+-		retval = ext4_mark_inode_dirty(handle, ent->inode);
++		retval = ext4_mark_inode_dirty_faultable(handle, ent->inode,
++							 dirty_fault_op);
+ 	}
+ 	if (retval) {
+ 		ext4_std_error(ent->dir->i_sb, retval);
+@@ -3633,13 +3689,17 @@
+ }
+ 
+ static int ext4_setent(handle_t *handle, struct ext4_renament *ent,
+-		       unsigned ino, unsigned file_type)
++		       unsigned ino, unsigned file_type,
++		       enum ext4_source_fault_op access_fault_op,
++		       enum ext4_source_fault_op inode_fault_op,
++		       enum ext4_source_fault_op dirty_fault_op)
+ {
+ 	int retval, retval2;
+ 
+ 	BUFFER_TRACE(ent->bh, "get write access");
+-	retval = ext4_journal_get_write_access(handle, ent->dir->i_sb, ent->bh,
+-					       EXT4_JTR_NONE);
++	retval = ext4_journal_get_write_access_faultable(handle, ent->dir->i_sb,
++					       ent->bh, EXT4_JTR_NONE,
++					       access_fault_op);
+ 	if (retval)
+ 		return retval;
+ 	ent->de->inode = cpu_to_le32(ino);
+@@ -3647,10 +3707,13 @@
+ 		ent->de->file_type = file_type;
+ 	inode_inc_iversion(ent->dir);
+ 	inode_set_mtime_to_ts(ent->dir, inode_set_ctime_current(ent->dir));
+-	retval = ext4_mark_inode_dirty(handle, ent->dir);
++	retval = ext4_mark_inode_dirty_faultable(handle, ent->dir,
++						 inode_fault_op);
+ 	BUFFER_TRACE(ent->bh, "call ext4_handle_dirty_metadata");
+ 	if (!ent->inlined) {
+-		retval2 = ext4_handle_dirty_dirblock(handle, ent->dir, ent->bh);
++		retval2 = ext4_handle_dirty_dirblock_faultable(handle, ent->dir,
++							       ent->bh,
++							       dirty_fault_op);
+ 		if (unlikely(retval2)) {
+ 			ext4_std_error(ent->dir->i_sb, retval2);
+ 			return retval2;
+@@ -3681,29 +3744,40 @@
+ 		return;
+ 	}
+ 
+-	ext4_setent(handle, &old, ino, file_type);
++	ext4_setent(handle, &old, ino, file_type, EXT4_SOURCE_FAULT_NONE,
++		    EXT4_SOURCE_FAULT_NONE, EXT4_SOURCE_FAULT_NONE);
+ 	brelse(old.bh);
+ }
+ 
+ static int ext4_find_delete_entry(handle_t *handle, struct inode *dir,
+-				  const struct qstr *d_name)
++				  const struct qstr *d_name,
++				  enum ext4_source_fault_op lookup_fault_op)
+ {
+ 	int retval = -ENOENT;
++	int err;
+ 	struct buffer_head *bh;
+ 	struct ext4_dir_entry_2 *de;
+ 
++	err = ext4_source_fault_take(dir->i_sb, lookup_fault_op);
++	if (err)
++		return err;
+ 	bh = ext4_find_entry(dir, d_name, &de, NULL);
+ 	if (IS_ERR(bh))
+ 		return PTR_ERR(bh);
+ 	if (bh) {
+-		retval = ext4_delete_entry(handle, dir, de, bh);
++		retval = ext4_delete_entry(handle, dir, de, bh,
++					   EXT4_SOURCE_FAULT_NONE,
++					   EXT4_SOURCE_FAULT_NONE);
+ 		brelse(bh);
+ 	}
+ 	return retval;
+ }
+ 
+ static void ext4_rename_delete(handle_t *handle, struct ext4_renament *ent,
+-			       int force_reread)
++			       int force_reread,
++			       enum ext4_source_fault_op access_fault_op,
++			       enum ext4_source_fault_op dirty_fault_op,
++			       enum ext4_source_fault_op lookup_fault_op)
+ {
+ 	int retval;
+ 	/*
+@@ -3718,12 +3792,15 @@
+ 		    ent->de->name_len) ||
+ 	    force_reread) {
+ 		retval = ext4_find_delete_entry(handle, ent->dir,
+-						&ent->dentry->d_name);
++						&ent->dentry->d_name,
++						lookup_fault_op);
+ 	} else {
+-		retval = ext4_delete_entry(handle, ent->dir, ent->de, ent->bh);
++		retval = ext4_delete_entry(handle, ent->dir, ent->de, ent->bh,
++					   access_fault_op, dirty_fault_op);
+ 		if (retval == -ENOENT) {
+ 			retval = ext4_find_delete_entry(handle, ent->dir,
+-							&ent->dentry->d_name);
++							&ent->dentry->d_name,
++							lookup_fault_op);
+ 		}
+ 	}
+ 
+@@ -3734,14 +3811,15 @@
+ 	}
+ }
+ 
+-static void ext4_update_dir_count(handle_t *handle, struct ext4_renament *ent)
++static void ext4_update_dir_count(handle_t *handle, struct ext4_renament *ent,
++				 enum ext4_source_fault_op fault_op)
+ {
+ 	if (ent->dir_nlink_delta) {
+ 		if (ent->dir_nlink_delta == -1)
+ 			ext4_dec_count(ent->dir);
+ 		else
+ 			ext4_inc_count(ent->dir);
+-		ext4_mark_inode_dirty(handle, ent->dir);
++		ext4_mark_inode_dirty_faultable(handle, ent->dir, fault_op);
+ 	}
+ }
+ 
+@@ -3899,7 +3977,8 @@
+ 			if (new.dir != old.dir && EXT4_DIR_LINK_MAX(new.dir))
+ 				goto end_rename;
+ 		}
+-		retval = ext4_rename_dir_prepare(handle, &old, new.dir != old.dir);
++		retval = ext4_rename_dir_prepare(handle, &old, new.dir != old.dir,
++						 EXT4_SOURCE_FAULT_RENAME_OLD_DOTDOT_ACCESS);
+ 		if (retval)
+ 			goto end_rename;
+ 	}
+@@ -3919,7 +3998,9 @@
+ 		 * to be still pointing to the valid old entry.
+ 		 */
+ 		retval = ext4_setent(handle, &old, whiteout->i_ino,
+-				     EXT4_FT_CHRDEV);
++				     EXT4_FT_CHRDEV, EXT4_SOURCE_FAULT_NONE,
++				     EXT4_SOURCE_FAULT_NONE,
++				     EXT4_SOURCE_FAULT_NONE);
+ 		if (retval)
+ 			goto end_rename;
+ 		retval = ext4_mark_inode_dirty(handle, whiteout);
+@@ -3928,12 +4009,17 @@
+ 
+ 	}
+ 	if (!new.bh) {
+-		retval = ext4_add_entry(handle, new.dentry, old.inode);
++		retval = ext4_add_entry(handle, new.dentry, old.inode,
++					EXT4_SOURCE_FAULT_RENAME_NEW_DIRENT_ACCESS,
++					EXT4_SOURCE_FAULT_RENAME_NEW_DIRENT_DIRTY);
+ 		if (retval)
+ 			goto end_rename;
+ 	} else {
+ 		retval = ext4_setent(handle, &new,
+-				     old.inode->i_ino, old_file_type);
++				     old.inode->i_ino, old_file_type,
++				     EXT4_SOURCE_FAULT_RENAME_NEW_DIRENT_ACCESS,
++				     EXT4_SOURCE_FAULT_RENAME_NEW_PARENT_DIRTY,
++				     EXT4_SOURCE_FAULT_RENAME_NEW_DIRENT_DIRTY);
+ 		if (retval)
+ 			goto end_rename;
+ 	}
+@@ -3946,7 +4032,8 @@
+ 	 * rename.
+ 	 */
+ 	inode_set_ctime_current(old.inode);
+-	retval = ext4_mark_inode_dirty(handle, old.inode);
++		retval = ext4_mark_inode_dirty_faultable(handle, old.inode,
++						 EXT4_SOURCE_FAULT_RENAME_SOURCE_DIRTY);
+ 	if (unlikely(retval))
+ 		goto end_rename;
+ 
+@@ -3954,7 +4041,10 @@
+ 		/*
+ 		 * ok, that's it
+ 		 */
+-		ext4_rename_delete(handle, &old, force_reread);
++		ext4_rename_delete(handle, &old, force_reread,
++				   EXT4_SOURCE_FAULT_RENAME_OLD_DIRENT_ACCESS,
++				   EXT4_SOURCE_FAULT_RENAME_OLD_DIRENT_DIRTY,
++				   EXT4_SOURCE_FAULT_RENAME_OLD_LOOKUP);
+ 	}
+ 
+ 	if (new.inode) {
+@@ -3964,7 +4054,8 @@
+ 	inode_set_mtime_to_ts(old.dir, inode_set_ctime_current(old.dir));
+ 	ext4_update_dx_flag(old.dir);
+ 	if (old.is_dir) {
+-		retval = ext4_rename_dir_finish(handle, &old, new.dir->i_ino);
++		retval = ext4_rename_dir_finish(handle, &old, new.dir->i_ino,
++						EXT4_SOURCE_FAULT_RENAME_OLD_DOTDOT_DIRTY);
+ 		if (retval)
+ 			goto end_rename;
+ 
+@@ -3977,12 +4068,14 @@
+ 		} else {
+ 			ext4_inc_count(new.dir);
+ 			ext4_update_dx_flag(new.dir);
+-			retval = ext4_mark_inode_dirty(handle, new.dir);
++			retval = ext4_mark_inode_dirty_faultable(handle, new.dir,
++						 EXT4_SOURCE_FAULT_RENAME_NEW_PARENT_DIRTY);
+ 			if (unlikely(retval))
+ 				goto end_rename;
+ 		}
+ 	}
+-	retval = ext4_mark_inode_dirty(handle, old.dir);
++	retval = ext4_mark_inode_dirty_faultable(handle, old.dir,
++						 EXT4_SOURCE_FAULT_RENAME_OLD_PARENT_DIRTY);
+ 	if (unlikely(retval))
+ 		goto end_rename;
+ 
+@@ -4011,7 +4104,8 @@
+ 	}
+ 
+ 	if (new.inode) {
+-		retval = ext4_mark_inode_dirty(handle, new.inode);
++		retval = ext4_mark_inode_dirty_faultable(handle, new.inode,
++						 EXT4_SOURCE_FAULT_RENAME_REPLACED_DIRTY);
+ 		if (unlikely(retval))
+ 			goto end_rename;
+ 		if (!new.inode->i_nlink)
+@@ -4113,12 +4207,14 @@
+ 		ext4_handle_sync(handle);
+ 
+ 	if (S_ISDIR(old.inode->i_mode)) {
+-		retval = ext4_rename_dir_prepare(handle, &old, new.dir != old.dir);
++		retval = ext4_rename_dir_prepare(handle, &old, new.dir != old.dir,
++						 EXT4_SOURCE_FAULT_RENAME_OLD_DOTDOT_ACCESS);
+ 		if (retval)
+ 			goto end_rename;
+ 	}
+ 	if (S_ISDIR(new.inode->i_mode)) {
+-		retval = ext4_rename_dir_prepare(handle, &new, new.dir != old.dir);
++		retval = ext4_rename_dir_prepare(handle, &new, new.dir != old.dir,
++						 EXT4_SOURCE_FAULT_RENAME_NEW_DOTDOT_ACCESS);
+ 		if (retval)
+ 			goto end_rename;
+ 	}
+@@ -4137,11 +4233,18 @@
+ 	}
+ 
+ 	new_file_type = new.de->file_type;
+-	retval = ext4_setent(handle, &new, old.inode->i_ino, old.de->file_type);
++	retval = ext4_setent(handle, &new, old.inode->i_ino,
++			     old.de->file_type,
++			     EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_ACCESS,
++			     EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_INODE_DIRTY,
++			     EXT4_SOURCE_FAULT_RENAME_EXCHANGE_FIRST_DIRTY);
+ 	if (retval)
+ 		goto end_rename;
+ 
+-	retval = ext4_setent(handle, &old, new.inode->i_ino, new_file_type);
++	retval = ext4_setent(handle, &old, new.inode->i_ino, new_file_type,
++			     EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_ACCESS,
++			     EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_INODE_DIRTY,
++			     EXT4_SOURCE_FAULT_RENAME_EXCHANGE_SECOND_DIRTY);
+ 	if (retval)
+ 		goto end_rename;
+ 
+@@ -4160,17 +4263,19 @@
+ 	ext4_fc_mark_ineligible(new.inode->i_sb,
+ 				EXT4_FC_REASON_CROSS_RENAME, handle);
+ 	if (old.dir_bh) {
+-		retval = ext4_rename_dir_finish(handle, &old, new.dir->i_ino);
++		retval = ext4_rename_dir_finish(handle, &old, new.dir->i_ino,
++						EXT4_SOURCE_FAULT_RENAME_OLD_DOTDOT_DIRTY);
+ 		if (retval)
+ 			goto end_rename;
+ 	}
+ 	if (new.dir_bh) {
+-		retval = ext4_rename_dir_finish(handle, &new, old.dir->i_ino);
++		retval = ext4_rename_dir_finish(handle, &new, old.dir->i_ino,
++						EXT4_SOURCE_FAULT_RENAME_NEW_DOTDOT_DIRTY);
+ 		if (retval)
+ 			goto end_rename;
+ 	}
+-	ext4_update_dir_count(handle, &old);
+-	ext4_update_dir_count(handle, &new);
++	ext4_update_dir_count(handle, &old, EXT4_SOURCE_FAULT_RENAME_OLD_PARENT_DIRTY);
++	ext4_update_dir_count(handle, &new, EXT4_SOURCE_FAULT_RENAME_NEW_PARENT_DIRTY);
+ 	retval = 0;
+ 
+ end_rename:
+--- a/fs/ext4/orphan.c
++++ b/fs/ext4/orphan.c
+@@ -204,15 +204,19 @@
+ 	if (WARN_ON_ONCE(blk >= oi->of_blocks))
+ 		goto out;
+ 
+-	ret = ext4_journal_get_write_access(handle, inode->i_sb,
+-				oi->of_binfo[blk].ob_bh, EXT4_JTR_ORPHAN_FILE);
++	ret = ext4_journal_get_write_access_faultable(handle, inode->i_sb,
++					oi->of_binfo[blk].ob_bh,
++					EXT4_JTR_ORPHAN_FILE,
++					EXT4_SOURCE_FAULT_ORPHAN_DELETE_ACCESS);
+ 	if (ret)
+ 		goto out;
+ 
+ 	bdata = (__le32 *)(oi->of_binfo[blk].ob_bh->b_data);
+ 	bdata[off] = 0;
+ 	atomic_inc(&oi->of_binfo[blk].ob_free_entries);
+-	ret = ext4_handle_dirty_metadata(handle, NULL, oi->of_binfo[blk].ob_bh);
++	ret = ext4_handle_dirty_metadata_faultable(handle, NULL,
++						  oi->of_binfo[blk].ob_bh,
++						  EXT4_SOURCE_FAULT_ORPHAN_DELETE_DIRTY);
+ out:
+ 	ext4_clear_inode_state(inode, EXT4_STATE_ORPHAN_FILE);
+ 	INIT_LIST_HEAD(&EXT4_I(inode)->i_orphan);
+--- a/fs/ext4/resize.c
++++ b/fs/ext4/resize.c
+@@ -1391,7 +1391,10 @@
+ 		 * We can allocate memory for mb_alloc based on the new group
+ 		 * descriptor
+ 		 */
+-		err = ext4_mb_add_groupinfo(sb, group, gdp);
++		err = ext4_source_fault_take(sb,
++					     EXT4_SOURCE_FAULT_GROUP_ADD_GROUPINFO);
++		if (!err)
++			err = ext4_mb_add_groupinfo(sb, group, gdp);
+ 		if (err)
+ 			break;
+ 	}
+@@ -1592,7 +1595,8 @@
+ 
+ 	ext4_update_super(sb, flex_gd);
+ 
+-	err = ext4_handle_dirty_metadata(handle, NULL, sbi->s_sbh);
++	err = ext4_handle_dirty_metadata_faultable(handle, NULL, sbi->s_sbh,
++						  EXT4_SOURCE_FAULT_GROUP_ADD_SUPER_DIRTY);
+ 
+ exit_journal:
+ 	err2 = ext4_journal_stop(handle);
+--- a/fs/ext4/super.c
++++ b/fs/ext4/super.c
+@@ -7383,17 +7383,22 @@
+ 	err = ext4_fc_init_dentry_cache();
+ 	if (err)
+ 		goto out05;
++	err = ext4_source_fault_init();
++	if (err)
++		goto out_fc;
+ 
+ 	register_as_ext3();
+ 	register_as_ext2();
+ 	err = register_filesystem(&ext4_fs_type);
+ 	if (err)
+-		goto out;
++		goto out_fault;
+ 
+ 	return 0;
+-out:
++out_fault:
++	ext4_source_fault_exit();
+ 	unregister_as_ext2();
+ 	unregister_as_ext3();
++out_fc:
+ 	ext4_fc_destroy_dentry_cache();
+ out05:
+ 	destroy_inodecache();
+@@ -7418,6 +7423,7 @@
+ static void __exit ext4_exit_fs(void)
+ {
+ 	ext4_destroy_lazyinit_thread();
++	ext4_source_fault_exit();
+ 	unregister_as_ext2();
+ 	unregister_as_ext3();
+ 	unregister_filesystem(&ext4_fs_type);
+--- a/fs/ext4/xattr.c
++++ b/fs/ext4/xattr.c
+@@ -1275,8 +1275,9 @@
+ 	int error = 0;
+ 
+ 	BUFFER_TRACE(bh, "get_write_access");
+-	error = ext4_journal_get_write_access(handle, inode->i_sb, bh,
+-					      EXT4_JTR_NONE);
++	error = ext4_journal_get_write_access_faultable(handle, inode->i_sb, bh,
++					      EXT4_JTR_NONE,
++					      EXT4_SOURCE_FAULT_XATTR_RELEASE_ACCESS);
+ 	if (error)
+ 		goto out;
+ 
+@@ -1343,10 +1344,12 @@
+ 		 * we handle the dirtying after unlocking the buffer.
+ 		 */
+ 		if (ext4_handle_valid(handle))
+-			error = ext4_handle_dirty_metadata(handle, inode, bh);
++			error = ext4_handle_dirty_metadata_faultable(handle, inode, bh,
++							   EXT4_SOURCE_FAULT_XATTR_RELEASE_DIRTY);
+ 		unlock_buffer(bh);
+ 		if (!ext4_handle_valid(handle))
+-			error = ext4_handle_dirty_metadata(handle, inode, bh);
++			error = ext4_handle_dirty_metadata_faultable(handle, inode, bh,
++							   EXT4_SOURCE_FAULT_XATTR_RELEASE_DIRTY);
+ 		if (IS_SYNC(inode))
+ 			ext4_handle_sync(handle);
+ 		dquot_free_block(inode, EXT4_C2B(EXT4_SB(inode->i_sb), 1));

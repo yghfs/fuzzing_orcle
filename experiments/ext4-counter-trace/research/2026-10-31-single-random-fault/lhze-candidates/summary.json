@@ -1,0 +1,355 @@
+{
+  "original_hit_count": 40,
+  "real_hit_count": 20,
+  "real_operations": {
+    "mballoc_mark": 11,
+    "inode_evict_final_dirty": 6,
+    "unlink_inode_dirty": 3
+  },
+  "raw_errno_choices_verified": 20,
+  "canonical_native_errno_by_operation": {
+    "inode_evict_final_dirty": 5,
+    "mballoc_mark": 4,
+    "unlink_inode_dirty": 3
+  },
+  "recovered_manifest_events": [
+    53
+  ],
+  "candidate_count": 44,
+  "classifications": {
+    "first_namespace_invalid": 2,
+    "stale_off_state_repeat": 22,
+    "preexisting_namespace_invalid": 18,
+    "offline_confirmation": 2
+  },
+  "snapshot_count": 2754,
+  "timeline": {
+    "regular": {
+      "snapshots": 918,
+      "namespace_bad": 0,
+      "first_bad": null,
+      "recovered_after_first_bad": false,
+      "changes": []
+    },
+    "bigalloc": {
+      "snapshots": 918,
+      "namespace_bad": 639,
+      "first_bad": {
+        "segment": 139,
+        "workload_kind": "bigalloc",
+        "kind": "bigalloc",
+        "phase": "after",
+        "valid": true,
+        "namespace_valid": false,
+        "namespace_reason": "inode_read_failed",
+        "namespace_compared": 0,
+        "namespace_mismatched": 0,
+        "observed_mismatches": 0,
+        "relations_valid": true,
+        "relations_mismatches": 0,
+        "free_inodes": 4074,
+        "dirs": 8,
+        "free_clusters": 1823
+      },
+      "recovered_after_first_bad": false,
+      "changes": [
+        {
+          "segment": 139,
+          "workload_kind": "bigalloc",
+          "before": {
+            "free_inodes": 4075,
+            "dirs": 7,
+            "namespace_valid": true
+          },
+          "after": {
+            "free_inodes": 4074,
+            "dirs": 8,
+            "namespace_valid": false
+          }
+        },
+        {
+          "segment": 211,
+          "workload_kind": "bigalloc",
+          "before": {
+            "free_inodes": 4074,
+            "dirs": 8,
+            "namespace_valid": false
+          },
+          "after": {
+            "free_inodes": 4073,
+            "dirs": 8,
+            "namespace_valid": false
+          }
+        },
+        {
+          "segment": 256,
+          "workload_kind": "bigalloc",
+          "before": {
+            "free_inodes": 4073,
+            "dirs": 8,
+            "namespace_valid": false
+          },
+          "after": {
+            "free_inodes": 4072,
+            "dirs": 9,
+            "namespace_valid": false
+          }
+        }
+      ]
+    },
+    "inline": {
+      "snapshots": 918,
+      "namespace_bad": 811,
+      "first_bad": {
+        "segment": 53,
+        "workload_kind": "inline",
+        "kind": "inline",
+        "phase": "after",
+        "valid": true,
+        "namespace_valid": false,
+        "namespace_reason": "inode_read_failed",
+        "namespace_compared": 0,
+        "namespace_mismatched": 0,
+        "observed_mismatches": 0,
+        "relations_valid": true,
+        "relations_mismatches": 0,
+        "free_inodes": 4074,
+        "dirs": 7,
+        "free_clusters": 29362
+      },
+      "recovered_after_first_bad": false,
+      "changes": [
+        {
+          "segment": 53,
+          "workload_kind": "inline",
+          "before": {
+            "free_inodes": 4075,
+            "dirs": 7,
+            "namespace_valid": true
+          },
+          "after": {
+            "free_inodes": 4074,
+            "dirs": 7,
+            "namespace_valid": false
+          }
+        },
+        {
+          "segment": 281,
+          "workload_kind": "inline",
+          "before": {
+            "free_inodes": 4074,
+            "dirs": 7,
+            "namespace_valid": false
+          },
+          "after": {
+            "free_inodes": 4073,
+            "dirs": 8,
+            "namespace_valid": false
+          }
+        },
+        {
+          "segment": 347,
+          "workload_kind": "inline",
+          "before": {
+            "free_inodes": 4073,
+            "dirs": 8,
+            "namespace_valid": false
+          },
+          "after": {
+            "free_inodes": 4072,
+            "dirs": 8,
+            "namespace_valid": false
+          }
+        }
+      ]
+    }
+  },
+  "eviction_instances": [
+    {
+      "segment": 53,
+      "kind": "inline",
+      "operation": "inode_evict_final_dirty",
+      "errno": -30,
+      "target_inode": 30,
+      "trace_line": 111304,
+      "timestamp_ns": 1039221653000,
+      "pid": 10817,
+      "raw_errno_choice_verified": true,
+      "canonical_native_errno": true,
+      "manifest_event_missing": true,
+      "syscall": "outside_generated_syscall_envelope",
+      "call_index": null,
+      "syscall_result": null,
+      "user_errno": null,
+      "syscall_verified": null,
+      "namespace_before": true,
+      "namespace_after": false,
+      "free_inodes_before": 4075,
+      "free_inodes_after": 4074,
+      "dirs_before": 7,
+      "dirs_after": 7,
+      "free_clusters_before": 29362,
+      "free_clusters_after": 29362,
+      "target_exit_line": 111305,
+      "target_exit_actual": 1,
+      "target_exit_expected": 0,
+      "target_exit_comparison_valid": "1",
+      "workload_exit": 0
+    },
+    {
+      "segment": 139,
+      "kind": "bigalloc",
+      "operation": "inode_evict_final_dirty",
+      "errno": -22,
+      "target_inode": 38,
+      "trace_line": 32009,
+      "timestamp_ns": 2816440857000,
+      "pid": 30820,
+      "raw_errno_choice_verified": true,
+      "canonical_native_errno": false,
+      "manifest_event_missing": false,
+      "syscall": "rmdir",
+      "call_index": 6,
+      "syscall_result": 0,
+      "user_errno": 0,
+      "syscall_verified": true,
+      "namespace_before": true,
+      "namespace_after": false,
+      "free_inodes_before": 4075,
+      "free_inodes_after": 4074,
+      "dirs_before": 7,
+      "dirs_after": 8,
+      "free_clusters_before": 1823,
+      "free_clusters_after": 1823,
+      "target_exit_line": 32010,
+      "target_exit_actual": 1,
+      "target_exit_expected": 0,
+      "target_exit_comparison_valid": "1",
+      "workload_exit": 0
+    },
+    {
+      "segment": 211,
+      "kind": "bigalloc",
+      "operation": "inode_evict_final_dirty",
+      "errno": -28,
+      "target_inode": 35,
+      "trace_line": 39339,
+      "timestamp_ns": 4615744941000,
+      "pid": 50591,
+      "raw_errno_choice_verified": true,
+      "canonical_native_errno": true,
+      "manifest_event_missing": false,
+      "syscall": "renameat2",
+      "call_index": 9,
+      "syscall_result": 0,
+      "user_errno": 0,
+      "syscall_verified": true,
+      "namespace_before": false,
+      "namespace_after": false,
+      "free_inodes_before": 4074,
+      "free_inodes_after": 4073,
+      "dirs_before": 8,
+      "dirs_after": 8,
+      "free_clusters_before": 1823,
+      "free_clusters_after": 1823,
+      "target_exit_line": 39340,
+      "target_exit_actual": 1,
+      "target_exit_expected": 0,
+      "target_exit_comparison_valid": "1",
+      "workload_exit": 0
+    },
+    {
+      "segment": 256,
+      "kind": "bigalloc",
+      "operation": "inode_evict_final_dirty",
+      "errno": -28,
+      "target_inode": 31,
+      "trace_line": 42196,
+      "timestamp_ns": 5716322532000,
+      "pid": 62787,
+      "raw_errno_choice_verified": true,
+      "canonical_native_errno": true,
+      "manifest_event_missing": false,
+      "syscall": "rmdir",
+      "call_index": 7,
+      "syscall_result": 0,
+      "user_errno": 0,
+      "syscall_verified": true,
+      "namespace_before": false,
+      "namespace_after": false,
+      "free_inodes_before": 4073,
+      "free_inodes_after": 4072,
+      "dirs_before": 8,
+      "dirs_after": 9,
+      "free_clusters_before": 1823,
+      "free_clusters_after": 1823,
+      "target_exit_line": 42197,
+      "target_exit_actual": 1,
+      "target_exit_expected": 0,
+      "target_exit_comparison_valid": "1",
+      "workload_exit": 0
+    },
+    {
+      "segment": 281,
+      "kind": "inline",
+      "operation": "inode_evict_final_dirty",
+      "errno": -28,
+      "target_inode": 39,
+      "trace_line": 29838,
+      "timestamp_ns": 6362695959000,
+      "pid": 69655,
+      "raw_errno_choice_verified": true,
+      "canonical_native_errno": true,
+      "manifest_event_missing": false,
+      "syscall": "rmdir",
+      "call_index": 6,
+      "syscall_result": 0,
+      "user_errno": 0,
+      "syscall_verified": true,
+      "namespace_before": false,
+      "namespace_after": false,
+      "free_inodes_before": 4074,
+      "free_inodes_after": 4073,
+      "dirs_before": 7,
+      "dirs_after": 8,
+      "free_clusters_before": 29362,
+      "free_clusters_after": 29362,
+      "target_exit_line": 29839,
+      "target_exit_actual": 1,
+      "target_exit_expected": 0,
+      "target_exit_comparison_valid": "1",
+      "workload_exit": 0
+    },
+    {
+      "segment": 347,
+      "kind": "inline",
+      "operation": "inode_evict_final_dirty",
+      "errno": -117,
+      "target_inode": 35,
+      "trace_line": 49039,
+      "timestamp_ns": 8009692395000,
+      "pid": 87606,
+      "raw_errno_choice_verified": true,
+      "canonical_native_errno": true,
+      "manifest_event_missing": false,
+      "syscall": "renameat2",
+      "call_index": 9,
+      "syscall_result": 0,
+      "user_errno": 0,
+      "syscall_verified": true,
+      "namespace_before": false,
+      "namespace_after": false,
+      "free_inodes_before": 4073,
+      "free_inodes_after": 4072,
+      "dirs_before": 8,
+      "dirs_after": 8,
+      "free_clusters_before": 29362,
+      "free_clusters_after": 29362,
+      "target_exit_line": 49040,
+      "target_exit_actual": 1,
+      "target_exit_expected": 0,
+      "target_exit_comparison_valid": "1",
+      "workload_exit": 0
+    }
+  ]
+}

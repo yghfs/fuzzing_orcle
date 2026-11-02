@@ -1,0 +1,8 @@
+r0 = openat$dir(0xffffffffffffff9c, &(0x7f0000000000)='./\x00', 0x10000, 0x0)
+r1 = openat(r0, &(0x7f0000000040)='file0/file0\x00', 0x2, 0x0)
+write(r1, &(0x7f0000000080)='seed\x00', 0x4)
+fallocate(r1, 0x0, 0x0, 0x1000)
+fsync(r1)
+ftruncate(r1, 0x0)
+close(r1)
+close(r0)

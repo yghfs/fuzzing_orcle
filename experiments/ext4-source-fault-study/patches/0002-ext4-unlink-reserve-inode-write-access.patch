@@ -1,0 +1,67 @@
+Subject: [PATCH] ext4: reserve inode write access before unlinking entry
+
+__ext4_unlink() removes the directory entry and dirties the parent inode
+before it updates the target inode's link count.  If looking up the parent
+inode-table block or obtaining journal write access fails, the function
+returns with the name removed but the target inode's on-disk link count
+unchanged.  With errors=continue, this error need not abort the
+transaction, so the directory update can be committed.
+
+Reserve write access to the parent and target inode-table buffers before
+changing the directory entry.  This moves inode-location and journal access
+errors ahead of the namespace mutation.  Keep the existing namespace mutation
+and link-count update order, and release the references on every exit path.
+
+Fast-commit replay can skip the parent update when the directory entry does
+not match the target inode, so only reserve the target inode in that case.
+
+---
+ fs/ext4/namei.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/fs/ext4/namei.c b/fs/ext4/namei.c
+index 790db7ea..78fdab15 100644
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -3232,6 +3232,7 @@ int __ext4_unlink(struct inode *dir, const struct qstr *d_name,
+ 	int retval = -ENOENT;
+ 	struct buffer_head *bh;
+ 	struct ext4_dir_entry_2 *de;
++	struct ext4_iloc dir_iloc, inode_iloc;
+ 	handle_t *handle;
+ 	int skip_remove_dentry = 0;
+ 
+@@ -3268,6 +3269,22 @@ int __ext4_unlink(struct inode *dir, const struct qstr *d_name,
+ 	if (IS_DIRSYNC(dir))
+ 		ext4_handle_sync(handle);
+ 
++	/*
++	 * Reserve the inode buffers before removing the directory entry.  If
++	 * reading either inode table block or getting journal write access fails,
++	 * unlink must fail before it changes the directory.
++	 */
++	dir_iloc.bh = NULL;
++	inode_iloc.bh = NULL;
++	if (!skip_remove_dentry) {
++		retval = ext4_reserve_inode_write(handle, dir, &dir_iloc);
++		if (retval)
++			goto out_handle;
++	}
++	retval = ext4_reserve_inode_write(handle, inode, &inode_iloc);
++	if (retval)
++		goto out_handle;
++
+ 	if (!skip_remove_dentry) {
+ 		retval = ext4_delete_entry(handle, dir, de, bh);
+ 		if (retval)
+@@ -3292,6 +3309,10 @@ int __ext4_unlink(struct inode *dir, const struct qstr *d_name,
+ 	if (dentry && !retval)
+ 		ext4_fc_track_unlink(handle, dentry);
+ out_handle:
++	if (dir_iloc.bh)
++		brelse(dir_iloc.bh);
++	if (inode_iloc.bh)
++		brelse(inode_iloc.bh);
+ 	ext4_journal_stop(handle);
+ out_bh:
+ 	brelse(bh);

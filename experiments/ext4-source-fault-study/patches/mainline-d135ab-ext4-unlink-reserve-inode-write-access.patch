@@ -1,0 +1,87 @@
+From e6972c9dc250f53faba0d61784693ee172954058 Mon Sep 17 00:00:00 2001
+From: Alan <3164729207@qq.com>
+Date: Tue, 27 Oct 2026 17:00:16 +0800
+Subject: [PATCH] ext4: reserve inode write access before unlinking entry
+To: Theodore Ts'o <tytso@mit.edu>
+Cc: linux-ext4@vger.kernel.org
+
+__ext4_unlink() removes the directory entry and dirties the parent inode
+before it updates the target inode's link count. If the inode write access
+operation fails after the directory entry has been removed, unlink returns
+without decrementing the target inode's link count. With errors=continue,
+the directory update can still be committed.
+
+Reserve write access to the parent and target inode-table buffers before
+removing the directory entry. This makes inode-location and journal-access
+errors fail before the namespace changes. Keep the existing namespace and
+link-count update order, and release the inode-location references on all
+exits. Fast-commit replay can skip the parent update when the directory
+entry no longer matches the target inode, so reserve only the target inode
+in that case.
+
+The source-derived fault injector reproduced this window by returning EIO
+from the real journal write-access boundary in ext4_reserve_inode_write().
+Before this change, after a normal unmount, e2fsck reported inode 13 as
+unattached, debugfs showed Links: 1, and the parent directory no longer
+contained the file. With this change, the same error is returned before the
+directory entry is changed; the file remains present with Links: 1 and
+e2fsck -fn passes.
+
+The failure injection and the repaired run were performed on Linux 6.12.1
+with errors=continue and an ordinary sync/unmount; no forced-shutdown ioctl
+was used. The repaired change also builds in the current mainline tree with
+make O=/tmp/linux-mainline-d135ab-build ARCH=x86 W=1 -j8 fs/ext4/namei.o.
+
+Fixes: 4209ae12b122 ("ext4: handle ext4_mark_inode_dirty errors")
+Cc: stable@vger.kernel.org
+Signed-off-by: Alan <3164729207@qq.com>
+---
+ fs/ext4/namei.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/fs/ext4/namei.c b/fs/ext4/namei.c
+index 354fc2d22df1a..312ff0b682123 100644
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -3233,6 +3233,7 @@ int __ext4_unlink(struct inode *dir, const struct qstr *d_name,
+ 	int retval = -ENOENT;
+ 	struct buffer_head *bh;
+ 	struct ext4_dir_entry_2 *de = NULL;
++	struct ext4_iloc dir_iloc, inode_iloc;
+ 	handle_t *handle;
+ 	int skip_remove_dentry = 0;
+ 
+@@ -3269,6 +3270,22 @@ int __ext4_unlink(struct inode *dir, const struct qstr *d_name,
+ 	if (IS_DIRSYNC(dir))
+ 		ext4_handle_sync(handle);
+ 
++	/*
++	 * Get the inode-table buffers and journal write access before removing
++	 * the directory entry. Otherwise, an error while updating either inode
++	 * can leave the name removed but the link count unchanged.
++	 */
++	dir_iloc.bh = NULL;
++	inode_iloc.bh = NULL;
++	if (!skip_remove_dentry) {
++		retval = ext4_reserve_inode_write(handle, dir, &dir_iloc);
++		if (retval)
++			goto out_handle;
++	}
++	retval = ext4_reserve_inode_write(handle, inode, &inode_iloc);
++	if (retval)
++		goto out_handle;
++
+ 	if (!skip_remove_dentry) {
+ 		retval = ext4_delete_entry(handle, dir, de, bh);
+ 		if (retval)
+@@ -3293,6 +3310,10 @@ int __ext4_unlink(struct inode *dir, const struct qstr *d_name,
+ 	if (dentry && !retval)
+ 		ext4_fc_track_unlink(handle, dentry);
+ out_handle:
++	if (dir_iloc.bh)
++		brelse(dir_iloc.bh);
++	if (inode_iloc.bh)
++		brelse(inode_iloc.bh);
+ 	ext4_journal_stop(handle);
+ out_bh:
+ 	brelse(bh);

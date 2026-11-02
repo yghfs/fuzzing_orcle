@@ -1,0 +1,10 @@
+# Resize an enlarged backing device, then read invariant_summary.  The read
+# invokes ext4_checker_snapshot() and exercises the checker group-array size
+# after s_groups_count grows.  Run syz-execprog with guest cwd=/; the path
+# sandbox rejects absolute paths, so debugfs is opened relative to this fd.
+r0 = openat$dir(0xffffffffffffff9c, &AUTO='.\x00', 0x10000, 0)
+ioctl$auto_EXT4_IOC_RESIZE_FS(r0, 0x40086610, &(0x7f0000000000)=0xc0000)
+r1 = openat(r0, &AUTO='sys/kernel/debug/ext4/vda/invariant_summary\x00', 0, 0)
+read(r1, &(0x7f0000001000)="", 0x1000)
+close(r1)
+close(r0)

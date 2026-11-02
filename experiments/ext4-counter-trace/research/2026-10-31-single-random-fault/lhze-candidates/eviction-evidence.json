@@ -1,0 +1,779 @@
+[
+  {
+    "segment": 53,
+    "kind": "inline",
+    "target_inode": 30,
+    "event": {
+      "line": 111304,
+      "text": "workload-10817   [001] .....  1039.221653: ext4_fault_inject: dev=253,48 operation=inode_evict_final_dirty errno=-30 errno_choice_index=4 errno_choice_draw=766534 generation=36 injection=1 pid=10817 target_pid=10817 program=workload target_program=- call_index=0 match_index=3 group=0 block=30 len=1 result=-30 randomized=1 random_seed=8610496484110817744 probability_ppm=10000 random_check=3 random_draw=3664"
+    },
+    "object_findings": [
+      {
+        "formula": "R-IEVICT",
+        "point": "INODE.EVICT.TARGET.EXIT",
+        "seq": 23322,
+        "op": 2897,
+        "ino": 30,
+        "group": 0,
+        "block": 0,
+        "slot": 0,
+        "actual": 1,
+        "expected": 0,
+        "reason": "after_incore_cleanup",
+        "stage": "operation_postcondition",
+        "capture_complete": true,
+        "recovered_seq": null,
+        "recovery_point": null,
+        "recovery_status": "not_observed"
+      }
+    ],
+    "eviction_scope": [
+      {
+        "line": 111295,
+        "text": "workload-10817   [001] .....  1039.221009: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23313 op=2897 parent=0 point=INODE.EVICT formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111296,
+        "text": "workload-10817   [001] .....  1039.221352: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23314 op=2897 parent=0 point=INODE.EVICT.TARGET.BEFORE formula=R-IEVICT ino=30 group=0 tid=0 actual=1 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=target_before_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111305,
+        "text": "workload-10817   [001] .....  1039.221860: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23322 op=2897 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=30 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111306,
+        "text": "workload-10817   [001] .....  1039.221900: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23323 op=2897 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=30 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111307,
+        "text": "workload-10817   [001] .....  1039.221908: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23324 op=2897 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=30 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111308,
+        "text": "workload-10817   [001] .....  1039.221921: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23325 op=2897 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      }
+    ],
+    "target_free_bitmap_events_in_segment": [
+      {
+        "line": 30592,
+        "text": "workload-10817   [001] ...1.  1035.518648: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23219 op=2880 parent=2877 point=INODE.FREE.BITMAP formula=R-IDELTA ino=30 group=0 tid=50 actual=1 expected=0 delta=0 update_delta=1 status=0 comparison_valid=0 reason=bitmap_transition nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      }
+    ],
+    "target_free_bitmap_events_after_hit": [],
+    "nearby_trace": [
+      {
+        "line": 111297,
+        "text": "workload-10817   [001] .....  1039.221526: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23315 op=2898 parent=2897 point=XATTR.INODE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111298,
+        "text": "workload-10817   [001] .....  1039.221546: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23316 op=2898 parent=2897 point=XATTR.INODE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111299,
+        "text": "workload-10817   [001] .....  1039.221561: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23317 op=2899 parent=2897 point=ORPHAN.FILE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111300,
+        "text": "workload-10817   [001] .....  1039.221597: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23318 op=2899 parent=2897 point=ORPHAN.FILE.SLOT.DELETE formula=O-LIFE-DELTA ino=30 group=4294967295 tid=0 actual=0 expected=30 delta=0 update_delta=-1 status=0 comparison_valid=0 reason=slot_cleared nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4392 slot=0"
+      },
+      {
+        "line": 111301,
+        "text": "workload-10817   [001] .....  1039.221613: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23319 op=2899 parent=2897 point=ORPHAN.FILE.DELETE.EXIT formula=O-LIFE ino=30 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=1 comparison_valid=1 reason=after_orphan_state_clear nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4392 slot=0"
+      },
+      {
+        "line": 111302,
+        "text": "workload-10817   [001] .....  1039.221621: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23320 op=2899 parent=2897 point=ORPHAN.FILE.FREE.EXIT formula=O-LIFE-DELTA ino=30 group=4294967295 tid=0 actual=1 expected=1 delta=0 update_delta=1 status=1 comparison_valid=1 reason=free_counter_after_slot_delete nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4392 slot=0"
+      },
+      {
+        "line": 111303,
+        "text": "workload-10817   [001] .....  1039.221628: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23321 op=2899 parent=2897 point=ORPHAN.FILE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111304,
+        "text": "workload-10817   [001] .....  1039.221653: ext4_fault_inject: dev=253,48 operation=inode_evict_final_dirty errno=-30 errno_choice_index=4 errno_choice_draw=766534 generation=36 injection=1 pid=10817 target_pid=10817 program=workload target_program=- call_index=0 match_index=3 group=0 block=30 len=1 result=-30 randomized=1 random_seed=8610496484110817744 probability_ppm=10000 random_check=3 random_draw=3664"
+      },
+      {
+        "line": 111305,
+        "text": "workload-10817   [001] .....  1039.221860: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23322 op=2897 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=30 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111306,
+        "text": "workload-10817   [001] .....  1039.221900: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23323 op=2897 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=30 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111307,
+        "text": "workload-10817   [001] .....  1039.221908: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23324 op=2897 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=30 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111308,
+        "text": "workload-10817   [001] .....  1039.221921: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23325 op=2897 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111309,
+        "text": "ct-syz-launcher-10813   [000] .....  1039.231827: tracing_mark_write: CT_PHASE phase=BEGIN source=cleanup target_pid=10813 id=cleanup-10813"
+      },
+      {
+        "line": 111310,
+        "text": "ct-syz-launcher-10813   [000] .....  1039.233734: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23326 op=2900 parent=0 point=NAMESPACE.unlink formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111311,
+        "text": "ct-syz-launcher-10813   [000] .....  1039.233901: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23327 op=2900 parent=0 point=NAMESPACE.REF.DELETE formula=R-LINK ino=35 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=namespace_step nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=16 schema=4 dir_ino=2049 ref_delta=-1 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 111312,
+        "text": "ct-syz-launcher-10813   [000] .....  1039.233975: ext4_counter_event: dev=253,48 epoch=46575020522 seq=23328 op=2900 parent=0 point=NAMESPACE.DIRENT.DELETE formula=R-LINK ino=35 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=namespace_step nlink_before=0 nlink_after=0 dir_nlink_before=9 dir_nlink_after=9 step=2 schema=4 dir_ino=2049 ref_delta=0 result=0 generation=0 is_dir=1 block=0 slot=0"
+      }
+    ],
+    "last_generated_call": {
+      "id": "segment-000053-b1-10817-32",
+      "pid": 10817,
+      "name": "fchmod",
+      "nr": 91,
+      "program": "b1-w0",
+      "call_index": 31,
+      "object_ino": 23,
+      "object_dev": 64816,
+      "object_is_dir": 0,
+      "repaired": 1,
+      "original_fd": "6",
+      "executed_fd": "240",
+      "repair_version": "2",
+      "marker_begin_line": 108725,
+      "marker_end_line": 111546,
+      "user_result": 0,
+      "user_errno": 0,
+      "verified": true,
+      "reason": "native_return",
+      "enter_line": 108729,
+      "exit_line": 108730,
+      "enter_ns": 1038732383000,
+      "exit_ns": 1038732629000,
+      "raw_result": 0,
+      "first_arg": 240,
+      "errno": 0
+    },
+    "raw_exit_syscalls": [
+      {
+        "line": 111284,
+        "text": "workload-10817   [001] .....  1039.159703: sys_enter: NR 231 (0, fffffffffffffff0, 11d50788, 110, 0, 11d51980)"
+      }
+    ]
+  },
+  {
+    "segment": 139,
+    "kind": "bigalloc",
+    "target_inode": 38,
+    "event": {
+      "line": 32009,
+      "text": "workload-30820   [000] .....  2816.440857: ext4_fault_inject: dev=253,32 operation=inode_evict_final_dirty errno=-22 errno_choice_index=2 errno_choice_draw=619628 generation=94 injection=1 pid=30820 target_pid=30820 program=workload target_program=- call_index=0 match_index=2 group=0 block=38 len=1 result=-22 randomized=1 random_seed=4981082906109253350 probability_ppm=10000 random_check=2 random_draw=6391"
+    },
+    "object_findings": [
+      {
+        "formula": "R-IEVICT",
+        "point": "INODE.EVICT.TARGET.EXIT",
+        "seq": 72079,
+        "op": 10348,
+        "ino": 38,
+        "group": 0,
+        "block": 0,
+        "slot": 0,
+        "actual": 1,
+        "expected": 0,
+        "reason": "after_incore_cleanup",
+        "stage": "operation_postcondition",
+        "capture_complete": true,
+        "recovered_seq": null,
+        "recovery_point": null,
+        "recovery_status": "not_observed"
+      }
+    ],
+    "eviction_scope": [
+      {
+        "line": 31988,
+        "text": "workload-30820   [000] .....  2816.439579: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72058 op=10348 parent=0 point=INODE.EVICT formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 31989,
+        "text": "workload-30820   [000] .....  2816.439623: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72059 op=10348 parent=0 point=INODE.EVICT.TARGET.BEFORE formula=R-IEVICT ino=38 group=0 tid=0 actual=1 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=target_before_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32010,
+        "text": "workload-30820   [000] .....  2816.441239: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72079 op=10348 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=38 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32011,
+        "text": "workload-30820   [000] .....  2816.441267: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72080 op=10348 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=38 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32012,
+        "text": "workload-30820   [000] .....  2816.441278: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72081 op=10348 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=38 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32013,
+        "text": "workload-30820   [000] .....  2816.441289: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72082 op=10348 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      }
+    ],
+    "target_free_bitmap_events_in_segment": [],
+    "target_free_bitmap_events_after_hit": [],
+    "nearby_trace": [
+      {
+        "line": 32002,
+        "text": "workload-30820   [000] .....  2816.440753: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72072 op=10352 parent=10348 point=XATTR.INODE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32003,
+        "text": "workload-30820   [000] .....  2816.440766: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72073 op=10352 parent=10348 point=XATTR.INODE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32004,
+        "text": "workload-30820   [000] .....  2816.440780: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72074 op=10353 parent=10348 point=ORPHAN.FILE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32005,
+        "text": "workload-30820   [000] .....  2816.440800: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72075 op=10353 parent=10348 point=ORPHAN.FILE.SLOT.DELETE formula=O-LIFE-DELTA ino=38 group=4294967295 tid=0 actual=0 expected=38 delta=0 update_delta=-1 status=0 comparison_valid=0 reason=slot_cleared nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4448 slot=0"
+      },
+      {
+        "line": 32006,
+        "text": "workload-30820   [000] .....  2816.440816: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72076 op=10353 parent=10348 point=ORPHAN.FILE.DELETE.EXIT formula=O-LIFE ino=38 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=1 comparison_valid=1 reason=after_orphan_state_clear nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4448 slot=0"
+      },
+      {
+        "line": 32007,
+        "text": "workload-30820   [000] .....  2816.440824: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72077 op=10353 parent=10348 point=ORPHAN.FILE.FREE.EXIT formula=O-LIFE-DELTA ino=38 group=4294967295 tid=0 actual=1 expected=1 delta=0 update_delta=1 status=1 comparison_valid=1 reason=free_counter_after_slot_delete nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4448 slot=0"
+      },
+      {
+        "line": 32008,
+        "text": "workload-30820   [000] .....  2816.440832: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72078 op=10353 parent=10348 point=ORPHAN.FILE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32009,
+        "text": "workload-30820   [000] .....  2816.440857: ext4_fault_inject: dev=253,32 operation=inode_evict_final_dirty errno=-22 errno_choice_index=2 errno_choice_draw=619628 generation=94 injection=1 pid=30820 target_pid=30820 program=workload target_program=- call_index=0 match_index=2 group=0 block=38 len=1 result=-22 randomized=1 random_seed=4981082906109253350 probability_ppm=10000 random_check=2 random_draw=6391"
+      },
+      {
+        "line": 32010,
+        "text": "workload-30820   [000] .....  2816.441239: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72079 op=10348 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=38 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32011,
+        "text": "workload-30820   [000] .....  2816.441267: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72080 op=10348 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=38 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32012,
+        "text": "workload-30820   [000] .....  2816.441278: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72081 op=10348 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=38 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32013,
+        "text": "workload-30820   [000] .....  2816.441289: ext4_counter_event: dev=253,32 epoch=46134635637 seq=72082 op=10348 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 32014,
+        "text": "workload-30820   [000] .....  2816.441399: sys_exit: NR 84 = 0"
+      },
+      {
+        "line": 32015,
+        "text": "workload-30820   [000] .....  2816.441415: sys_enter: NR 16 (4, 6365, 0, 0, 0, 0)"
+      },
+      {
+        "line": 32016,
+        "text": "workload-30820   [000] .....  2816.441445: sys_exit: NR 16 = 0"
+      },
+      {
+        "line": 32017,
+        "text": "workload-30820   [000] .....  2816.441464: sys_enter: NR 1 (3, 7ffe1cceafb0, 10, 0, 0, 0)"
+      }
+    ]
+  },
+  {
+    "segment": 211,
+    "kind": "bigalloc",
+    "target_inode": 35,
+    "event": {
+      "line": 39339,
+      "text": "workload-50591   [000] .N...  4615.744941: ext4_fault_inject: dev=253,32 operation=inode_evict_final_dirty errno=-28 errno_choice_index=3 errno_choice_draw=3405 generation=142 injection=1 pid=50591 target_pid=50591 program=workload target_program=- call_index=0 match_index=3 group=0 block=35 len=1 result=-28 randomized=1 random_seed=9020905892345329710 probability_ppm=10000 random_check=3 random_draw=179"
+    },
+    "object_findings": [
+      {
+        "formula": "R-IEVICT",
+        "point": "INODE.EVICT.TARGET.EXIT",
+        "seq": 132582,
+        "op": 16293,
+        "ino": 35,
+        "group": 0,
+        "block": 0,
+        "slot": 0,
+        "actual": 1,
+        "expected": 0,
+        "reason": "after_incore_cleanup",
+        "stage": "operation_postcondition",
+        "capture_complete": true,
+        "recovered_seq": null,
+        "recovery_point": null,
+        "recovery_status": "not_observed"
+      }
+    ],
+    "eviction_scope": [
+      {
+        "line": 39330,
+        "text": "workload-50591   [000] .....  4615.744390: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132573 op=16293 parent=0 point=INODE.EVICT formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39331,
+        "text": "workload-50591   [000] .....  4615.744440: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132574 op=16293 parent=0 point=INODE.EVICT.TARGET.BEFORE formula=R-IEVICT ino=35 group=0 tid=0 actual=1 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=target_before_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39340,
+        "text": "workload-50591   [000] .N...  4615.745127: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132582 op=16293 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=35 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39341,
+        "text": "workload-50591   [000] .N...  4615.745139: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132583 op=16293 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=35 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39342,
+        "text": "workload-50591   [000] .N...  4615.745148: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132584 op=16293 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=35 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39343,
+        "text": "workload-50591   [000] .N...  4615.745157: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132585 op=16293 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      }
+    ],
+    "target_free_bitmap_events_in_segment": [],
+    "target_free_bitmap_events_after_hit": [],
+    "nearby_trace": [
+      {
+        "line": 39332,
+        "text": "workload-50591   [000] .....  4615.744727: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132575 op=16294 parent=16293 point=XATTR.INODE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39333,
+        "text": "workload-50591   [000] .....  4615.744746: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132576 op=16294 parent=16293 point=XATTR.INODE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39334,
+        "text": "workload-50591   [000] .....  4615.744761: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132577 op=16295 parent=16293 point=ORPHAN.FILE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39335,
+        "text": "workload-50591   [000] .....  4615.744784: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132578 op=16295 parent=16293 point=ORPHAN.FILE.SLOT.DELETE formula=O-LIFE-DELTA ino=35 group=4294967295 tid=0 actual=0 expected=35 delta=0 update_delta=-1 status=0 comparison_valid=0 reason=slot_cleared nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4448 slot=0"
+      },
+      {
+        "line": 39336,
+        "text": "workload-50591   [000] .....  4615.744800: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132579 op=16295 parent=16293 point=ORPHAN.FILE.DELETE.EXIT formula=O-LIFE ino=35 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=1 comparison_valid=1 reason=after_orphan_state_clear nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4448 slot=0"
+      },
+      {
+        "line": 39337,
+        "text": "workload-50591   [000] .N...  4615.744904: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132580 op=16295 parent=16293 point=ORPHAN.FILE.FREE.EXIT formula=O-LIFE-DELTA ino=35 group=4294967295 tid=0 actual=1 expected=1 delta=0 update_delta=1 status=1 comparison_valid=1 reason=free_counter_after_slot_delete nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4448 slot=0"
+      },
+      {
+        "line": 39338,
+        "text": "workload-50591   [000] .N...  4615.744914: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132581 op=16295 parent=16293 point=ORPHAN.FILE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39339,
+        "text": "workload-50591   [000] .N...  4615.744941: ext4_fault_inject: dev=253,32 operation=inode_evict_final_dirty errno=-28 errno_choice_index=3 errno_choice_draw=3405 generation=142 injection=1 pid=50591 target_pid=50591 program=workload target_program=- call_index=0 match_index=3 group=0 block=35 len=1 result=-28 randomized=1 random_seed=9020905892345329710 probability_ppm=10000 random_check=3 random_draw=179"
+      },
+      {
+        "line": 39340,
+        "text": "workload-50591   [000] .N...  4615.745127: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132582 op=16293 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=35 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39341,
+        "text": "workload-50591   [000] .N...  4615.745139: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132583 op=16293 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=35 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39342,
+        "text": "workload-50591   [000] .N...  4615.745148: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132584 op=16293 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=35 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39343,
+        "text": "workload-50591   [000] .N...  4615.745157: ext4_counter_event: dev=253,32 epoch=46134635637 seq=132585 op=16293 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 39344,
+        "text": "workload-50591   [000] .....  4615.747510: sys_exit: NR 316 = 0"
+      },
+      {
+        "line": 39345,
+        "text": "workload-50591   [000] .....  4615.747563: sys_enter: NR 16 (4, 6365, 0, 2000000003c0, 0, 0)"
+      },
+      {
+        "line": 39346,
+        "text": "workload-50591   [000] .....  4615.747623: sys_exit: NR 16 = 0"
+      },
+      {
+        "line": 39347,
+        "text": "workload-50591   [000] .....  4615.747643: sys_enter: NR 1 (3, 7ffdfd2708a0, 10, 0, 0, 0)"
+      }
+    ]
+  },
+  {
+    "segment": 256,
+    "kind": "bigalloc",
+    "target_inode": 31,
+    "event": {
+      "line": 42196,
+      "text": "workload-62787   [000] .....  5716.322532: ext4_fault_inject: dev=253,32 operation=inode_evict_final_dirty errno=-28 errno_choice_index=3 errno_choice_draw=665019 generation=172 injection=1 pid=62787 target_pid=62787 program=workload target_program=- call_index=0 match_index=3 group=0 block=31 len=1 result=-28 randomized=1 random_seed=8087030744922336507 probability_ppm=10000 random_check=3 random_draw=8869"
+    },
+    "object_findings": [
+      {
+        "formula": "R-IEVICT",
+        "point": "INODE.EVICT.TARGET.EXIT",
+        "seq": 169737,
+        "op": 19883,
+        "ino": 31,
+        "group": 0,
+        "block": 0,
+        "slot": 0,
+        "actual": 1,
+        "expected": 0,
+        "reason": "after_incore_cleanup",
+        "stage": "operation_postcondition",
+        "capture_complete": true,
+        "recovered_seq": null,
+        "recovery_point": null,
+        "recovery_status": "not_observed"
+      }
+    ],
+    "eviction_scope": [
+      {
+        "line": 42175,
+        "text": "workload-62787   [000] .....  5716.321051: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169716 op=19883 parent=0 point=INODE.EVICT formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42176,
+        "text": "workload-62787   [000] .....  5716.321094: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169717 op=19883 parent=0 point=INODE.EVICT.TARGET.BEFORE formula=R-IEVICT ino=31 group=0 tid=0 actual=1 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=target_before_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42197,
+        "text": "workload-62787   [000] .....  5716.322605: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169737 op=19883 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=31 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42198,
+        "text": "workload-62787   [000] .....  5716.322615: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169738 op=19883 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=31 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42199,
+        "text": "workload-62787   [000] .....  5716.322624: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169739 op=19883 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=31 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42200,
+        "text": "workload-62787   [000] .....  5716.322633: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169740 op=19883 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      }
+    ],
+    "target_free_bitmap_events_in_segment": [],
+    "target_free_bitmap_events_after_hit": [],
+    "nearby_trace": [
+      {
+        "line": 42189,
+        "text": "workload-62787   [000] .....  5716.322403: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169730 op=19887 parent=19883 point=XATTR.INODE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42190,
+        "text": "workload-62787   [000] .....  5716.322416: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169731 op=19887 parent=19883 point=XATTR.INODE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42191,
+        "text": "workload-62787   [000] .....  5716.322429: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169732 op=19888 parent=19883 point=ORPHAN.FILE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42192,
+        "text": "workload-62787   [000] .....  5716.322450: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169733 op=19888 parent=19883 point=ORPHAN.FILE.SLOT.DELETE formula=O-LIFE-DELTA ino=31 group=4294967295 tid=0 actual=0 expected=31 delta=0 update_delta=-1 status=0 comparison_valid=0 reason=slot_cleared nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4448 slot=0"
+      },
+      {
+        "line": 42193,
+        "text": "workload-62787   [000] .....  5716.322465: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169734 op=19888 parent=19883 point=ORPHAN.FILE.DELETE.EXIT formula=O-LIFE ino=31 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=1 comparison_valid=1 reason=after_orphan_state_clear nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4448 slot=0"
+      },
+      {
+        "line": 42194,
+        "text": "workload-62787   [000] .....  5716.322473: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169735 op=19888 parent=19883 point=ORPHAN.FILE.FREE.EXIT formula=O-LIFE-DELTA ino=31 group=4294967295 tid=0 actual=1 expected=1 delta=0 update_delta=1 status=1 comparison_valid=1 reason=free_counter_after_slot_delete nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4448 slot=0"
+      },
+      {
+        "line": 42195,
+        "text": "workload-62787   [000] .....  5716.322502: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169736 op=19888 parent=19883 point=ORPHAN.FILE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42196,
+        "text": "workload-62787   [000] .....  5716.322532: ext4_fault_inject: dev=253,32 operation=inode_evict_final_dirty errno=-28 errno_choice_index=3 errno_choice_draw=665019 generation=172 injection=1 pid=62787 target_pid=62787 program=workload target_program=- call_index=0 match_index=3 group=0 block=31 len=1 result=-28 randomized=1 random_seed=8087030744922336507 probability_ppm=10000 random_check=3 random_draw=8869"
+      },
+      {
+        "line": 42197,
+        "text": "workload-62787   [000] .....  5716.322605: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169737 op=19883 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=31 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42198,
+        "text": "workload-62787   [000] .....  5716.322615: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169738 op=19883 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=31 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42199,
+        "text": "workload-62787   [000] .....  5716.322624: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169739 op=19883 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=31 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42200,
+        "text": "workload-62787   [000] .....  5716.322633: ext4_counter_event: dev=253,32 epoch=46134635637 seq=169740 op=19883 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 42201,
+        "text": "workload-62787   [000] .....  5716.322728: sys_exit: NR 84 = 0"
+      },
+      {
+        "line": 42202,
+        "text": "workload-62787   [000] .....  5716.324164: sys_enter: NR 16 (4, 6365, 0, 0, 0, 0)"
+      },
+      {
+        "line": 42203,
+        "text": "workload-62787   [000] .....  5716.324234: sys_exit: NR 16 = 0"
+      },
+      {
+        "line": 42204,
+        "text": "workload-62787   [000] .....  5716.324250: sys_enter: NR 1 (3, 7ffc3f8d8a20, 10, 0, 0, 0)"
+      }
+    ]
+  },
+  {
+    "segment": 281,
+    "kind": "inline",
+    "target_inode": 39,
+    "event": {
+      "line": 29838,
+      "text": "workload-69655   [001] .....  6362.695959: ext4_fault_inject: dev=253,48 operation=inode_evict_final_dirty errno=-28 errno_choice_index=3 errno_choice_draw=218133 generation=188 injection=1 pid=69655 target_pid=69655 program=workload target_program=- call_index=0 match_index=1 group=0 block=39 len=1 result=-28 randomized=1 random_seed=7568211218576229172 probability_ppm=10000 random_check=1 random_draw=3074"
+    },
+    "object_findings": [
+      {
+        "formula": "R-IEVICT",
+        "point": "INODE.EVICT.TARGET.EXIT",
+        "seq": 201153,
+        "op": 17104,
+        "ino": 39,
+        "group": 0,
+        "block": 0,
+        "slot": 0,
+        "actual": 1,
+        "expected": 0,
+        "reason": "after_incore_cleanup",
+        "stage": "operation_postcondition",
+        "capture_complete": true,
+        "recovered_seq": null,
+        "recovery_point": null,
+        "recovery_status": "not_observed"
+      }
+    ],
+    "eviction_scope": [
+      {
+        "line": 29829,
+        "text": "workload-69655   [001] .....  6362.695612: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201144 op=17104 parent=0 point=INODE.EVICT formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29830,
+        "text": "workload-69655   [001] .....  6362.695656: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201145 op=17104 parent=0 point=INODE.EVICT.TARGET.BEFORE formula=R-IEVICT ino=39 group=0 tid=0 actual=1 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=target_before_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29839,
+        "text": "workload-69655   [001] .....  6362.696049: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201153 op=17104 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=39 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29840,
+        "text": "workload-69655   [001] .....  6362.696059: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201154 op=17104 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=39 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29841,
+        "text": "workload-69655   [001] .....  6362.696067: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201155 op=17104 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=39 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29842,
+        "text": "workload-69655   [001] .....  6362.696075: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201156 op=17104 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      }
+    ],
+    "target_free_bitmap_events_in_segment": [],
+    "target_free_bitmap_events_after_hit": [],
+    "nearby_trace": [
+      {
+        "line": 29831,
+        "text": "workload-69655   [001] .....  6362.695833: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201146 op=17105 parent=17104 point=XATTR.INODE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29832,
+        "text": "workload-69655   [001] .....  6362.695855: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201147 op=17105 parent=17104 point=XATTR.INODE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29833,
+        "text": "workload-69655   [001] .....  6362.695870: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201148 op=17106 parent=17104 point=ORPHAN.FILE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29834,
+        "text": "workload-69655   [001] .....  6362.695901: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201149 op=17106 parent=17104 point=ORPHAN.FILE.SLOT.DELETE formula=O-LIFE-DELTA ino=39 group=4294967295 tid=0 actual=0 expected=39 delta=0 update_delta=-1 status=0 comparison_valid=0 reason=slot_cleared nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4392 slot=0"
+      },
+      {
+        "line": 29835,
+        "text": "workload-69655   [001] .....  6362.695918: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201150 op=17106 parent=17104 point=ORPHAN.FILE.DELETE.EXIT formula=O-LIFE ino=39 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=1 comparison_valid=1 reason=after_orphan_state_clear nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4392 slot=0"
+      },
+      {
+        "line": 29836,
+        "text": "workload-69655   [001] .....  6362.695927: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201151 op=17106 parent=17104 point=ORPHAN.FILE.FREE.EXIT formula=O-LIFE-DELTA ino=39 group=4294967295 tid=0 actual=1 expected=1 delta=0 update_delta=1 status=1 comparison_valid=1 reason=free_counter_after_slot_delete nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4392 slot=0"
+      },
+      {
+        "line": 29837,
+        "text": "workload-69655   [001] .....  6362.695934: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201152 op=17106 parent=17104 point=ORPHAN.FILE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29838,
+        "text": "workload-69655   [001] .....  6362.695959: ext4_fault_inject: dev=253,48 operation=inode_evict_final_dirty errno=-28 errno_choice_index=3 errno_choice_draw=218133 generation=188 injection=1 pid=69655 target_pid=69655 program=workload target_program=- call_index=0 match_index=1 group=0 block=39 len=1 result=-28 randomized=1 random_seed=7568211218576229172 probability_ppm=10000 random_check=1 random_draw=3074"
+      },
+      {
+        "line": 29839,
+        "text": "workload-69655   [001] .....  6362.696049: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201153 op=17104 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=39 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29840,
+        "text": "workload-69655   [001] .....  6362.696059: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201154 op=17104 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=39 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29841,
+        "text": "workload-69655   [001] .....  6362.696067: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201155 op=17104 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=39 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29842,
+        "text": "workload-69655   [001] .....  6362.696075: ext4_counter_event: dev=253,48 epoch=46575020522 seq=201156 op=17104 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 29843,
+        "text": "workload-69655   [001] .....  6362.696169: sys_exit: NR 84 = 0"
+      },
+      {
+        "line": 29844,
+        "text": "workload-69655   [001] .....  6362.696183: sys_enter: NR 16 (4, 6365, 0, 0, 0, 0)"
+      },
+      {
+        "line": 29845,
+        "text": "workload-69655   [001] .....  6362.696273: sys_exit: NR 16 = 0"
+      },
+      {
+        "line": 29846,
+        "text": "workload-69655   [001] .....  6362.696288: sys_enter: NR 1 (3, 7ffdf2943b60, 10, 0, 0, 0)"
+      }
+    ]
+  },
+  {
+    "segment": 347,
+    "kind": "inline",
+    "target_inode": 35,
+    "event": {
+      "line": 49039,
+      "text": "workload-87606   [001] .....  8009.692395: ext4_fault_inject: dev=253,48 operation=inode_evict_final_dirty errno=-117 errno_choice_index=5 errno_choice_draw=28577 generation=232 injection=1 pid=87606 target_pid=87606 program=workload target_program=- call_index=0 match_index=3 group=0 block=35 len=1 result=-117 randomized=1 random_seed=4353853261651550646 probability_ppm=10000 random_check=3 random_draw=9096"
+    },
+    "object_findings": [
+      {
+        "formula": "R-IEVICT",
+        "point": "INODE.EVICT.TARGET.EXIT",
+        "seq": 252858,
+        "op": 21243,
+        "ino": 35,
+        "group": 0,
+        "block": 0,
+        "slot": 0,
+        "actual": 1,
+        "expected": 0,
+        "reason": "after_incore_cleanup",
+        "stage": "operation_postcondition",
+        "capture_complete": true,
+        "recovered_seq": null,
+        "recovery_point": null,
+        "recovery_status": "not_observed"
+      }
+    ],
+    "eviction_scope": [
+      {
+        "line": 49030,
+        "text": "workload-87606   [001] .....  8009.691979: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252849 op=21243 parent=0 point=INODE.EVICT formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49031,
+        "text": "workload-87606   [001] .....  8009.692023: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252850 op=21243 parent=0 point=INODE.EVICT.TARGET.BEFORE formula=R-IEVICT ino=35 group=0 tid=0 actual=1 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=target_before_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49040,
+        "text": "workload-87606   [001] .....  8009.692491: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252858 op=21243 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=35 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49041,
+        "text": "workload-87606   [001] .....  8009.692501: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252859 op=21243 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=35 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49042,
+        "text": "workload-87606   [001] .....  8009.692509: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252860 op=21243 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=35 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49043,
+        "text": "workload-87606   [001] .....  8009.692518: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252861 op=21243 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      }
+    ],
+    "target_free_bitmap_events_in_segment": [],
+    "target_free_bitmap_events_after_hit": [],
+    "nearby_trace": [
+      {
+        "line": 49032,
+        "text": "workload-87606   [001] .....  8009.692281: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252851 op=21244 parent=21243 point=XATTR.INODE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49033,
+        "text": "workload-87606   [001] .....  8009.692301: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252852 op=21244 parent=21243 point=XATTR.INODE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49034,
+        "text": "workload-87606   [001] .....  8009.692316: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252853 op=21245 parent=21243 point=ORPHAN.FILE.DELETE formula=BEGIN ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_scope nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49035,
+        "text": "workload-87606   [001] .....  8009.692338: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252854 op=21245 parent=21243 point=ORPHAN.FILE.SLOT.DELETE formula=O-LIFE-DELTA ino=35 group=4294967295 tid=0 actual=0 expected=35 delta=0 update_delta=-1 status=0 comparison_valid=0 reason=slot_cleared nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4392 slot=0"
+      },
+      {
+        "line": 49036,
+        "text": "workload-87606   [001] .....  8009.692353: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252855 op=21245 parent=21243 point=ORPHAN.FILE.DELETE.EXIT formula=O-LIFE ino=35 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=1 comparison_valid=1 reason=after_orphan_state_clear nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4392 slot=0"
+      },
+      {
+        "line": 49037,
+        "text": "workload-87606   [001] .....  8009.692363: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252856 op=21245 parent=21243 point=ORPHAN.FILE.FREE.EXIT formula=O-LIFE-DELTA ino=35 group=4294967295 tid=0 actual=1 expected=1 delta=0 update_delta=1 status=1 comparison_valid=1 reason=free_counter_after_slot_delete nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=4392 slot=0"
+      },
+      {
+        "line": 49038,
+        "text": "workload-87606   [001] .....  8009.692370: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252857 op=21245 parent=21243 point=ORPHAN.FILE.DELETE formula=END ino=0 group=4294967295 tid=0 actual=0 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49039,
+        "text": "workload-87606   [001] .....  8009.692395: ext4_fault_inject: dev=253,48 operation=inode_evict_final_dirty errno=-117 errno_choice_index=5 errno_choice_draw=28577 generation=232 injection=1 pid=87606 target_pid=87606 program=workload target_program=- call_index=0 match_index=3 group=0 block=35 len=1 result=-117 randomized=1 random_seed=4353853261651550646 probability_ppm=10000 random_check=3 random_draw=9096"
+      },
+      {
+        "line": 49040,
+        "text": "workload-87606   [001] .....  8009.692491: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252858 op=21243 parent=0 point=INODE.EVICT.TARGET.EXIT formula=R-IEVICT ino=35 group=0 tid=0 actual=1 expected=0 delta=1 update_delta=0 status=2 comparison_valid=1 reason=after_incore_cleanup nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49041,
+        "text": "workload-87606   [001] .....  8009.692501: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252859 op=21243 parent=0 point=INODE.EVICT.DESCRIPTOR.EXIT formula=R-IDELTA-EVICT ino=35 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49042,
+        "text": "workload-87606   [001] .....  8009.692509: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252860 op=21243 parent=0 point=INODE.EVICT.GLOBAL.EXIT formula=R-IDELTA-EVICT ino=35 group=0 tid=0 actual=0 expected=1 delta=0 update_delta=0 status=3 comparison_valid=0 reason=slot_not_released_or_other_inode_updates nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=0 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49043,
+        "text": "workload-87606   [001] .....  8009.692518: ext4_counter_event: dev=253,48 epoch=46575020522 seq=252861 op=21243 parent=0 point=INODE.EVICT formula=END ino=0 group=4294967295 tid=0 actual=-117 expected=0 delta=0 update_delta=0 status=0 comparison_valid=0 reason=ext4_return_not_syscall nlink_before=0 nlink_after=0 dir_nlink_before=0 dir_nlink_after=0 step=0 schema=4 dir_ino=0 ref_delta=0 result=-117 generation=0 is_dir=0 block=0 slot=0"
+      },
+      {
+        "line": 49044,
+        "text": "workload-87606   [001] .....  8009.692632: sys_exit: NR 316 = 0"
+      },
+      {
+        "line": 49045,
+        "text": "workload-87606   [001] .....  8009.692717: sys_enter: NR 16 (4, 6365, 0, 2000000003c0, 0, 0)"
+      },
+      {
+        "line": 49046,
+        "text": "workload-87606   [001] .....  8009.695092: sys_exit: NR 16 = 0"
+      },
+      {
+        "line": 49047,
+        "text": "workload-87606   [001] .....  8009.695132: sys_enter: NR 1 (3, 7ffe55176110, 10, 0, 0, 0)"
+      }
+    ]
+  }
+]

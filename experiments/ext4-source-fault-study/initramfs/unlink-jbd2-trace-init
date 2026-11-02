@@ -1,0 +1,84 @@
+#!/bin/busybox sh
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /sys/kernel/debug /sys/kernel/tracing /mnt
+mount -t debugfs debugfs /sys/kernel/debug
+mount -t tracefs tracefs /sys/kernel/tracing 2>/dev/null || true
+
+TRACE=/sys/kernel/tracing
+mount -t ext4 -o errors=continue,noatime,inode_readahead_blks=0 /dev/vda /mnt || {
+	echo MOUNT_FAILED
+	exec /bin/busybox poweroff -f
+}
+cd /mnt/p || { echo PARENT_LOOKUP_FAILED; exec /bin/busybox poweroff -f; }
+exec 3<> file || { echo TARGET_OPEN_FAILED; exec /bin/busybox poweroff -f; }
+exec 4<> arm || { echo ARMFILE_OPEN_FAILED; exec /bin/busybox poweroff -f; }
+sync
+echo "QMP_READY parent_inode=$(stat -c %i .) target_inode=$(stat -c %i file)"
+read -r answer </dev/console
+/bin/busybox blockdev --flushbufs /dev/vda
+echo "BLOCKDEV_FLUSHBUFS_RESULT rc=$?"
+
+if [ ! -w "$TRACE/kprobe_events" ]; then
+	echo JBD2_TRACE_SETUP_ERROR=no-kprobe-events
+	exec /bin/busybox poweroff -f
+fi
+echo 0 > "$TRACE/tracing_on"
+echo > "$TRACE/trace"
+echo 'p:unlink_jbd2/abort jbd2_journal_abort journal=$arg1:x64 errno=$arg2:s32' > "$TRACE/kprobe_events" || {
+	echo JBD2_TRACE_SETUP_ERROR=abort-probe
+	exec /bin/busybox poweroff -f
+}
+echo 'p:unlink_jbd2/stop jbd2_journal_stop comm=$comm handle=$arg1:x64 tx=+0($arg1):x64 tid=+8(+0($arg1)):u32 state=+12(+0($arg1)):u32 h_err=+32($arg1):s32 h_aborted=+36($arg1):b1@3/32 j_flags=+0(+0(+0($arg1))):x64 j_errno=+8(+0(+0($arg1))):s32' >> "$TRACE/kprobe_events" || {
+	echo JBD2_TRACE_SETUP_ERROR=stop-probe
+	exec /bin/busybox poweroff -f
+}
+echo 'r:unlink_jbd2/stop_ret jbd2_journal_stop handle=$arg1:x64 ret=$retval:s32' >> "$TRACE/kprobe_events" || {
+	echo JBD2_TRACE_SETUP_ERROR=stop-return-probe
+	exec /bin/busybox poweroff -f
+}
+echo 1 > "$TRACE/events/unlink_jbd2/abort/enable"
+echo 1 > "$TRACE/events/unlink_jbd2/stop/enable"
+echo 1 > "$TRACE/events/unlink_jbd2/stop_ret/enable"
+if [ -w "$TRACE/events/jbd2/jbd2_start_commit/enable" ] &&
+	[ -w "$TRACE/events/jbd2/jbd2_end_commit/enable" ]; then
+	echo 1 > "$TRACE/events/jbd2/jbd2_start_commit/enable"
+	echo 1 > "$TRACE/events/jbd2/jbd2_end_commit/enable"
+else
+	echo JBD2_TRACE_SETUP_ERROR=no-commit-tracepoints
+	exec /bin/busybox poweroff -f
+fi
+echo "JBD2_ABORT_PROBE=$(grep 'unlink_jbd2/abort jbd2_journal_abort' "$TRACE/kprobe_events")"
+echo "JBD2_ABORT_PROBE_ENABLED=$(cat "$TRACE/events/unlink_jbd2/abort/enable")"
+echo JBD2_TRACE_SETUP_OK
+echo 1 > "$TRACE/tracing_on"
+/bin/fault-workload unlink file
+WORKLOAD_RC=$?
+echo "JBD2_WORKLOAD_RC=$WORKLOAD_RC"
+echo JBD2_STATS_BEFORE_SYNC_BEGIN
+for info in /proc/fs/jbd2/*/info; do
+	[ -f "$info" ] && { echo "JBD2_INFO_FILE=$info"; cat "$info"; }
+done
+echo JBD2_STATS_BEFORE_SYNC_END
+sync
+echo JBD2_STATS_AFTER_SYNC_BEGIN
+for info in /proc/fs/jbd2/*/info; do
+	[ -f "$info" ] && { echo "JBD2_INFO_FILE=$info"; cat "$info"; }
+done
+echo JBD2_STATS_AFTER_SYNC_END
+echo QMP_RESULT_READY
+read -r answer </dev/console
+sync
+exec 3>&- 4>&-
+cd /
+umount /mnt
+UMOUNT_RC=$?
+echo "UNMOUNT_RESULT rc=$UMOUNT_RC"
+echo 0 > "$TRACE/tracing_on"
+ABORT_HITS=$(grep -c 'abort:' "$TRACE/trace" || true)
+echo "JBD2_ABORT_PROBE_HITS=$ABORT_HITS"
+echo JBD2_TRACE_BEGIN
+cat "$TRACE/trace"
+echo JBD2_TRACE_END
+exec /bin/busybox poweroff -f

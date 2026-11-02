@@ -1,0 +1,17 @@
+Inode: 35   Type: regular    Mode:  0600   Flags: 0x10000000
+Generation: 148778612    Version: 0x00000000:00000002
+User:     0   Group:     0   Project:     0   Size: 19
+File ACL: 0
+Links: 0   Blockcount: 0
+Fragment:  Address: 0    Number: 0    Size: 0
+ ctime: 0x6ade2af6:95ea3b40 -- Mon Oct 26 00:14:46 2026
+ atime: 0x6ade2af3:4ea0b568 -- Mon Oct 26 00:14:43 2026
+ mtime: 0x6ade2af3:4ea0b568 -- Mon Oct 26 00:14:43 2026
+crtime: 0x6ade2af3:4ea0b568 -- Mon Oct 26 00:14:43 2026
+Size of extra inode fields: 32
+Extended attributes:
+  security.selinux (33) = "system_u:object_r:unlabeled_t:s0\000"
+  system.data (0)
+Inode checksum: 0x3d99b171
+Size of inline data: 60
+debugfs 1.47.2 (1-Jan-2025)

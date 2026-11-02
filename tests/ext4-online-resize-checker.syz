@@ -1,0 +1,5 @@
+# Online resize followed by the debugfs snapshot exercises checker group-array
+# lifetime.  The backing device must be larger than the initial filesystem.
+r0 = openat$dir(0xffffffffffffff9c, &AUTO='.\\x00', 0x10000, 0)
+ioctl$auto_EXT4_IOC_RESIZE_FS(r0, 0x40086610, &(0x7f0000000000)=0xc0000)
+close(r0)

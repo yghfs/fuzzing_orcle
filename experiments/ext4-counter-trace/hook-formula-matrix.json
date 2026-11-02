@@ -1,0 +1,3073 @@
+{
+  "schema": 1,
+  "source": "fault-errno-catalog.json + 公式.md",
+  "kernel_source": "Linux 6.12.1 ext4 development tree",
+  "hook_count": 88,
+  "observation_only_formula_count": 6,
+  "entries": [
+    {
+      "hook_id": "acl_mode_dirty",
+      "operation": "acl_mode_dirty",
+      "kernel_operation": "EXT4_FAULT_ACL_MODE_DIRTY",
+      "formula_ids": [
+        "R-ACL-MODE"
+      ],
+      "source_anchors": [
+        "fs/ext4/acl.c:ext4_set_acl",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-acl_mode_dirty-single-worker",
+      "fixture_action": "acl-mode",
+      "fixture_syscall_nr": 188,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/acl_mode_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "acl_mode_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "delalloc_reserve",
+      "operation": "delalloc_reserve",
+      "kernel_operation": "EXT4_FAULT_DELALLOC_RESERVE",
+      "formula_ids": [
+        "R-RESV",
+        "R-DELALLOC"
+      ],
+      "source_anchors": [
+        "fs/ext4/inode.c:ext4_da_reserve_space",
+        "fs/ext4/inode.c:ext4_claim_free_clusters"
+      ],
+      "mutation_stage": "reserve",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-delalloc_reserve-single-worker",
+      "fixture_action": "inline-file-write",
+      "fixture_syscall_nr": 1,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/delalloc_reserve",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "delalloc_reserve|reserve|caller_error_return"
+    },
+    {
+      "hook_id": "ea_inode_ref_dirty",
+      "operation": "ea_inode_ref_dirty",
+      "kernel_operation": "EXT4_FAULT_EA_INODE_REF_DIRTY",
+      "formula_ids": [
+        "EA-REF",
+        "EA-REF-DELTA",
+        "EA-INODE-REF"
+      ],
+      "source_anchors": [
+        "fs/ext4/xattr.c:ext4_xattr_inode_update_ref",
+        "fs/ext4/inode.c:ext4_mark_iloc_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-ea_inode_ref_dirty-single-worker",
+      "fixture_action": "ea-ref-set",
+      "fixture_syscall_nr": 188,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/ea_inode_ref_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "ea_inode_ref_dirty|dirty|source_defined"
+    },
+    {
+      "hook_id": "es_insert_alloc",
+      "operation": "es_insert_alloc",
+      "kernel_operation": "EXT4_FAULT_ES_INSERT_ALLOC",
+      "formula_ids": [
+        "R-ES"
+      ],
+      "source_anchors": [
+        "fs/ext4/extents_status.c:__es_insert_extent",
+        "fs/ext4/extents_status.c:__es_alloc_extent"
+      ],
+      "mutation_stage": "alloc",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "ENOMEM"
+      ],
+      "fixture_id": "fixture-es_insert_alloc-single-worker",
+      "fixture_action": "extent-split",
+      "fixture_syscall_nr": 285,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/es_insert_alloc",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "es_insert_alloc|alloc|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "extent_insert_dirty",
+      "operation": "extent_insert_dirty",
+      "kernel_operation": "EXT4_FAULT_EXTENT_INSERT_DIRTY",
+      "formula_ids": [
+        "R-EXTENT"
+      ],
+      "source_anchors": [
+        "fs/ext4/extents.c:__ext4_ext_dirty_faultable",
+        "fs/ext4/extents.c:ext4_ext_insert_extent",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-extent_insert_dirty-single-worker",
+      "fixture_action": "extent-split",
+      "fixture_syscall_nr": 285,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/extent_insert_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "extent_insert_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "fast_commit_inode_claim",
+      "operation": "fast_commit_inode_claim",
+      "kernel_operation": "EXT4_FAULT_FAST_COMMIT_INODE_CLAIM",
+      "formula_ids": [
+        "R-IG",
+        "R-ISUM",
+        "R-IDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/ialloc.c:ext4_mark_inode_used",
+        "fs/ext4/ialloc.c:ext4_read_inode_bitmap"
+      ],
+      "mutation_stage": "claim",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO"
+      ],
+      "fixture_id": "fixture-fast_commit_inode_claim-single-worker",
+      "fixture_action": "fast-commit-replay",
+      "fixture_syscall_nr": 165,
+      "fixture_kind": "fast-commit-replay",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/fast_commit_inode_claim",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "fast_commit_inode_claim|claim|source_defined"
+    },
+    {
+      "hook_id": "fileattr_flags_dirty",
+      "operation": "fileattr_flags_dirty",
+      "kernel_operation": "EXT4_FAULT_FILEATTR_FLAGS_DIRTY",
+      "formula_ids": [
+        "R-FILEATTR"
+      ],
+      "source_anchors": [
+        "fs/ext4/ioctl.c:ext4_ioctl_setflags",
+        "fs/ext4/inode.c:ext4_mark_iloc_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-fileattr_flags_dirty-single-worker",
+      "fixture_action": "fileattr-flags",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/fileattr_flags_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "fileattr_flags_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "fileattr_project_dirty",
+      "operation": "fileattr_project_dirty",
+      "kernel_operation": "EXT4_FAULT_FILEATTR_PROJECT_DIRTY",
+      "formula_ids": [
+        "R-FILEATTR"
+      ],
+      "source_anchors": [
+        "fs/ext4/ioctl.c:ext4_ioctl_setproject",
+        "fs/ext4/inode.c:ext4_mark_iloc_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-fileattr_project_dirty-single-worker",
+      "fixture_action": "fileattr-project",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/fileattr_project_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "fileattr_project_dirty|dirty|source_defined"
+    },
+    {
+      "hook_id": "group_add_bitmap_read",
+      "operation": "group_add_bitmap_read",
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_BITMAP_READ",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/resize.c:ext4_set_bitmap_checksums",
+        "fs/ext4/resize.c:ext4_get_bitmap",
+        "fs/ext4/resize.c:ext4_setup_new_descs"
+      ],
+      "mutation_stage": "read",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EIO"
+      ],
+      "fixture_id": "fixture-group_add_bitmap_read-single-worker",
+      "fixture_action": "resize-add-group",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/group_add_bitmap_read",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "group_add_bitmap_read|read|caller_error_return"
+    },
+    {
+      "hook_id": "group_add_desc_access",
+      "operation": "group_add_desc_access",
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_DESC_ACCESS",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/resize.c:ext4_add_new_descs",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-group_add_desc_access-single-worker",
+      "fixture_action": "resize-add-group",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/group_add_desc_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "group_add_desc_access|access|source_defined"
+    },
+    {
+      "hook_id": "group_add_desc_dirty",
+      "operation": "group_add_desc_dirty",
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_DESC_DIRTY",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/resize.c:ext4_setup_new_descs"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-group_add_desc_dirty-single-worker",
+      "fixture_action": "resize-add-group",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/group_add_desc_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "group_add_desc_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "group_add_groupinfo_alloc",
+      "operation": "group_add_groupinfo_alloc",
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_GROUPINFO_ALLOC",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/resize.c:ext4_setup_new_descs",
+        "fs/ext4/mballoc.c:ext4_mb_add_groupinfo"
+      ],
+      "mutation_stage": "alloc",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "ENOMEM"
+      ],
+      "fixture_id": "fixture-group_add_groupinfo_alloc-single-worker",
+      "fixture_action": "resize-add-group",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/group_add_groupinfo_alloc",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "group_add_groupinfo_alloc|alloc|caller_error_return"
+    },
+    {
+      "hook_id": "group_add_super_access",
+      "operation": "group_add_super_access",
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_SUPER_ACCESS",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/resize.c:ext4_flex_group_add",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-group_add_super_access-single-worker",
+      "fixture_action": "resize-add-group",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/group_add_super_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "group_add_super_access|access|source_defined"
+    },
+    {
+      "hook_id": "group_add_super_dirty",
+      "operation": "group_add_super_dirty",
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_SUPER_DIRTY",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/resize.c:ext4_flex_group_add"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-group_add_super_dirty-single-worker",
+      "fixture_action": "resize-add-group",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/group_add_super_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "group_add_super_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "inline_data_block_write_begin",
+      "operation": "inline_data_block_write_begin",
+      "kernel_operation": "EXT4_FAULT_INLINE_DATA_BLOCK_WRITE_BEGIN",
+      "formula_ids": [
+        "R-INLINE"
+      ],
+      "source_anchors": [
+        "fs/ext4/inline.c:ext4_convert_inline_data_to_extent",
+        "fs/ext4/inline.c:ext4_da_convert_inline_data_to_extent",
+        "fs/ext4/inode.c:ext4_block_write_begin",
+        "fs/ext4/inode.c:ext4_get_block"
+      ],
+      "mutation_stage": "begin",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EIO"
+      ],
+      "fixture_id": "fixture-inline_data_block_write_begin-single-worker",
+      "fixture_action": "inline-file-write",
+      "fixture_syscall_nr": 1,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/inline_data_block_write_begin",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "inline_data_block_write_begin|begin|caller_error_return"
+    },
+    {
+      "hook_id": "inline_dir_block_dirty",
+      "operation": "inline_dir_block_dirty",
+      "kernel_operation": "EXT4_FAULT_INLINE_DIR_BLOCK_DIRTY",
+      "formula_ids": [
+        "R-INLINE",
+        "R-INLINE-DIR"
+      ],
+      "source_anchors": [
+        "fs/ext4/inline.c:ext4_finish_convert_inline_dir",
+        "fs/ext4/namei.c:ext4_handle_dirty_dirblock_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-inline_dir_block_dirty-single-worker",
+      "fixture_action": "inline-dir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/inline_dir_block_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "inline_dir_block_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "inline_dir_inode_dirty",
+      "operation": "inline_dir_inode_dirty",
+      "kernel_operation": "EXT4_FAULT_INLINE_DIR_INODE_DIRTY",
+      "formula_ids": [
+        "R-INLINE",
+        "R-INLINE-DIR"
+      ],
+      "source_anchors": [
+        "fs/ext4/inline.c:ext4_finish_convert_inline_dir",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-inline_dir_inode_dirty-single-worker",
+      "fixture_action": "inline-dir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/inline_dir_inode_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "inline_dir_inode_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "inode_evict_bitmap_access",
+      "operation": "inode_evict_bitmap_access",
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_BITMAP_ACCESS",
+      "formula_ids": [
+        "R-IG",
+        "R-ISUM",
+        "R-IDELTA",
+        "R-IEVICT",
+        "R-IDELTA-EVICT"
+      ],
+      "source_anchors": [
+        "fs/ext4/ialloc.c:ext4_free_inode",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-inode_evict_bitmap_access-single-worker",
+      "fixture_action": "evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/inode_evict_bitmap_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "inode_evict_bitmap_access|access|source_defined"
+    },
+    {
+      "hook_id": "inode_evict_bitmap_dirty",
+      "operation": "inode_evict_bitmap_dirty",
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_BITMAP_DIRTY",
+      "formula_ids": [
+        "R-IG",
+        "R-ISUM",
+        "R-IDELTA",
+        "R-IEVICT",
+        "R-IDELTA-EVICT"
+      ],
+      "source_anchors": [
+        "fs/ext4/ialloc.c:ext4_free_inode",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-inode_evict_bitmap_dirty-single-worker",
+      "fixture_action": "evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/inode_evict_bitmap_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "inode_evict_bitmap_dirty|dirty|source_defined"
+    },
+    {
+      "hook_id": "inode_evict_bitmap_read",
+      "operation": "inode_evict_bitmap_read",
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_BITMAP_READ",
+      "formula_ids": [
+        "R-IG",
+        "R-ISUM",
+        "R-IDELTA",
+        "R-IEVICT",
+        "R-IDELTA-EVICT"
+      ],
+      "source_anchors": [
+        "fs/ext4/ialloc.c:ext4_free_inode",
+        "fs/ext4/ialloc.c:ext4_read_inode_bitmap"
+      ],
+      "mutation_stage": "read",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "ENOMEM",
+        "EFSCORRUPTED",
+        "EFSBADCRC"
+      ],
+      "fixture_id": "fixture-inode_evict_bitmap_read-single-worker",
+      "fixture_action": "evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/inode_evict_bitmap_read",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "inode_evict_bitmap_read|read|source_defined"
+    },
+    {
+      "hook_id": "inode_evict_final_access",
+      "operation": "inode_evict_final_access",
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_FINAL_ACCESS",
+      "formula_ids": [
+        "R-IG",
+        "R-ISUM",
+        "R-IDELTA",
+        "R-IEVICT",
+        "R-IDELTA-EVICT"
+      ],
+      "source_anchors": [
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/ext4/inode.c:__ext4_reserve_inode_write",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-inode_evict_final_access-single-worker",
+      "fixture_action": "evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/inode_evict_final_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "inode_evict_final_access|access|source_defined"
+    },
+    {
+      "hook_id": "inode_evict_final_dirty",
+      "operation": "inode_evict_final_dirty",
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_FINAL_DIRTY",
+      "formula_ids": [
+        "R-IG",
+        "R-ISUM",
+        "R-IDELTA",
+        "R-IEVICT",
+        "R-IDELTA-EVICT"
+      ],
+      "source_anchors": [
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/ext4/inode.c:ext4_mark_iloc_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-inode_evict_final_dirty-single-worker",
+      "fixture_action": "evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/inode_evict_final_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": true,
+      "coverage_kind": "fault",
+      "canonical_key": "inode_evict_final_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "inode_evict_group_desc_access",
+      "operation": "inode_evict_group_desc_access",
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_GROUP_DESC_ACCESS",
+      "formula_ids": [
+        "R-IG",
+        "R-ISUM",
+        "R-IDELTA",
+        "R-IEVICT",
+        "R-IDELTA-EVICT"
+      ],
+      "source_anchors": [
+        "fs/ext4/ialloc.c:ext4_free_inode",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-inode_evict_group_desc_access-single-worker",
+      "fixture_action": "evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/inode_evict_group_desc_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "inode_evict_group_desc_access|access|source_defined"
+    },
+    {
+      "hook_id": "inode_evict_group_desc_dirty",
+      "operation": "inode_evict_group_desc_dirty",
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_GROUP_DESC_DIRTY",
+      "formula_ids": [
+        "R-IG",
+        "R-ISUM",
+        "R-IDELTA",
+        "R-IEVICT",
+        "R-IDELTA-EVICT"
+      ],
+      "source_anchors": [
+        "fs/ext4/ialloc.c:ext4_free_inode",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-inode_evict_group_desc_dirty-single-worker",
+      "fixture_action": "evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/inode_evict_group_desc_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "inode_evict_group_desc_dirty|dirty|source_defined"
+    },
+    {
+      "hook_id": "mb_buddy_load",
+      "operation": "mb_buddy_load",
+      "kernel_operation": "EXT4_FAULT_MB_BUDDY_LOAD",
+      "formula_ids": [
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-MB-BUDDY"
+      ],
+      "source_anchors": [
+        "fs/ext4/mballoc.c:ext4_mb_load_buddy_gfp",
+        "fs/ext4/mballoc.c:ext4_mb_load_buddy",
+        "fs/ext4/mballoc.c:ext4_mb_init_group",
+        "fs/ext4/mballoc.c:ext4_mb_init_cache",
+        "fs/ext4/balloc.c:ext4_validate_block_bitmap"
+      ],
+      "mutation_stage": "load",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EIO",
+        "ENOMEM",
+        "EFSCORRUPTED",
+        "EFSBADCRC"
+      ],
+      "fixture_id": "fixture-mb_buddy_load-single-worker",
+      "fixture_action": "alloc-mballoc",
+      "fixture_syscall_nr": 285,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mb_buddy_load",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mb_buddy_load|load|caller_error_return"
+    },
+    {
+      "hook_id": "mballoc_free_mark",
+      "operation": "mballoc_free_mark",
+      "kernel_operation": "EXT4_FAULT_MBALLOC_FREE_MARK",
+      "formula_ids": [
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-MB-BUDDY"
+      ],
+      "source_anchors": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/ext4/mballoc.c:ext4_mb_clear_bb"
+      ],
+      "mutation_stage": "mark",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-mballoc_free_mark-single-worker",
+      "fixture_action": "free-punch",
+      "fixture_syscall_nr": 285,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mballoc_free_mark",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mballoc_free_mark|mark|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "mballoc_mark",
+      "operation": "mballoc_mark",
+      "kernel_operation": "EXT4_FAULT_MBALLOC_MARK",
+      "formula_ids": [
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-MB-BUDDY"
+      ],
+      "source_anchors": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "mark",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-mballoc_mark-single-worker",
+      "fixture_action": "alloc-mballoc",
+      "fixture_syscall_nr": 285,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mballoc_mark",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": true,
+      "coverage_kind": "fault",
+      "canonical_key": "mballoc_mark|mark|source_defined"
+    },
+    {
+      "hook_id": "migrate_swap_inode_data",
+      "operation": "migrate_swap_inode_data",
+      "kernel_operation": "EXT4_FAULT_MIGRATE_SWAP_INODE_DATA",
+      "formula_ids": [
+        "R-MIGRATE",
+        "R-EXTENT"
+      ],
+      "source_anchors": [
+        "fs/ext4/migrate.c:ext4_ext_swap_inode_data",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-migrate_swap_inode_data-single-worker",
+      "fixture_action": "migrate-extents",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/migrate_swap_inode_data",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "migrate_swap_inode_data|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "mkdir_add_entry_access",
+      "operation": "mkdir_add_entry_access",
+      "kernel_operation": "EXT4_FAULT_MKDIR_ADD_ENTRY_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA",
+        "R-MKDIR-ATOMIC"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:add_dirent_to_buf",
+        "fs/ext4/namei.c:ext4_dx_add_entry",
+        "fs/ext4/inline.c:ext4_add_dirent_to_inline",
+        "fs/ext4/namei.c:ext4_mkdir"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-mkdir_add_entry_access-single-worker",
+      "fixture_action": "mkdir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mkdir_add_entry_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mkdir_add_entry_access|access|source_defined"
+    },
+    {
+      "hook_id": "mkdir_add_entry_dirty",
+      "operation": "mkdir_add_entry_dirty",
+      "kernel_operation": "EXT4_FAULT_MKDIR_ADD_ENTRY_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA",
+        "R-MKDIR-ATOMIC"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:add_dirent_to_buf",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata",
+        "fs/ext4/namei.c:ext4_mkdir"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-mkdir_add_entry_dirty-single-worker",
+      "fixture_action": "mkdir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mkdir_add_entry_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mkdir_add_entry_dirty|dirty|source_defined"
+    },
+    {
+      "hook_id": "mkdir_add_entry_read",
+      "operation": "mkdir_add_entry_read",
+      "kernel_operation": "EXT4_FAULT_MKDIR_ADD_ENTRY_READ",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA",
+        "R-MKDIR-ATOMIC"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_add_entry",
+        "fs/ext4/namei.c:__ext4_read_dirblock",
+        "fs/ext4/namei.c:ext4_dx_add_entry",
+        "fs/ext4/namei.c:ext4_mkdir"
+      ],
+      "mutation_stage": "read",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "ENOMEM",
+        "EFSCORRUPTED",
+        "EFSBADCRC"
+      ],
+      "fixture_id": "fixture-mkdir_add_entry_read-single-worker",
+      "fixture_action": "mkdir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mkdir_add_entry_read",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mkdir_add_entry_read|read|source_defined"
+    },
+    {
+      "hook_id": "mkdir_append_alloc",
+      "operation": "mkdir_append_alloc",
+      "kernel_operation": "EXT4_FAULT_MKDIR_APPEND_ALLOC",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA",
+        "R-MKDIR-ATOMIC"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_append_faultable",
+        "fs/ext4/namei.c:ext4_add_entry",
+        "fs/ext4/inode.c:ext4_bread",
+        "fs/ext4/inode.c:ext4_getblk",
+        "fs/ext4/mballoc.c:ext4_mb_new_blocks",
+        "fs/ext4/namei.c:ext4_mkdir"
+      ],
+      "mutation_stage": "alloc",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EIO",
+        "ENOMEM",
+        "ENOSPC",
+        "EROFS",
+        "EFSCORRUPTED",
+        "EFSBADCRC",
+        "EDQUOT"
+      ],
+      "fixture_id": "fixture-mkdir_append_alloc-single-worker",
+      "fixture_action": "mkdir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mkdir_append_alloc",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mkdir_append_alloc|alloc|caller_error_return"
+    },
+    {
+      "hook_id": "mkdir_append_block_access",
+      "operation": "mkdir_append_block_access",
+      "kernel_operation": "EXT4_FAULT_MKDIR_APPEND_BLOCK_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA",
+        "R-MKDIR-ATOMIC"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_append_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/ext4/namei.c:ext4_mkdir"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-mkdir_append_block_access-single-worker",
+      "fixture_action": "mkdir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mkdir_append_block_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mkdir_append_block_access|access|source_defined"
+    },
+    {
+      "hook_id": "mkdir_child_access",
+      "operation": "mkdir_child_access",
+      "kernel_operation": "EXT4_FAULT_MKDIR_CHILD_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA",
+        "R-MKDIR-ATOMIC"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_mkdir",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-mkdir_child_access-single-worker",
+      "fixture_action": "mkdir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mkdir_child_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mkdir_child_access|access|caller_error_return"
+    },
+    {
+      "hook_id": "mkdir_child_dirty",
+      "operation": "mkdir_child_dirty",
+      "kernel_operation": "EXT4_FAULT_MKDIR_CHILD_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA",
+        "R-MKDIR-ATOMIC"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_mkdir"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-mkdir_child_dirty-single-worker",
+      "fixture_action": "mkdir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mkdir_child_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mkdir_child_dirty|dirty|source_defined"
+    },
+    {
+      "hook_id": "mkdir_dirblock_dirty",
+      "operation": "mkdir_dirblock_dirty",
+      "kernel_operation": "EXT4_FAULT_MKDIR_DIRBLOCK_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA",
+        "R-MKDIR-ATOMIC"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_init_new_dir_faultable",
+        "fs/ext4/namei.c:ext4_mkdir",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-mkdir_dirblock_dirty-single-worker",
+      "fixture_action": "mkdir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mkdir_dirblock_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mkdir_dirblock_dirty|dirty|source_defined"
+    },
+    {
+      "hook_id": "mkdir_parent_access",
+      "operation": "mkdir_parent_access",
+      "kernel_operation": "EXT4_FAULT_MKDIR_PARENT_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA",
+        "R-MKDIR-ATOMIC"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_mkdir",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-mkdir_parent_access-single-worker",
+      "fixture_action": "mkdir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mkdir_parent_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mkdir_parent_access|access|source_defined"
+    },
+    {
+      "hook_id": "mkdir_parent_dirty",
+      "operation": "mkdir_parent_dirty",
+      "kernel_operation": "EXT4_FAULT_MKDIR_PARENT_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA",
+        "R-MKDIR-ATOMIC"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_mkdir"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-mkdir_parent_dirty-single-worker",
+      "fixture_action": "mkdir",
+      "fixture_syscall_nr": 258,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/mkdir_parent_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "mkdir_parent_dirty|dirty|source_defined"
+    },
+    {
+      "hook_id": "orphan_file_delete_access",
+      "operation": "orphan_file_delete_access",
+      "kernel_operation": "EXT4_FAULT_ORPHAN_FILE_DELETE_ACCESS",
+      "formula_ids": [
+        "O-LIFE",
+        "O-LIFE-DELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/orphan.c:ext4_orphan_file_del",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-orphan_file_delete_access-single-worker",
+      "fixture_action": "evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/orphan_file_delete_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "orphan_file_delete_access|access|source_defined"
+    },
+    {
+      "hook_id": "orphan_file_delete_dirty",
+      "operation": "orphan_file_delete_dirty",
+      "kernel_operation": "EXT4_FAULT_ORPHAN_FILE_DELETE_DIRTY",
+      "formula_ids": [
+        "O-LIFE",
+        "O-LIFE-DELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/orphan.c:ext4_orphan_file_del",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-orphan_file_delete_dirty-single-worker",
+      "fixture_action": "evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/orphan_file_delete_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "orphan_file_delete_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "rename_delete_old",
+      "operation": "rename_delete_old",
+      "kernel_operation": "EXT4_FAULT_RENAME_DELETE_OLD",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_delete_entry_internal",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ],
+      "mutation_stage": "old",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rename_delete_old-single-worker",
+      "fixture_action": "rename-replace",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_delete_old",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_delete_old|old|source_defined"
+    },
+    {
+      "hook_id": "rename_delete_old_dirty",
+      "operation": "rename_delete_old_dirty",
+      "kernel_operation": "EXT4_FAULT_RENAME_DELETE_OLD_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename_delete"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rename_delete_old_dirty-single-worker",
+      "fixture_action": "rename-replace",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_delete_old_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_delete_old_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "rename_dir_finish",
+      "operation": "rename_dir_finish",
+      "kernel_operation": "EXT4_FAULT_RENAME_DIR_FINISH",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename_dir_finish"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rename_dir_finish-single-worker",
+      "fixture_action": "rename-dir",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_dir_finish",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_dir_finish|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "rename_dir_finish_inode_access",
+      "operation": "rename_dir_finish_inode_access",
+      "kernel_operation": "EXT4_FAULT_RENAME_DIR_FINISH_INODE_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename_dir_finish",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rename_dir_finish_inode_access-single-worker",
+      "fixture_action": "rename-dir-inline",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_dir_finish_inode_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_dir_finish_inode_access|access|source_defined"
+    },
+    {
+      "hook_id": "rename_dir_prepare_access",
+      "operation": "rename_dir_prepare_access",
+      "kernel_operation": "EXT4_FAULT_RENAME_DIR_PREPARE_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename_dir_prepare",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rename_dir_prepare_access-single-worker",
+      "fixture_action": "rename-dir",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_dir_prepare_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_dir_prepare_access|access|caller_error_return"
+    },
+    {
+      "hook_id": "rename_exchange_new_parent_access",
+      "operation": "rename_exchange_new_parent_access",
+      "kernel_operation": "EXT4_FAULT_RENAME_EXCHANGE_NEW_PARENT_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_cross_rename",
+        "fs/ext4/namei.c:ext4_update_dir_count",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rename_exchange_new_parent_access-single-worker",
+      "fixture_action": "rename-exchange",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_exchange_new_parent_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_exchange_new_parent_access|access|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "rename_exchange_new_parent_dirty",
+      "operation": "rename_exchange_new_parent_dirty",
+      "kernel_operation": "EXT4_FAULT_RENAME_EXCHANGE_NEW_PARENT_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_update_dir_count",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rename_exchange_new_parent_dirty-single-worker",
+      "fixture_action": "rename-exchange",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_exchange_new_parent_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_exchange_new_parent_dirty|dirty|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "rename_exchange_old_parent_access",
+      "operation": "rename_exchange_old_parent_access",
+      "kernel_operation": "EXT4_FAULT_RENAME_EXCHANGE_OLD_PARENT_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_cross_rename",
+        "fs/ext4/namei.c:ext4_update_dir_count",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rename_exchange_old_parent_access-single-worker",
+      "fixture_action": "rename-exchange",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_exchange_old_parent_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_exchange_old_parent_access|access|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "rename_exchange_old_parent_dirty",
+      "operation": "rename_exchange_old_parent_dirty",
+      "kernel_operation": "EXT4_FAULT_RENAME_EXCHANGE_OLD_PARENT_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_update_dir_count",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rename_exchange_old_parent_dirty-single-worker",
+      "fixture_action": "rename-exchange",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_exchange_old_parent_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_exchange_old_parent_dirty|dirty|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "rename_new_parent_access",
+      "operation": "rename_new_parent_access",
+      "kernel_operation": "EXT4_FAULT_RENAME_NEW_PARENT_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rename_new_parent_access-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_new_parent_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_new_parent_access|access|source_defined"
+    },
+    {
+      "hook_id": "rename_new_parent_dirty",
+      "operation": "rename_new_parent_dirty",
+      "kernel_operation": "EXT4_FAULT_RENAME_NEW_PARENT_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rename_new_parent_dirty-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_new_parent_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_new_parent_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "rename_old_inode_access",
+      "operation": "rename_old_inode_access",
+      "kernel_operation": "EXT4_FAULT_RENAME_OLD_INODE_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rename_old_inode_access-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_old_inode_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_old_inode_access|access|source_defined"
+    },
+    {
+      "hook_id": "rename_old_inode_dirty",
+      "operation": "rename_old_inode_dirty",
+      "kernel_operation": "EXT4_FAULT_RENAME_OLD_INODE_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rename_old_inode_dirty-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_old_inode_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_old_inode_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "rename_old_parent_access",
+      "operation": "rename_old_parent_access",
+      "kernel_operation": "EXT4_FAULT_RENAME_OLD_PARENT_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rename_old_parent_access-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_old_parent_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_old_parent_access|access|source_defined"
+    },
+    {
+      "hook_id": "rename_old_parent_dirty",
+      "operation": "rename_old_parent_dirty",
+      "kernel_operation": "EXT4_FAULT_RENAME_OLD_PARENT_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rename_old_parent_dirty-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_old_parent_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_old_parent_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "rename_replaced_inode_access",
+      "operation": "rename_replaced_inode_access",
+      "kernel_operation": "EXT4_FAULT_RENAME_REPLACED_INODE_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rename_replaced_inode_access-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_replaced_inode_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_replaced_inode_access|access|source_defined"
+    },
+    {
+      "hook_id": "rename_replaced_inode_dirty",
+      "operation": "rename_replaced_inode_dirty",
+      "kernel_operation": "EXT4_FAULT_RENAME_REPLACED_INODE_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rename"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rename_replaced_inode_dirty-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_replaced_inode_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_replaced_inode_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "rename_setent_access",
+      "operation": "rename_setent_access",
+      "kernel_operation": "EXT4_FAULT_RENAME_SETENT_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_setent",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rename_setent_access-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_setent_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_setent_access|access|source_defined"
+    },
+    {
+      "hook_id": "rename_setent_dirty",
+      "operation": "rename_setent_dirty",
+      "kernel_operation": "EXT4_FAULT_RENAME_SETENT_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_setent"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rename_setent_dirty-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_setent_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_setent_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "rename_setent_inode_access",
+      "operation": "rename_setent_inode_access",
+      "kernel_operation": "EXT4_FAULT_RENAME_SETENT_INODE_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_setent",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rename_setent_inode_access-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_setent_inode_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_setent_inode_access|access|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "rename_setent_inode_dirty",
+      "operation": "rename_setent_inode_dirty",
+      "kernel_operation": "EXT4_FAULT_RENAME_SETENT_INODE_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_setent"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rename_setent_inode_dirty-single-worker",
+      "fixture_action": "rename",
+      "fixture_syscall_nr": 316,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rename_setent_inode_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rename_setent_inode_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "resize_extend_add_blocks",
+      "operation": "resize_extend_add_blocks",
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_ADD_BLOCKS",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/mballoc.c:ext4_group_add_blocks",
+        "fs/ext4/resize.c:ext4_group_extend_no_check"
+      ],
+      "mutation_stage": "blocks",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-resize_extend_add_blocks-single-worker",
+      "fixture_action": "resize-extend",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/resize_extend_add_blocks",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "resize_extend_add_blocks|blocks|source_defined"
+    },
+    {
+      "hook_id": "resize_extend_bitmap_dirty",
+      "operation": "resize_extend_bitmap_dirty",
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_BITMAP_DIRTY",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/mballoc.c:ext4_group_add_blocks"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-resize_extend_bitmap_dirty-single-worker",
+      "fixture_action": "resize-extend",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/resize_extend_bitmap_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "resize_extend_bitmap_dirty|dirty|source_defined"
+    },
+    {
+      "hook_id": "resize_extend_bitmap_read",
+      "operation": "resize_extend_bitmap_read",
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_BITMAP_READ",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/balloc.c:ext4_read_block_bitmap",
+        "fs/ext4/balloc.c:ext4_wait_block_bitmap"
+      ],
+      "mutation_stage": "read",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EIO",
+        "ENOMEM",
+        "EFSCORRUPTED",
+        "EFSBADCRC"
+      ],
+      "fixture_id": "fixture-resize_extend_bitmap_read-single-worker",
+      "fixture_action": "resize-extend",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/resize_extend_bitmap_read",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "resize_extend_bitmap_read|read|caller_error_return"
+    },
+    {
+      "hook_id": "resize_extend_buddy_load",
+      "operation": "resize_extend_buddy_load",
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_BUDDY_LOAD",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/mballoc.c:ext4_group_add_blocks",
+        "fs/ext4/mballoc.c:ext4_mb_load_buddy_gfp",
+        "fs/ext4/mballoc.c:ext4_mb_init_group",
+        "fs/ext4/resize.c:ext4_group_extend_no_check"
+      ],
+      "mutation_stage": "load",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EIO",
+        "ENOMEM",
+        "EFSCORRUPTED",
+        "EFSBADCRC"
+      ],
+      "fixture_id": "fixture-resize_extend_buddy_load-single-worker",
+      "fixture_action": "resize-extend",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/resize_extend_buddy_load",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "resize_extend_buddy_load|load|caller_error_return"
+    },
+    {
+      "hook_id": "resize_extend_group_desc_access",
+      "operation": "resize_extend_group_desc_access",
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_GROUP_DESC_ACCESS",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/resize.c:ext4_group_extend_no_check"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-resize_extend_group_desc_access-single-worker",
+      "fixture_action": "resize-extend",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/resize_extend_group_desc_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "resize_extend_group_desc_access|access|source_defined"
+    },
+    {
+      "hook_id": "resize_extend_group_desc_dirty",
+      "operation": "resize_extend_group_desc_dirty",
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_GROUP_DESC_DIRTY",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/mballoc.c:ext4_group_add_blocks"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-resize_extend_group_desc_dirty-single-worker",
+      "fixture_action": "resize-extend",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/resize_extend_group_desc_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "resize_extend_group_desc_dirty|dirty|source_defined"
+    },
+    {
+      "hook_id": "resize_extend_super_access",
+      "operation": "resize_extend_super_access",
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_SUPER_ACCESS",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/resize.c:ext4_group_extend_no_check",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-resize_extend_super_access-single-worker",
+      "fixture_action": "resize-extend",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/resize_extend_super_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "resize_extend_super_access|access|source_defined"
+    },
+    {
+      "hook_id": "resize_extend_super_dirty",
+      "operation": "resize_extend_super_dirty",
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_SUPER_DIRTY",
+      "formula_ids": [
+        "P-SB",
+        "R-BG",
+        "R-BSUM",
+        "R-BDELTA",
+        "R-FLEX"
+      ],
+      "source_anchors": [
+        "fs/ext4/resize.c:ext4_group_extend_no_check",
+        "fs/ext4/ext4_jbd2.c:ext4_handle_dirty_metadata_error",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_stop"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-resize_extend_super_dirty-single-worker",
+      "fixture_action": "resize-extend",
+      "fixture_syscall_nr": 16,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/resize_extend_super_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "resize_extend_super_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "rmdir_child_access",
+      "operation": "rmdir_child_access",
+      "kernel_operation": "EXT4_FAULT_RMDIR_CHILD_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rmdir",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rmdir_child_access-single-worker",
+      "fixture_action": "rmdir",
+      "fixture_syscall_nr": 84,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rmdir_child_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rmdir_child_access|access|caller_error_return"
+    },
+    {
+      "hook_id": "rmdir_child_dirty",
+      "operation": "rmdir_child_dirty",
+      "kernel_operation": "EXT4_FAULT_RMDIR_CHILD_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rmdir"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rmdir_child_dirty-single-worker",
+      "fixture_action": "rmdir",
+      "fixture_syscall_nr": 84,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rmdir_child_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rmdir_child_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "rmdir_dirent_delete",
+      "operation": "rmdir_dirent_delete",
+      "kernel_operation": "EXT4_FAULT_RMDIR_DIRENT_DELETE",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_delete_entry_internal",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ],
+      "mutation_stage": "delete",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rmdir_dirent_delete-single-worker",
+      "fixture_action": "rmdir",
+      "fixture_syscall_nr": 84,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rmdir_dirent_delete",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rmdir_dirent_delete|delete|source_defined"
+    },
+    {
+      "hook_id": "rmdir_dirent_dirty",
+      "operation": "rmdir_dirent_dirty",
+      "kernel_operation": "EXT4_FAULT_RMDIR_DIRENT_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rmdir"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rmdir_dirent_dirty-single-worker",
+      "fixture_action": "rmdir",
+      "fixture_syscall_nr": 84,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rmdir_dirent_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rmdir_dirent_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "rmdir_parent_access",
+      "operation": "rmdir_parent_access",
+      "kernel_operation": "EXT4_FAULT_RMDIR_PARENT_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rmdir",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-rmdir_parent_access-single-worker",
+      "fixture_action": "rmdir",
+      "fixture_syscall_nr": 84,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rmdir_parent_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rmdir_parent_access|access|caller_error_return"
+    },
+    {
+      "hook_id": "rmdir_parent_dirty",
+      "operation": "rmdir_parent_dirty",
+      "kernel_operation": "EXT4_FAULT_RMDIR_PARENT_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_rmdir"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-rmdir_parent_dirty-single-worker",
+      "fixture_action": "rmdir",
+      "fixture_syscall_nr": 84,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/rmdir_parent_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "rmdir_parent_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "unlink_dirent_block_dirty",
+      "operation": "unlink_dirent_block_dirty",
+      "kernel_operation": "EXT4_FAULT_UNLINK_DIRENT_BLOCK_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:__ext4_unlink"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-unlink_dirent_block_dirty-single-worker",
+      "fixture_action": "unlink",
+      "fixture_syscall_nr": 263,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/unlink_dirent_block_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "unlink_dirent_block_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "unlink_dirent_delete",
+      "operation": "unlink_dirent_delete",
+      "kernel_operation": "EXT4_FAULT_UNLINK_DIRENT_DELETE",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:ext4_delete_entry_internal",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ],
+      "mutation_stage": "delete",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-unlink_dirent_delete-single-worker",
+      "fixture_action": "unlink",
+      "fixture_syscall_nr": 263,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/unlink_dirent_delete",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "unlink_dirent_delete|delete|source_defined"
+    },
+    {
+      "hook_id": "unlink_dirent_dirty",
+      "operation": "unlink_dirent_dirty",
+      "kernel_operation": "EXT4_FAULT_UNLINK_DIRENT_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:__ext4_unlink"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-unlink_dirent_dirty-single-worker",
+      "fixture_action": "unlink",
+      "fixture_syscall_nr": 263,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/unlink_dirent_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "unlink_dirent_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "unlink_dirent_inode_access",
+      "operation": "unlink_dirent_inode_access",
+      "kernel_operation": "EXT4_FAULT_UNLINK_DIRENT_INODE_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:__ext4_unlink",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-unlink_dirent_inode_access-single-worker",
+      "fixture_action": "unlink",
+      "fixture_syscall_nr": 263,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/unlink_dirent_inode_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "unlink_dirent_inode_access|access|source_defined"
+    },
+    {
+      "hook_id": "unlink_inode_access",
+      "operation": "unlink_inode_access",
+      "kernel_operation": "EXT4_FAULT_UNLINK_INODE_ACCESS",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:__ext4_unlink",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "source_defined",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-unlink_inode_access-single-worker",
+      "fixture_action": "unlink",
+      "fixture_syscall_nr": 263,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/unlink_inode_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "unlink_inode_access|access|source_defined"
+    },
+    {
+      "hook_id": "unlink_inode_dirty",
+      "operation": "unlink_inode_dirty",
+      "kernel_operation": "EXT4_FAULT_UNLINK_INODE_DIRTY",
+      "formula_ids": [
+        "R-LINK",
+        "R-UG",
+        "R-USUM",
+        "R-UDELTA",
+        "R-IDELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/namei.c:__ext4_unlink"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-unlink_inode_dirty-single-worker",
+      "fixture_action": "unlink",
+      "fixture_syscall_nr": 263,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/unlink_inode_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": true,
+      "coverage_kind": "fault",
+      "canonical_key": "unlink_inode_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "xattr_release_access",
+      "operation": "xattr_release_access",
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_ACCESS",
+      "formula_ids": [
+        "XATTR-REF",
+        "XATTR-REF-DELTA",
+        "EA-REF",
+        "EA-REF-DELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-xattr_release_access-single-worker",
+      "fixture_action": "xattr-evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/xattr_release_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "xattr_release_access|access|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "xattr_release_bitmap_access",
+      "operation": "xattr_release_bitmap_access",
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_BITMAP_ACCESS",
+      "formula_ids": [
+        "XATTR-REF",
+        "XATTR-REF-DELTA",
+        "EA-REF",
+        "EA-REF-DELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/mballoc.c:ext4_free_blocks",
+        "fs/ext4/mballoc.c:ext4_mb_mark_context"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-xattr_release_bitmap_access-single-worker",
+      "fixture_action": "xattr-single-evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/xattr_release_bitmap_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "xattr_release_bitmap_access|access|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "xattr_release_bitmap_dirty",
+      "operation": "xattr_release_bitmap_dirty",
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_BITMAP_DIRTY",
+      "formula_ids": [
+        "XATTR-REF",
+        "XATTR-REF-DELTA",
+        "EA-REF",
+        "EA-REF-DELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/mballoc.c:ext4_free_blocks",
+        "fs/ext4/mballoc.c:ext4_mb_mark_context"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-xattr_release_bitmap_dirty-single-worker",
+      "fixture_action": "xattr-single-evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/xattr_release_bitmap_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "xattr_release_bitmap_dirty|dirty|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "xattr_release_dirty",
+      "operation": "xattr_release_dirty",
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_DIRTY",
+      "formula_ids": [
+        "XATTR-REF",
+        "XATTR-REF-DELTA",
+        "EA-REF",
+        "EA-REF-DELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-xattr_release_dirty-single-worker",
+      "fixture_action": "xattr-evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/xattr_release_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "xattr_release_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": "xattr_release_group_desc_access",
+      "operation": "xattr_release_group_desc_access",
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_GROUP_DESC_ACCESS",
+      "formula_ids": [
+        "XATTR-REF",
+        "XATTR-REF-DELTA",
+        "EA-REF",
+        "EA-REF-DELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/mballoc.c:ext4_free_blocks",
+        "fs/ext4/mballoc.c:ext4_mb_mark_context"
+      ],
+      "mutation_stage": "access",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "EIO",
+        "EROFS"
+      ],
+      "fixture_id": "fixture-xattr_release_group_desc_access-single-worker",
+      "fixture_action": "xattr-single-evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/xattr_release_group_desc_access",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "xattr_release_group_desc_access|access|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "xattr_release_group_desc_dirty",
+      "operation": "xattr_release_group_desc_dirty",
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_GROUP_DESC_DIRTY",
+      "formula_ids": [
+        "XATTR-REF",
+        "XATTR-REF-DELTA",
+        "EA-REF",
+        "EA-REF-DELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/mballoc.c:ext4_free_blocks",
+        "fs/ext4/mballoc.c:ext4_mb_mark_context"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "helper_consumed_or_void",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-xattr_release_group_desc_dirty-single-worker",
+      "fixture_action": "xattr-single-evict-close",
+      "fixture_syscall_nr": 3,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/xattr_release_group_desc_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "xattr_release_group_desc_dirty|dirty|helper_consumed_or_void"
+    },
+    {
+      "hook_id": "xattr_set_inode_dirty",
+      "operation": "xattr_set_inode_dirty",
+      "kernel_operation": "EXT4_FAULT_XATTR_SET_INODE_DIRTY",
+      "formula_ids": [
+        "R-XATTR-ATOMIC",
+        "XATTR-REF",
+        "XATTR-REF-DELTA"
+      ],
+      "source_anchors": [
+        "fs/ext4/xattr.c:ext4_xattr_set_handle",
+        "fs/ext4/inode.c:ext4_mark_iloc_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ],
+      "mutation_stage": "dirty",
+      "caller_return_contract": "caller_error_return",
+      "native_errno_choices": [
+        "EFSCORRUPTED",
+        "EROFS",
+        "ENOSPC"
+      ],
+      "fixture_id": "fixture-xattr_set_inode_dirty-single-worker",
+      "fixture_action": "xattr-set",
+      "fixture_syscall_nr": 188,
+      "fixture_kind": "single-worker-c",
+      "fixture_workers": 1,
+      "vm_evidence_dir": "results/hook-fixtures/xattr_set_inode_dirty",
+      "vm_evidence_schema": 2,
+      "evidence_required": true,
+      "random_admission": false,
+      "coverage_kind": "fault",
+      "canonical_key": "xattr_set_inode_dirty|dirty|caller_error_return"
+    },
+    {
+      "hook_id": null,
+      "operation": null,
+      "kernel_operation": null,
+      "formula_ids": [
+        "M-B"
+      ],
+      "source_anchors": [],
+      "mutation_stage": "observation-only",
+      "caller_return_contract": "no_native_fault_return",
+      "native_errno_choices": [],
+      "fixture_id": null,
+      "fixture_action": null,
+      "fixture_workers": 1,
+      "vm_evidence_dir": null,
+      "vm_evidence_schema": 2,
+      "evidence_required": false,
+      "random_admission": false,
+      "coverage_kind": "observation-only",
+      "canonical_key": "observation-only|M-B"
+    },
+    {
+      "hook_id": null,
+      "operation": null,
+      "kernel_operation": null,
+      "formula_ids": [
+        "M-I"
+      ],
+      "source_anchors": [],
+      "mutation_stage": "observation-only",
+      "caller_return_contract": "no_native_fault_return",
+      "native_errno_choices": [],
+      "fixture_id": null,
+      "fixture_action": null,
+      "fixture_workers": 1,
+      "vm_evidence_dir": null,
+      "vm_evidence_schema": 2,
+      "evidence_required": false,
+      "random_admission": false,
+      "coverage_kind": "observation-only",
+      "canonical_key": "observation-only|M-I"
+    },
+    {
+      "hook_id": null,
+      "operation": null,
+      "kernel_operation": null,
+      "formula_ids": [
+        "M-U"
+      ],
+      "source_anchors": [],
+      "mutation_stage": "observation-only",
+      "caller_return_contract": "no_native_fault_return",
+      "native_errno_choices": [],
+      "fixture_id": null,
+      "fixture_action": null,
+      "fixture_workers": 1,
+      "vm_evidence_dir": null,
+      "vm_evidence_schema": 2,
+      "evidence_required": false,
+      "random_admission": false,
+      "coverage_kind": "observation-only",
+      "canonical_key": "observation-only|M-U"
+    },
+    {
+      "hook_id": null,
+      "operation": null,
+      "kernel_operation": null,
+      "formula_ids": [
+        "P-DISK"
+      ],
+      "source_anchors": [],
+      "mutation_stage": "observation-only",
+      "caller_return_contract": "no_native_fault_return",
+      "native_errno_choices": [],
+      "fixture_id": null,
+      "fixture_action": null,
+      "fixture_workers": 1,
+      "vm_evidence_dir": null,
+      "vm_evidence_schema": 2,
+      "evidence_required": false,
+      "random_admission": false,
+      "coverage_kind": "observation-only",
+      "canonical_key": "observation-only|P-DISK"
+    },
+    {
+      "hook_id": null,
+      "operation": null,
+      "kernel_operation": null,
+      "formula_ids": [
+        "R-IH"
+      ],
+      "source_anchors": [],
+      "mutation_stage": "observation-only",
+      "caller_return_contract": "no_native_fault_return",
+      "native_errno_choices": [],
+      "fixture_id": null,
+      "fixture_action": null,
+      "fixture_workers": 1,
+      "vm_evidence_dir": null,
+      "vm_evidence_schema": 2,
+      "evidence_required": false,
+      "random_admission": false,
+      "coverage_kind": "observation-only",
+      "canonical_key": "observation-only|R-IH"
+    },
+    {
+      "hook_id": null,
+      "operation": null,
+      "kernel_operation": null,
+      "formula_ids": [
+        "R-MB-PENDING"
+      ],
+      "source_anchors": [],
+      "mutation_stage": "observation-only",
+      "caller_return_contract": "no_native_fault_return",
+      "native_errno_choices": [],
+      "fixture_id": null,
+      "fixture_action": null,
+      "fixture_workers": 1,
+      "vm_evidence_dir": null,
+      "vm_evidence_schema": 2,
+      "evidence_required": false,
+      "random_admission": false,
+      "coverage_kind": "observation-only",
+      "canonical_key": "observation-only|R-MB-PENDING"
+    }
+  ]
+}

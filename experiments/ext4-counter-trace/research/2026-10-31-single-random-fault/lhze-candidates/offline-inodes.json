@@ -1,0 +1,825 @@
+{
+  "regular": {
+    "allocated_zero_link_inodes": [],
+    "directories": [
+      {
+        "ino": 2,
+        "links": 4,
+        "entries": [
+          [
+            2,
+            ".",
+            2
+          ],
+          [
+            2,
+            "..",
+            2
+          ],
+          [
+            11,
+            "lost+found",
+            2
+          ],
+          [
+            13,
+            "syz-work",
+            2
+          ]
+        ]
+      },
+      {
+        "ino": 11,
+        "links": 2,
+        "entries": [
+          [
+            11,
+            ".",
+            2
+          ],
+          [
+            2,
+            "..",
+            2
+          ]
+        ]
+      },
+      {
+        "ino": 13,
+        "links": 6,
+        "entries": [
+          [
+            13,
+            ".",
+            2
+          ],
+          [
+            2,
+            "..",
+            2
+          ],
+          [
+            14,
+            "file0",
+            2
+          ],
+          [
+            16,
+            "file1",
+            2
+          ],
+          [
+            18,
+            "file2",
+            2
+          ],
+          [
+            20,
+            "file3",
+            2
+          ]
+        ]
+      },
+      {
+        "ino": 14,
+        "links": 2,
+        "entries": [
+          [
+            14,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            15,
+            "data",
+            1
+          ]
+        ]
+      },
+      {
+        "ino": 16,
+        "links": 2,
+        "entries": [
+          [
+            16,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            17,
+            "data",
+            1
+          ]
+        ]
+      },
+      {
+        "ino": 18,
+        "links": 2,
+        "entries": [
+          [
+            18,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            19,
+            "data",
+            1
+          ]
+        ]
+      },
+      {
+        "ino": 20,
+        "links": 2,
+        "entries": [
+          [
+            20,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            21,
+            "data",
+            1
+          ]
+        ]
+      }
+    ],
+    "original_checker": {
+      "bitmap_descriptor_match": true,
+      "block_size": 4096,
+      "cluster_ratio": 1,
+      "cluster_size": 4096,
+      "descriptor_size": 64,
+      "descriptor_totals": {
+        "dirs": 7,
+        "free_clusters": 29353,
+        "free_inodes": 4075
+      },
+      "groups": [
+        {
+          "allocated_inodes": 14,
+          "bitmap_free_clusters": 28351,
+          "bitmap_free_inodes": 2027,
+          "descriptor_dirs": 7,
+          "descriptor_free_clusters": 28351,
+          "descriptor_free_inodes": 2027,
+          "flags": 4,
+          "group": 0,
+          "inode_dirs": 7,
+          "inode_uninit": false,
+          "itable_highwater_checked": true,
+          "itable_highwater_valid": true,
+          "itable_initialized_prefix": 39,
+          "itable_unused": 2009
+        },
+        {
+          "allocated_inodes": 0,
+          "bitmap_free_clusters": 1002,
+          "bitmap_free_inodes": 2048,
+          "descriptor_dirs": 0,
+          "descriptor_free_clusters": 1002,
+          "descriptor_free_inodes": 2048,
+          "flags": 4,
+          "group": 1,
+          "inode_dirs": 0,
+          "inode_uninit": false,
+          "itable_highwater_checked": true,
+          "itable_highwater_valid": true,
+          "itable_initialized_prefix": 1,
+          "itable_unused": 2047
+        }
+      ],
+      "image": "/home/ikun/fuzzing-orcle/experiments/ext4-counter-trace/results/campaign-lhze43mu/regular.raw",
+      "r_itable_highwater": {
+        "checked": true,
+        "checked_groups": 2,
+        "inode_uninit_groups_skipped": 0,
+        "mismatches": [],
+        "unsupported_groups_skipped": 0,
+        "valid": true
+      },
+      "r_link": {
+        "checked": true,
+        "checked_inodes": 11,
+        "mismatches": [],
+        "unverified": [],
+        "valid": true
+      },
+      "r_ug": {
+        "checked": true,
+        "inode_scan": 7,
+        "stored": 7,
+        "unverified_reason": null,
+        "valid": true
+      },
+      "status": "verified",
+      "superblock": {
+        "free_block_units": "block",
+        "free_blocks": 29353,
+        "free_clusters": 29353,
+        "free_inodes": 4075
+      },
+      "superblock_descriptor_match": true,
+      "unverified": [],
+      "valid": true
+    }
+  },
+  "bigalloc": {
+    "allocated_zero_link_inodes": [
+      {
+        "ino": 31,
+        "mode": 16832,
+        "links": 0,
+        "dtime": 0,
+        "size": 0,
+        "flags": 524288,
+        "blockcount": 0,
+        "refs": []
+      },
+      {
+        "ino": 35,
+        "mode": 33152,
+        "links": 0,
+        "dtime": 0,
+        "size": 0,
+        "flags": 524288,
+        "blockcount": 0,
+        "refs": []
+      },
+      {
+        "ino": 38,
+        "mode": 16832,
+        "links": 0,
+        "dtime": 0,
+        "size": 0,
+        "flags": 524288,
+        "blockcount": 0,
+        "refs": []
+      }
+    ],
+    "directories": [
+      {
+        "ino": 2,
+        "links": 4,
+        "entries": [
+          [
+            2,
+            ".",
+            2
+          ],
+          [
+            2,
+            "..",
+            2
+          ],
+          [
+            11,
+            "lost+found",
+            2
+          ],
+          [
+            13,
+            "syz-work",
+            2
+          ]
+        ]
+      },
+      {
+        "ino": 11,
+        "links": 2,
+        "entries": [
+          [
+            11,
+            ".",
+            2
+          ],
+          [
+            2,
+            "..",
+            2
+          ]
+        ]
+      },
+      {
+        "ino": 13,
+        "links": 6,
+        "entries": [
+          [
+            13,
+            ".",
+            2
+          ],
+          [
+            2,
+            "..",
+            2
+          ],
+          [
+            14,
+            "file0",
+            2
+          ],
+          [
+            16,
+            "file1",
+            2
+          ],
+          [
+            18,
+            "file2",
+            2
+          ],
+          [
+            20,
+            "file3",
+            2
+          ]
+        ]
+      },
+      {
+        "ino": 14,
+        "links": 2,
+        "entries": [
+          [
+            14,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            15,
+            "data",
+            1
+          ]
+        ]
+      },
+      {
+        "ino": 16,
+        "links": 2,
+        "entries": [
+          [
+            16,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            17,
+            "data",
+            1
+          ]
+        ]
+      },
+      {
+        "ino": 18,
+        "links": 2,
+        "entries": [
+          [
+            18,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            19,
+            "data",
+            1
+          ]
+        ]
+      },
+      {
+        "ino": 20,
+        "links": 2,
+        "entries": [
+          [
+            20,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            21,
+            "data",
+            1
+          ]
+        ]
+      },
+      {
+        "ino": 31,
+        "links": 0,
+        "entries": []
+      },
+      {
+        "ino": 38,
+        "links": 0,
+        "entries": []
+      }
+    ],
+    "original_checker": {
+      "bitmap_descriptor_match": true,
+      "block_size": 4096,
+      "cluster_ratio": 16,
+      "cluster_size": 65536,
+      "descriptor_size": 64,
+      "descriptor_totals": {
+        "dirs": 9,
+        "free_clusters": 1823,
+        "free_inodes": 4072
+      },
+      "groups": [
+        {
+          "allocated_inodes": 17,
+          "bitmap_free_clusters": 1823,
+          "bitmap_free_inodes": 4072,
+          "descriptor_dirs": 9,
+          "descriptor_free_clusters": 1823,
+          "descriptor_free_inodes": 4072,
+          "flags": 4,
+          "group": 0,
+          "inode_dirs": 9,
+          "inode_uninit": false,
+          "itable_highwater_checked": true,
+          "itable_highwater_valid": true,
+          "itable_initialized_prefix": 42,
+          "itable_unused": 4054
+        }
+      ],
+      "image": "/home/ikun/fuzzing-orcle/experiments/ext4-counter-trace/results/campaign-lhze43mu/bigalloc.raw",
+      "r_itable_highwater": {
+        "checked": true,
+        "checked_groups": 1,
+        "inode_uninit_groups_skipped": 0,
+        "mismatches": [],
+        "unsupported_groups_skipped": 0,
+        "valid": true
+      },
+      "r_link": {
+        "checked": true,
+        "checked_inodes": 11,
+        "mismatches": [],
+        "unverified": [],
+        "valid": true
+      },
+      "r_ug": {
+        "checked": true,
+        "inode_scan": 9,
+        "stored": 9,
+        "unverified_reason": null,
+        "valid": true
+      },
+      "status": "verified",
+      "superblock": {
+        "free_block_units": "block",
+        "free_blocks": 29168,
+        "free_clusters": 1823,
+        "free_inodes": 4072
+      },
+      "superblock_descriptor_match": true,
+      "unverified": [],
+      "valid": true
+    }
+  },
+  "inline": {
+    "allocated_zero_link_inodes": [
+      {
+        "ino": 30,
+        "mode": 32808,
+        "links": 0,
+        "dtime": 0,
+        "size": 0,
+        "flags": 524288,
+        "blockcount": 0,
+        "refs": []
+      },
+      {
+        "ino": 35,
+        "mode": 33152,
+        "links": 0,
+        "dtime": 0,
+        "size": 19,
+        "flags": 268435456,
+        "blockcount": 0,
+        "refs": []
+      },
+      {
+        "ino": 39,
+        "mode": 16832,
+        "links": 0,
+        "dtime": 0,
+        "size": 60,
+        "flags": 268435456,
+        "blockcount": 0,
+        "refs": [
+          {
+            "directory": 39,
+            "name": ".",
+            "file_type": 2
+          }
+        ]
+      }
+    ],
+    "directories": [
+      {
+        "ino": 2,
+        "links": 4,
+        "entries": [
+          [
+            2,
+            ".",
+            2
+          ],
+          [
+            2,
+            "..",
+            2
+          ],
+          [
+            11,
+            "lost+found",
+            2
+          ],
+          [
+            13,
+            "syz-work",
+            2
+          ]
+        ]
+      },
+      {
+        "ino": 11,
+        "links": 2,
+        "entries": [
+          [
+            11,
+            ".",
+            2
+          ],
+          [
+            2,
+            "..",
+            2
+          ]
+        ]
+      },
+      {
+        "ino": 13,
+        "links": 6,
+        "entries": [
+          [
+            13,
+            ".",
+            2
+          ],
+          [
+            2,
+            "..",
+            2
+          ],
+          [
+            14,
+            "file0",
+            2
+          ],
+          [
+            16,
+            "file1",
+            2
+          ],
+          [
+            18,
+            "file2",
+            2
+          ],
+          [
+            20,
+            "file3",
+            2
+          ]
+        ]
+      },
+      {
+        "ino": 14,
+        "links": 2,
+        "entries": [
+          [
+            14,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            15,
+            "data",
+            1
+          ]
+        ]
+      },
+      {
+        "ino": 16,
+        "links": 2,
+        "entries": [
+          [
+            16,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            17,
+            "data",
+            1
+          ]
+        ]
+      },
+      {
+        "ino": 18,
+        "links": 2,
+        "entries": [
+          [
+            18,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            19,
+            "data",
+            1
+          ]
+        ]
+      },
+      {
+        "ino": 20,
+        "links": 2,
+        "entries": [
+          [
+            20,
+            ".",
+            2
+          ],
+          [
+            13,
+            "..",
+            2
+          ],
+          [
+            21,
+            "data",
+            1
+          ]
+        ]
+      },
+      {
+        "ino": 39,
+        "links": 0,
+        "entries": [
+          [
+            39,
+            ".",
+            2
+          ],
+          [
+            22,
+            "..",
+            2
+          ]
+        ]
+      }
+    ],
+    "original_checker": {
+      "bitmap_descriptor_match": true,
+      "block_size": 4096,
+      "cluster_ratio": 1,
+      "cluster_size": 4096,
+      "descriptor_size": 64,
+      "descriptor_totals": {
+        "dirs": 8,
+        "free_clusters": 29362,
+        "free_inodes": 4072
+      },
+      "groups": [
+        {
+          "allocated_inodes": 17,
+          "bitmap_free_clusters": 28356,
+          "bitmap_free_inodes": 2024,
+          "descriptor_dirs": 8,
+          "descriptor_free_clusters": 28356,
+          "descriptor_free_inodes": 2024,
+          "flags": 4,
+          "group": 0,
+          "inode_dirs": 8,
+          "inode_uninit": false,
+          "itable_highwater_checked": true,
+          "itable_highwater_valid": true,
+          "itable_initialized_prefix": 41,
+          "itable_unused": 2007
+        },
+        {
+          "allocated_inodes": 0,
+          "bitmap_free_clusters": 1006,
+          "bitmap_free_inodes": 2048,
+          "descriptor_dirs": 0,
+          "descriptor_free_clusters": 1006,
+          "descriptor_free_inodes": 2048,
+          "flags": 4,
+          "group": 1,
+          "inode_dirs": 0,
+          "inode_uninit": false,
+          "itable_highwater_checked": true,
+          "itable_highwater_valid": true,
+          "itable_initialized_prefix": 1,
+          "itable_unused": 2047
+        }
+      ],
+      "image": "/home/ikun/fuzzing-orcle/experiments/ext4-counter-trace/results/campaign-lhze43mu/inline.raw",
+      "r_itable_highwater": {
+        "checked": true,
+        "checked_groups": 2,
+        "inode_uninit_groups_skipped": 0,
+        "mismatches": [],
+        "unsupported_groups_skipped": 0,
+        "valid": true
+      },
+      "r_link": {
+        "checked": true,
+        "checked_inodes": 12,
+        "mismatches": [
+          {
+            "directory_refs": 1,
+            "ino": 39,
+            "stored": 0,
+            "valid": false
+          }
+        ],
+        "unverified": [],
+        "valid": false
+      },
+      "r_ug": {
+        "checked": true,
+        "inode_scan": 8,
+        "stored": 8,
+        "unverified_reason": null,
+        "valid": true
+      },
+      "status": "mismatch",
+      "superblock": {
+        "free_block_units": "block",
+        "free_blocks": 29362,
+        "free_clusters": 29362,
+        "free_inodes": 4072
+      },
+      "superblock_descriptor_match": true,
+      "unverified": [],
+      "valid": false
+    }
+  }
+}

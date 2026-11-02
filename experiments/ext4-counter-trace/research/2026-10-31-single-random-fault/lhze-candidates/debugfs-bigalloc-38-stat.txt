@@ -1,0 +1,16 @@
+Inode: 38   Type: directory    Mode:  0700   Flags: 0x80000
+Generation: 1650982726    Version: 0x00000000:00000003
+User:     0   Group:     0   Project:     0   Size: 0
+File ACL: 0
+Links: 0   Blockcount: 0
+Fragment:  Address: 0    Number: 0    Size: 0
+ ctime: 0x6ade16ad:5a3de42c -- Sun Oct 25 22:48:13 2026
+ atime: 0x6ade16ac:8804a37c -- Sun Oct 25 22:48:12 2026
+ mtime: 0x6ade16ad:5a3de42c -- Sun Oct 25 22:48:13 2026
+crtime: 0x6ade16ac:8804a37c -- Sun Oct 25 22:48:12 2026
+Size of extra inode fields: 32
+Extended attributes:
+  security.selinux (33) = "system_u:object_r:unlabeled_t:s0\000"
+Inode checksum: 0x8a462b3d
+EXTENTS:
+debugfs 1.47.2 (1-Jan-2025)

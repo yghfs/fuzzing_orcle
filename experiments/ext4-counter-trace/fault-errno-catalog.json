@@ -1,0 +1,2326 @@
+{
+  "schema": 1,
+  "default_errno": "native",
+  "random_admission": [
+    "mballoc_mark",
+    "unlink_inode_dirty",
+    "inode_evict_final_dirty"
+  ],
+  "hooks": {
+    "mballoc_mark": {
+      "kernel_operation": "EXT4_FAULT_MBALLOC_MARK",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The write-access error follows the existing ext4 abort-handle path. EIO aborts the JBD2 journal as in the native writeback-error branch; EROFS models an aborted handle. ext4_force_shutdown() is not called.",
+      "source": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "mballoc_free_mark": {
+      "kernel_operation": "EXT4_FAULT_MBALLOC_FREE_MARK",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The error exits ext4_mb_mark_context() before the bitmap transition, is consumed by ext4_mb_clear_bb()/ext4_free_blocks(), and is reported with ext4_std_error(); the free-block API is void.",
+      "source": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/ext4/mballoc.c:ext4_mb_clear_bb"
+      ]
+    },
+    "inode_evict_final_access": {
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_FINAL_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The write-access error follows the existing ext4 abort-handle path. EIO aborts the JBD2 journal as in the native writeback-error branch; EROFS models an aborted handle. ext4_force_shutdown() is not called.",
+      "source": [
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/ext4/inode.c:__ext4_reserve_inode_write",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ]
+    },
+    "inode_evict_final_dirty": {
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_FINAL_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/ext4/inode.c:ext4_mark_iloc_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "orphan_file_delete_access": {
+      "kernel_operation": "EXT4_FAULT_ORPHAN_FILE_DELETE_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The write-access error follows the existing ext4 abort-handle path. EIO aborts the JBD2 journal as in the native writeback-error branch; EROFS models an aborted handle. ext4_force_shutdown() is not called.",
+      "source": [
+        "fs/ext4/orphan.c:ext4_orphan_file_del",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ]
+    },
+    "orphan_file_delete_dirty": {
+      "kernel_operation": "EXT4_FAULT_ORPHAN_FILE_DELETE_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/orphan.c:ext4_orphan_file_del",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "xattr_release_access": {
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The write-access hook runs before ext4_xattr_release_block() reads h_refcount, so it is eligible for both shared and final-reference blocks. On error the void release helper reports through ext4_std_error() and the caller continues its existing xattr detach path; final-reference bitmap/descriptor operations are not reached.",
+      "source": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ]
+    },
+    "xattr_release_dirty": {
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "rmdir_dirent_delete": {
+      "kernel_operation": "EXT4_FAULT_RMDIR_DIRENT_DELETE",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The write-access error follows the existing ext4 abort-handle path. EIO aborts the JBD2 journal as in the native writeback-error branch; EROFS models an aborted handle. ext4_force_shutdown() is not called.",
+      "source": [
+        "fs/ext4/namei.c:ext4_delete_entry_internal",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ]
+    },
+    "rmdir_dirent_dirty": {
+      "kernel_operation": "EXT4_FAULT_RMDIR_DIRENT_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rmdir"
+      ]
+    },
+    "rmdir_child_dirty": {
+      "kernel_operation": "EXT4_FAULT_RMDIR_CHILD_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rmdir"
+      ]
+    },
+    "rmdir_parent_dirty": {
+      "kernel_operation": "EXT4_FAULT_RMDIR_PARENT_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rmdir"
+      ]
+    },
+    "unlink_dirent_dirty": {
+      "kernel_operation": "EXT4_FAULT_UNLINK_DIRENT_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:__ext4_unlink"
+      ]
+    },
+    "unlink_dirent_delete": {
+      "kernel_operation": "EXT4_FAULT_UNLINK_DIRENT_DELETE",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The write-access error follows the existing ext4 abort-handle path. EIO aborts the JBD2 journal as in the native writeback-error branch; EROFS models an aborted handle. ext4_force_shutdown() is not called.",
+      "source": [
+        "fs/ext4/namei.c:ext4_delete_entry_internal",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ]
+    },
+    "unlink_dirent_block_dirty": {
+      "kernel_operation": "EXT4_FAULT_UNLINK_DIRENT_BLOCK_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:__ext4_unlink"
+      ]
+    },
+    "unlink_inode_dirty": {
+      "kernel_operation": "EXT4_FAULT_UNLINK_INODE_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:__ext4_unlink"
+      ]
+    },
+    "rename_dir_finish": {
+      "kernel_operation": "EXT4_FAULT_RENAME_DIR_FINISH",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename_dir_finish"
+      ]
+    },
+    "rename_dir_prepare_access": {
+      "kernel_operation": "EXT4_FAULT_RENAME_DIR_PREPARE_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The write-access error returns from ext4_rename_dir_prepare() before changing the '..' entry and follows the existing rename failure path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename_dir_prepare",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "rename_exchange_new_parent_dirty": {
+      "kernel_operation": "EXT4_FAULT_RENAME_EXCHANGE_NEW_PARENT_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The error is injected after ext4_cross_rename() changes the parent directory link count. ext4_update_dir_count() ignores the dirty-helper return, matching its void source contract.",
+      "source": [
+        "fs/ext4/namei.c:ext4_update_dir_count",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "rename_exchange_old_parent_dirty": {
+      "kernel_operation": "EXT4_FAULT_RENAME_EXCHANGE_OLD_PARENT_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The error is injected after ext4_cross_rename() changes the parent directory link count. ext4_update_dir_count() ignores the dirty-helper return, matching its void source contract.",
+      "source": [
+        "fs/ext4/namei.c:ext4_update_dir_count",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "rename_delete_old": {
+      "kernel_operation": "EXT4_FAULT_RENAME_DELETE_OLD",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The write-access error follows the existing ext4 abort-handle path. EIO aborts the JBD2 journal as in the native writeback-error branch; EROFS models an aborted handle. ext4_force_shutdown() is not called.",
+      "source": [
+        "fs/ext4/namei.c:ext4_delete_entry_internal",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ]
+    },
+    "rename_old_inode_dirty": {
+      "kernel_operation": "EXT4_FAULT_RENAME_OLD_INODE_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename"
+      ]
+    },
+    "rename_new_parent_dirty": {
+      "kernel_operation": "EXT4_FAULT_RENAME_NEW_PARENT_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename"
+      ]
+    },
+    "rename_old_parent_dirty": {
+      "kernel_operation": "EXT4_FAULT_RENAME_OLD_PARENT_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename"
+      ]
+    },
+    "rename_replaced_inode_dirty": {
+      "kernel_operation": "EXT4_FAULT_RENAME_REPLACED_INODE_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename"
+      ]
+    },
+    "rename_setent_access": {
+      "kernel_operation": "EXT4_FAULT_RENAME_SETENT_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The write-access error follows the existing ext4 abort-handle path. EIO aborts the JBD2 journal as in the native writeback-error branch; EROFS models an aborted handle. ext4_force_shutdown() is not called.",
+      "source": [
+        "fs/ext4/namei.c:ext4_setent",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable"
+      ]
+    },
+    "rename_setent_dirty": {
+      "kernel_operation": "EXT4_FAULT_RENAME_SETENT_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_setent"
+      ]
+    },
+    "rename_setent_inode_dirty": {
+      "kernel_operation": "EXT4_FAULT_RENAME_SETENT_INODE_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_setent"
+      ]
+    },
+    "rename_delete_old_dirty": {
+      "kernel_operation": "EXT4_FAULT_RENAME_DELETE_OLD_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename_delete"
+      ]
+    },
+    "mkdir_child_dirty": {
+      "kernel_operation": "EXT4_FAULT_MKDIR_CHILD_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The hook is reached at ext4_mkdir() after ext4_init_new_dir_faultable() completes and before the parent dirent is inserted. A dirty error enters out_clear_inode, clears the child link count, adds the child to the orphan list, and attempts a cleanup inode dirty; it does not publish the parent dirent.",
+      "source": [
+        "fs/ext4/namei.c:ext4_mkdir"
+      ]
+    },
+    "mkdir_dirblock_dirty": {
+      "kernel_operation": "EXT4_FAULT_MKDIR_DIRBLOCK_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The error occurs after the new directory's '.' and '..' entries and initial nlink are set. ext4_mkdir() enters its ordinary out_clear_inode cleanup path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_init_new_dir_faultable",
+        "fs/ext4/namei.c:ext4_mkdir",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "mkdir_parent_dirty": {
+      "kernel_operation": "EXT4_FAULT_MKDIR_PARENT_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The hook is reached at ext4_mkdir() after ext4_add_entry() and ext4_inc_count(dir). A dirty error enters out_clear_inode, which orphans and clears the new child but does not roll back the already inserted parent dirent or parent link-count increment; cleanup inode dirty and journal-stop errors follow the existing path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_mkdir"
+      ]
+    },
+    "resize_extend_add_blocks": {
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_ADD_BLOCKS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The bitmap/group-descriptor error exits ext4_mb_mark_context(), propagates through ext4_group_add_blocks() and ext4_group_extend_no_check(), and reaches the resize ioctl. Superblock block/free counts were already updated before this call.",
+      "source": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/mballoc.c:ext4_group_add_blocks",
+        "fs/ext4/resize.c:ext4_group_extend_no_check"
+      ]
+    },
+    "resize_extend_super_access": {
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_SUPER_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The error exits ext4_group_extend_no_check() before the superblock size and free-block fields are updated in memory.",
+      "source": [
+        "fs/ext4/resize.c:ext4_group_extend_no_check",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "group_add_desc_access": {
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_DESC_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The hook targets descriptor/GDT and resize-inode pointer buffers in ext4_add_new_descs(); the superblock buffer is covered separately by group_add_super_access. An injected access error exits descriptor setup through its existing error and journal-stop path.",
+      "source": [
+        "fs/ext4/resize.c:ext4_add_new_descs",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "group_add_desc_dirty": {
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_DESC_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "ext4_setup_new_descs() injects after filling and checksumming the new group descriptor. On error it stops descriptor setup and returns through ext4_flex_group_add(); journal stop preserves the first error. The descriptor fields have already changed in memory.",
+      "source": [
+        "fs/ext4/resize.c:ext4_setup_new_descs"
+      ]
+    },
+    "group_add_super_dirty": {
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_SUPER_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected JBD2 dirty-metadata return goes through ext4’s common dirty-metadata error handler, including its existing handle abort and inode/superblock reporting, then follows the caller’s normal error path.",
+      "source": [
+        "fs/ext4/resize.c:ext4_flex_group_add"
+      ]
+    },
+    "resize_extend_group_desc_access": {
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_GROUP_DESC_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The bitmap/group-descriptor error exits ext4_mb_mark_context(), propagates through ext4_group_add_blocks() and ext4_group_extend_no_check(), and reaches the resize ioctl. Superblock block/free counts were already updated before this call.",
+      "source": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/resize.c:ext4_group_extend_no_check"
+      ]
+    },
+    "resize_extend_bitmap_dirty": {
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_BITMAP_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The bitmap/group-descriptor error exits ext4_mb_mark_context(), propagates through ext4_group_add_blocks() and ext4_group_extend_no_check(), and reaches the resize ioctl. Superblock block/free counts were already updated before this call.",
+      "source": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/mballoc.c:ext4_group_add_blocks"
+      ]
+    },
+    "resize_extend_group_desc_dirty": {
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_GROUP_DESC_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The bitmap/group-descriptor error exits ext4_mb_mark_context(), propagates through ext4_group_add_blocks() and ext4_group_extend_no_check(), and reaches the resize ioctl. Superblock block/free counts were already updated before this call.",
+      "source": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/mballoc.c:ext4_group_add_blocks"
+      ]
+    },
+    "resize_extend_super_dirty": {
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_SUPER_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "ext4_group_extend_no_check() ignores the dirty-helper return, but ext4_handle_dirty_metadata_error() aborts the handle and records h_err; ext4_journal_stop() then returns that error. The superblock counts were updated before this call.",
+      "source": [
+        "fs/ext4/resize.c:ext4_group_extend_no_check",
+        "fs/ext4/ext4_jbd2.c:ext4_handle_dirty_metadata_error",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_stop"
+      ]
+    },
+    "xattr_release_bitmap_access": {
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_BITMAP_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The error exits ext4_mb_mark_context(), is consumed by ext4_mb_clear_bb()/ext4_free_blocks(), and is reported with ext4_std_error(); ext4_free_blocks() is void, so the xattr release caller does not receive an errno.",
+      "source": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/mballoc.c:ext4_free_blocks",
+        "fs/ext4/mballoc.c:ext4_mb_mark_context"
+      ]
+    },
+    "xattr_release_group_desc_access": {
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_GROUP_DESC_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on a filesystem-device writeback error and returns -EIO"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an already aborted handle"
+        }
+      ],
+      "return_path": "The error exits ext4_mb_mark_context(), is consumed by ext4_mb_clear_bb()/ext4_free_blocks(), and is reported with ext4_std_error(); ext4_free_blocks() is void, so the xattr release caller does not receive an errno.",
+      "source": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/mballoc.c:ext4_free_blocks",
+        "fs/ext4/mballoc.c:ext4_mb_mark_context"
+      ]
+    },
+    "xattr_release_bitmap_dirty": {
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_BITMAP_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The error exits ext4_mb_mark_context(), is consumed by ext4_mb_clear_bb()/ext4_free_blocks(), and is reported with ext4_std_error(); ext4_free_blocks() is void, so the xattr release caller does not receive an errno.",
+      "source": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/mballoc.c:ext4_free_blocks",
+        "fs/ext4/mballoc.c:ext4_mb_mark_context"
+      ]
+    },
+    "xattr_release_group_desc_dirty": {
+      "kernel_operation": "EXT4_FAULT_XATTR_RELEASE_GROUP_DESC_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata returns -EUCLEAN when the buffer has no JBD2 journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata returns -EROFS for an already aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The error exits ext4_mb_mark_context(), is consumed by ext4_mb_clear_bb()/ext4_free_blocks(), and is reported with ext4_std_error(); ext4_free_blocks() is void, so the xattr release caller does not receive an errno.",
+      "source": [
+        "fs/ext4/xattr.c:ext4_xattr_release_block",
+        "fs/ext4/mballoc.c:ext4_free_blocks",
+        "fs/ext4/mballoc.c:ext4_mb_mark_context"
+      ]
+    },
+    "fast_commit_inode_claim": {
+      "kernel_operation": "EXT4_FAULT_FAST_COMMIT_INODE_CLAIM",
+      "runtime_random": false,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "ext4_read_inode_bitmap() returns -EIO when inode-bitmap I/O fails"
+        }
+      ],
+      "return_path": "The hook substitutes ERR_PTR(-EIO) for ext4_read_inode_bitmap() inside the fast-commit claim path. ext4_mark_inode_used() propagates the read error before inspecting or changing the inode bitmap.",
+      "source": [
+        "fs/ext4/ialloc.c:ext4_mark_inode_used",
+        "fs/ext4/ialloc.c:ext4_read_inode_bitmap"
+      ]
+    },
+    "mkdir_child_access": {
+      "kernel_operation": "EXT4_FAULT_MKDIR_CHILD_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The inode-table write-access error returns through ext4_mark_inode_dirty() and mkdir's out_clear_inode cleanup.",
+      "source": [
+        "fs/ext4/namei.c:ext4_mkdir",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "mkdir_parent_access": {
+      "kernel_operation": "EXT4_FAULT_MKDIR_PARENT_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The parent inode-table write-access error follows mkdir's out_clear_inode cleanup after the dirent and parent nlink have changed in memory.",
+      "source": [
+        "fs/ext4/namei.c:ext4_mkdir",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "rmdir_child_access": {
+      "kernel_operation": "EXT4_FAULT_RMDIR_CHILD_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The child inode-table access error is returned by ext4_rmdir() after the dirent is deleted and child links are cleared in memory.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rmdir",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "rmdir_parent_access": {
+      "kernel_operation": "EXT4_FAULT_RMDIR_PARENT_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The parent inode-table access error is returned after ext4_dec_count() changes the parent nlink in memory.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rmdir",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "unlink_dirent_inode_access": {
+      "kernel_operation": "EXT4_FAULT_UNLINK_DIRENT_INODE_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The parent inode-table access error exits __ext4_unlink() after the directory entry has been removed in memory.",
+      "source": [
+        "fs/ext4/namei.c:__ext4_unlink",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "unlink_inode_access": {
+      "kernel_operation": "EXT4_FAULT_UNLINK_INODE_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The inode-table access error exits __ext4_unlink() after the target nlink decrement and orphan add.",
+      "source": [
+        "fs/ext4/namei.c:__ext4_unlink",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "rename_dir_finish_inode_access": {
+      "kernel_operation": "EXT4_FAULT_RENAME_DIR_FINISH_INODE_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "This inode-table access boundary is used by the inline-directory branch of ext4_rename_dir_finish(); the error follows end_rename.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename_dir_finish",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "rename_setent_inode_access": {
+      "kernel_operation": "EXT4_FAULT_RENAME_SETENT_INODE_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The setent inode-table access error is retained while ext4_setent() continues to dirty the directory block, then follows end_rename.",
+      "source": [
+        "fs/ext4/namei.c:ext4_setent",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "rename_old_inode_access": {
+      "kernel_operation": "EXT4_FAULT_RENAME_OLD_INODE_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The source inode-table access error exits ext4_rename() after its destination entry is installed and old entry deletion is attempted.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "rename_new_parent_access": {
+      "kernel_operation": "EXT4_FAULT_RENAME_NEW_PARENT_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The destination parent inode-table access error follows end_rename after its link count is incremented.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "rename_old_parent_access": {
+      "kernel_operation": "EXT4_FAULT_RENAME_OLD_PARENT_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The source parent inode-table access error follows end_rename after parent and dirent changes.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "rename_replaced_inode_access": {
+      "kernel_operation": "EXT4_FAULT_RENAME_REPLACED_INODE_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The replaced inode-table access error follows end_rename after nlink has been decremented.",
+      "source": [
+        "fs/ext4/namei.c:ext4_rename",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "rename_exchange_new_parent_access": {
+      "kernel_operation": "EXT4_FAULT_RENAME_EXCHANGE_NEW_PARENT_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "ext4_update_dir_count() ignores the inode-table access error because the helper is void.",
+      "source": [
+        "fs/ext4/namei.c:ext4_cross_rename",
+        "fs/ext4/namei.c:ext4_update_dir_count",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable"
+      ]
+    },
+    "rename_exchange_old_parent_access": {
+      "kernel_operation": "EXT4_FAULT_RENAME_EXCHANGE_OLD_PARENT_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access aborts the journal on filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "ext4_update_dir_count() ignores the inode-table access error because the helper is void.",
+      "source": [
+        "fs/ext4/namei.c:ext4_cross_rename",
+        "fs/ext4/namei.c:ext4_update_dir_count",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable"
+      ]
+    },
+    "resize_extend_buddy_load": {
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_BUDDY_LOAD",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "ext4_mb_load_buddy_gfp() returns -EIO when the buddy-cache read is not uptodate"
+        },
+        {
+          "name": "ENOMEM",
+          "code": 12,
+          "source": "buddy-cache folio or buddy metadata allocation can fail with -ENOMEM"
+        },
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "ext4_mb_load_buddy_gfp() returns -EFSCORRUPTED when group metadata is unavailable"
+        },
+        {
+          "name": "EFSBADCRC",
+          "code": 74,
+          "aliases": [
+            "EBADMSG"
+          ],
+          "source": "block-bitmap validation during buddy initialization returns -EFSBADCRC"
+        }
+      ],
+      "return_path": "The error is returned by ext4_group_add_blocks() before bitmap mutation; ext4_group_extend_no_check() exits through errout after it has updated the in-memory superblock counts.",
+      "source": [
+        "fs/ext4/mballoc.c:ext4_group_add_blocks",
+        "fs/ext4/mballoc.c:ext4_mb_load_buddy_gfp",
+        "fs/ext4/mballoc.c:ext4_mb_init_group",
+        "fs/ext4/resize.c:ext4_group_extend_no_check"
+      ]
+    },
+    "resize_extend_bitmap_read": {
+      "kernel_operation": "EXT4_FAULT_RESIZE_EXTEND_BITMAP_READ",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "ext4_wait_block_bitmap() returns -EIO after a failed bitmap read"
+        },
+        {
+          "name": "ENOMEM",
+          "code": 12,
+          "source": "ext4_read_block_bitmap_nowait() returns -ENOMEM when sb_getblk() cannot allocate a buffer"
+        },
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "block-bitmap lookup or validation returns -EFSCORRUPTED for invalid metadata"
+        },
+        {
+          "name": "EFSBADCRC",
+          "code": 74,
+          "aliases": [
+            "EBADMSG"
+          ],
+          "source": "block-bitmap checksum validation returns -EFSBADCRC"
+        }
+      ],
+      "return_path": "The injected read error is wrapped as an ERR_PTR by ext4_mb_mark_context(), then returned through ext4_group_add_blocks() and the resize error path.",
+      "source": [
+        "fs/ext4/mballoc.c:ext4_mb_mark_context",
+        "fs/ext4/balloc.c:ext4_read_block_bitmap",
+        "fs/ext4/balloc.c:ext4_wait_block_bitmap"
+      ]
+    },
+    "group_add_super_access": {
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_SUPER_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access() aborts the journal on a filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access() returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The superblock write-access error exits ext4_flex_group_add() before group descriptors or global counters are published.",
+      "source": [
+        "fs/ext4/resize.c:ext4_flex_group_add",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "group_add_bitmap_read": {
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_BITMAP_READ",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "ext4_set_bitmap_checksums() maps a missing buffer or failed bitmap read to -EIO"
+        }
+      ],
+      "return_path": "The error exits ext4_setup_new_descs() before descriptor publication is completed and is returned by ext4_flex_group_add().",
+      "source": [
+        "fs/ext4/resize.c:ext4_set_bitmap_checksums",
+        "fs/ext4/resize.c:ext4_get_bitmap",
+        "fs/ext4/resize.c:ext4_setup_new_descs"
+      ]
+    },
+    "group_add_groupinfo_alloc": {
+      "kernel_operation": "EXT4_FAULT_GROUP_ADD_GROUPINFO_ALLOC",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "ENOMEM",
+          "code": 12,
+          "source": "kmalloc() or kmem_cache_zalloc() failure in ext4_mb_add_groupinfo() returns -ENOMEM"
+        }
+      ],
+      "return_path": "The descriptor has already been initialized and dirtied when ext4_mb_add_groupinfo() returns -ENOMEM; ext4_setup_new_descs() stops before ext4_update_super() publishes the new group counters.",
+      "source": [
+        "fs/ext4/resize.c:ext4_setup_new_descs",
+        "fs/ext4/mballoc.c:ext4_mb_add_groupinfo"
+      ]
+    },
+    "mkdir_append_alloc": {
+      "kernel_operation": "EXT4_FAULT_MKDIR_APPEND_ALLOC",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "ext4_getblk()/ext4_read_bh_lock() can return -EIO for metadata I/O failure during block creation"
+        },
+        {
+          "name": "ENOMEM",
+          "code": 12,
+          "source": "block-buffer, allocation-context, or extent metadata allocation can fail with -ENOMEM"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "ext4_mb_new_blocks() returns -ENOSPC when no free clusters can be claimed"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "an aborted JBD2 handle can make the metadata write-access path return -EROFS"
+        },
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "extent or allocation metadata validation can return -EFSCORRUPTED"
+        },
+        {
+          "name": "EFSBADCRC",
+          "code": 74,
+          "aliases": [
+            "EBADMSG"
+          ],
+          "source": "block-bitmap checksum validation during allocation can return -EFSBADCRC"
+        },
+        {
+          "name": "EDQUOT",
+          "code": 122,
+          "source": "ext4_mb_new_blocks() returns -EDQUOT when the block quota prevents allocation"
+        }
+      ],
+      "return_path": "The allocation error is injected before ext4_bread() either in ext4_append_faultable() or in ext4_add_entry() when a directory block read returns NULL. It propagates through directory initialization or entry insertion into mkdir out_clear_inode, which orphans and drops the new inode through its existing cleanup path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_append_faultable",
+        "fs/ext4/namei.c:ext4_add_entry",
+        "fs/ext4/inode.c:ext4_bread",
+        "fs/ext4/inode.c:ext4_getblk",
+        "fs/ext4/mballoc.c:ext4_mb_new_blocks",
+        "fs/ext4/namei.c:ext4_mkdir"
+      ]
+    },
+    "mkdir_add_entry_read": {
+      "kernel_operation": "EXT4_FAULT_MKDIR_ADD_ENTRY_READ",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "ext4_bread() returns -EIO when a directory-block read fails"
+        },
+        {
+          "name": "ENOMEM",
+          "code": 12,
+          "source": "buffer allocation for ext4_getblk() can fail with -ENOMEM"
+        },
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "directory structure and htree validation return -EFSCORRUPTED"
+        },
+        {
+          "name": "EFSBADCRC",
+          "code": 74,
+          "aliases": [
+            "EBADMSG"
+          ],
+          "source": "directory-block checksum verification returns -EFSBADCRC"
+        }
+      ],
+      "return_path": "The read error exits ext4_add_entry() and is handled by mkdir's out_clear_inode cleanup before inode instantiation.",
+      "source": [
+        "fs/ext4/namei.c:ext4_add_entry",
+        "fs/ext4/namei.c:__ext4_read_dirblock",
+        "fs/ext4/namei.c:ext4_dx_add_entry",
+        "fs/ext4/namei.c:ext4_mkdir"
+      ]
+    },
+    "mkdir_append_block_access": {
+      "kernel_operation": "EXT4_FAULT_MKDIR_APPEND_BLOCK_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access() aborts the journal on a filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access() returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The error exits ext4_append_faultable() after block allocation and i_size update; mkdir then enters its normal new-inode cleanup path.",
+      "source": [
+        "fs/ext4/namei.c:ext4_append_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/ext4/namei.c:ext4_mkdir"
+      ]
+    },
+    "mkdir_add_entry_access": {
+      "kernel_operation": "EXT4_FAULT_MKDIR_ADD_ENTRY_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access() aborts the journal on a filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access() returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The parent directory-block access error exits ext4_add_entry() before the new dirent is written; mkdir performs its existing inode cleanup.",
+      "source": [
+        "fs/ext4/namei.c:add_dirent_to_buf",
+        "fs/ext4/namei.c:ext4_dx_add_entry",
+        "fs/ext4/inline.c:ext4_add_dirent_to_inline",
+        "fs/ext4/namei.c:ext4_mkdir"
+      ]
+    },
+    "mkdir_add_entry_dirty": {
+      "kernel_operation": "EXT4_FAULT_MKDIR_ADD_ENTRY_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN without a journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The error follows the common ext4 dirty-metadata error path after the parent dirent and parent timestamps have changed in memory; mkdir enters out_clear_inode.",
+      "source": [
+        "fs/ext4/namei.c:add_dirent_to_buf",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata",
+        "fs/ext4/namei.c:ext4_mkdir"
+      ]
+    },
+    "inode_evict_bitmap_read": {
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_BITMAP_READ",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "ext4_read_inode_bitmap() returns -EIO when bitmap I/O fails"
+        },
+        {
+          "name": "ENOMEM",
+          "code": 12,
+          "source": "ext4_read_inode_bitmap() returns -ENOMEM when sb_getblk() cannot allocate a buffer"
+        },
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "inode-bitmap metadata lookup or validation returns -EFSCORRUPTED"
+        },
+        {
+          "name": "EFSBADCRC",
+          "code": 74,
+          "aliases": [
+            "EBADMSG"
+          ],
+          "source": "inode-bitmap checksum validation returns -EFSBADCRC"
+        }
+      ],
+      "return_path": "ext4_free_inode() records the bitmap error in fatal and exits before clearing the inode allocation bit.",
+      "source": [
+        "fs/ext4/ialloc.c:ext4_free_inode",
+        "fs/ext4/ialloc.c:ext4_read_inode_bitmap"
+      ]
+    },
+    "inode_evict_bitmap_access": {
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_BITMAP_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access() aborts the journal on a filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access() returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "The bitmap write-access error exits ext4_free_inode() before the bitmap bit is cleared.",
+      "source": [
+        "fs/ext4/ialloc.c:ext4_free_inode",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "inode_evict_group_desc_access": {
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_GROUP_DESC_ACCESS",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "jbd2_journal_get_write_access() aborts the journal on a filesystem-device writeback error"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_get_write_access() returns -EROFS for an aborted handle"
+        }
+      ],
+      "return_path": "If group-descriptor write access fails, ext4_free_inode() records the error but still clears the inode bitmap bit. The fatal error then skips descriptor/global counter publication; the bitmap is still dirtied, and the error is reported through ext4_std_error().",
+      "source": [
+        "fs/ext4/ialloc.c:ext4_free_inode",
+        "fs/ext4/ext4_jbd2.c:__ext4_journal_get_write_access_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_get_write_access"
+      ]
+    },
+    "inode_evict_bitmap_dirty": {
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_BITMAP_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN without a journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The inode bit and counters have already been changed in memory when the bitmap dirty-metadata error reaches ext4_std_error().",
+      "source": [
+        "fs/ext4/ialloc.c:ext4_free_inode",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "inode_evict_group_desc_dirty": {
+      "kernel_operation": "EXT4_FAULT_INODE_EVICT_GROUP_DESC_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN without a journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The descriptor and global counters are already changed in memory; ext4_free_inode() still attempts to dirty the bitmap and reports the first error.",
+      "source": [
+        "fs/ext4/ialloc.c:ext4_free_inode",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "migrate_swap_inode_data": {
+      "kernel_operation": "EXT4_FAULT_MIGRATE_SWAP_INODE_DATA",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN when the inode buffer has no journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injection replaces ext4_ext_swap_inode_data()'s existing unconditional inode dirty call after free_ind_block(). The caller still preserves a prior free_ind_block() error over this dirty error; otherwise the dirty error is returned through migration cleanup, which frees the temporary extent tree.",
+      "source": [
+        "fs/ext4/migrate.c:ext4_ext_swap_inode_data",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "xattr_set_inode_dirty": {
+      "kernel_operation": "EXT4_FAULT_XATTR_SET_INODE_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN when the inode buffer has no journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected inode dirty error is returned by ext4_xattr_set_handle() after the xattr body/block edits and follows its existing cleanup and journal-stop path.",
+      "source": [
+        "fs/ext4/xattr.c:ext4_xattr_set_handle",
+        "fs/ext4/inode.c:ext4_mark_iloc_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "ea_inode_ref_dirty": {
+      "kernel_operation": "EXT4_FAULT_EA_INODE_REF_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN when the EA inode buffer has no journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The reference count is changed in memory before ext4_xattr_inode_update_ref() dirties the EA inode; the injected error follows the existing caller cleanup path and is observable as the EA reference delta boundary.",
+      "source": [
+        "fs/ext4/xattr.c:ext4_xattr_inode_update_ref",
+        "fs/ext4/inode.c:ext4_mark_iloc_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "acl_mode_dirty": {
+      "kernel_operation": "EXT4_FAULT_ACL_MODE_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN when the inode buffer has no journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "After the access ACL has updated the in-memory mode, the injected inode dirty error is returned through ext4_set_acl()'s existing journal-stop and retry handling.",
+      "source": [
+        "fs/ext4/acl.c:ext4_set_acl",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "inline_dir_block_dirty": {
+      "kernel_operation": "EXT4_FAULT_INLINE_DIR_BLOCK_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN when the inline-conversion directory block has no journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The error is injected while publishing the converted directory block; ext4_convert_inline_data_nolock() enters its existing inline-data restore path before returning the error.",
+      "source": [
+        "fs/ext4/inline.c:ext4_finish_convert_inline_dir",
+        "fs/ext4/namei.c:ext4_handle_dirty_dirblock_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "inline_dir_inode_dirty": {
+      "kernel_operation": "EXT4_FAULT_INLINE_DIR_INODE_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN when the converted directory inode buffer has no journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The directory block is already published in the transaction; an inode dirty error is returned by ext4_finish_convert_inline_dir() and the caller restores the inline representation.",
+      "source": [
+        "fs/ext4/inline.c:ext4_finish_convert_inline_dir",
+        "fs/ext4/inode.c:ext4_mark_inode_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "fileattr_flags_dirty": {
+      "kernel_operation": "EXT4_FAULT_FILEATTR_FLAGS_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN when the fileattr inode buffer has no journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The injected error is returned by ext4_ioctl_setflags() after in-memory flags have been changed and follows its existing flags_err journal cleanup path.",
+      "source": [
+        "fs/ext4/ioctl.c:ext4_ioctl_setflags",
+        "fs/ext4/inode.c:ext4_mark_iloc_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "fileattr_project_dirty": {
+      "kernel_operation": "EXT4_FAULT_FILEATTR_PROJECT_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN when the project inode buffer has no journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The project id is changed in memory before ext4_ioctl_setproject() dirties the inode; the injected error follows its existing out_dirty and journal-stop path.",
+      "source": [
+        "fs/ext4/ioctl.c:ext4_ioctl_setproject",
+        "fs/ext4/inode.c:ext4_mark_iloc_dirty_faultable",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable",
+        "fs/jbd2/transaction.c:jbd2_journal_dirty_metadata"
+      ]
+    },
+    "inline_data_block_write_begin": {
+      "kernel_operation": "EXT4_FAULT_INLINE_DATA_BLOCK_WRITE_BEGIN",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "ext4_block_write_begin() can propagate -EIO from data-buffer preparation or block mapping"
+        }
+      ],
+      "return_path": "The faultable wrapper returns -EIO instead of calling ext4_block_write_begin() at either inline conversion call site. In ext4_convert_inline_data_to_extent(), ext4_destroy_inline_data_nolock() has already removed the inline representation; failure enters orphan-add, journal-stop, and failed-write truncation cleanup. In ext4_da_convert_inline_data_to_extent(), the inline representation has not been destroyed and no journal handle is active; failure releases the folio and runs failed-write truncation before returning. Block mapping preparation has not run in either case.",
+      "source": [
+        "fs/ext4/inline.c:ext4_convert_inline_data_to_extent",
+        "fs/ext4/inline.c:ext4_da_convert_inline_data_to_extent",
+        "fs/ext4/inode.c:ext4_block_write_begin",
+        "fs/ext4/inode.c:ext4_get_block"
+      ]
+    },
+    "es_insert_alloc": {
+      "kernel_operation": "EXT4_FAULT_ES_INSERT_ALLOC",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "ENOMEM",
+          "code": 12,
+          "source": "__es_alloc_extent(false) returns NULL and __es_insert_extent() returns -ENOMEM"
+        }
+      ],
+      "return_path": "The hook is reached only when __es_insert_extent() has no preallocated node, after ext4_es_insert_extent() has already run __es_remove_extent(). The injected -ENOMEM prevents the replacement status node from being published. For the ordinary non-delayed status used here, ext4_es_insert_extent() deliberately consumes -ENOMEM because the cache entry is optional, performs its remaining reservation accounting, and returns void; it does not retry this allocation or propagate an error to the syscall.",
+      "source": [
+        "fs/ext4/extents_status.c:__es_insert_extent",
+        "fs/ext4/extents_status.c:__es_alloc_extent"
+      ]
+    },
+    "delalloc_reserve": {
+      "kernel_operation": "EXT4_FAULT_DELALLOC_RESERVE",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "ext4_da_reserve_space() returns -ENOSPC when ext4_claim_free_clusters() cannot reserve clusters"
+        }
+      ],
+      "return_path": "The injected reservation failure releases the metadata quota reservation and returns before i_reserved_data_blocks or s_dirtyclusters_counter are changed; ext4's write path may consume the error and retry through its non-delalloc fallback.",
+      "source": [
+        "fs/ext4/inode.c:ext4_da_reserve_space",
+        "fs/ext4/inode.c:ext4_claim_free_clusters"
+      ]
+    },
+    "extent_insert_dirty": {
+      "kernel_operation": "EXT4_FAULT_EXTENT_INSERT_DIRTY",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "jbd2_journal_dirty_metadata() returns -EUCLEAN for an extent buffer without a journal head"
+        },
+        {
+          "name": "EROFS",
+          "code": 30,
+          "source": "jbd2_journal_dirty_metadata() returns -EROFS for an aborted handle"
+        },
+        {
+          "name": "ENOSPC",
+          "code": 28,
+          "source": "jbd2_journal_dirty_metadata() returns -ENOSPC when the handle has no buffer credits"
+        }
+      ],
+      "return_path": "The extent tree and indexes have already been changed in memory when ext4_ext_insert_extent() calls ext4_ext_dirty_faultable() at its final insertion publish point. The common dirty-metadata helper returns the injected error; ext4_ext_insert_extent() frees its temporary extent path and propagates the error, without rolling back the earlier in-memory tree edits.",
+      "source": [
+        "fs/ext4/extents.c:__ext4_ext_dirty_faultable",
+        "fs/ext4/extents.c:ext4_ext_insert_extent",
+        "fs/ext4/ext4_jbd2.c:__ext4_handle_dirty_metadata_faultable"
+      ]
+    },
+    "mb_buddy_load": {
+      "kernel_operation": "EXT4_FAULT_MB_BUDDY_LOAD",
+      "runtime_random": true,
+      "native_errnos": [
+        {
+          "name": "EIO",
+          "code": 5,
+          "source": "ext4_mb_load_buddy_gfp() returns -EIO when a bitmap or buddy folio is not uptodate"
+        },
+        {
+          "name": "ENOMEM",
+          "code": 12,
+          "source": "folio allocation in ext4_mb_load_buddy_gfp() can return -ENOMEM"
+        },
+        {
+          "name": "EFSCORRUPTED",
+          "code": 117,
+          "aliases": [
+            "EUCLEAN"
+          ],
+          "source": "ext4_mb_load_buddy_gfp() returns -EFSCORRUPTED for a missing group-info entry"
+        },
+        {
+          "name": "EFSBADCRC",
+          "code": 74,
+          "aliases": [
+            "EBADMSG"
+          ],
+          "source": "ext4_mb_init_cache() propagates -EFSBADCRC from block-bitmap checksum validation during buddy initialization"
+        }
+      ],
+      "return_path": "The buddy-load error is returned before bitmap/buddy state is handed to the caller; ext4_mb_init_cache() propagates bitmap checksum failure as -EFSBADCRC, while allocation and free paths retain their existing cleanup and caller contract.",
+      "source": [
+        "fs/ext4/mballoc.c:ext4_mb_load_buddy_gfp",
+        "fs/ext4/mballoc.c:ext4_mb_load_buddy",
+        "fs/ext4/mballoc.c:ext4_mb_init_group",
+        "fs/ext4/mballoc.c:ext4_mb_init_cache",
+        "fs/ext4/balloc.c:ext4_validate_block_bitmap"
+      ]
+    }
+  }
+}

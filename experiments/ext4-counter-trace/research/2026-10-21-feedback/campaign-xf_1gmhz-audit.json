@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "campaign": "/home/ikun/fuzzing-orcle/experiments/ext4-counter-trace/results/campaign-xf_1gmhz",
+  "programs": 36,
+  "program_counts_scope": "stored program.json records, potentially including unexecuted exports",
+  "feedback_implementation_sha256": {
+    "archived": "d18d0273c2d428dce94adf6fc46cab110c09cc06008cfebc0e6de62ad708a2d9",
+    "current": "d18d0273c2d428dce94adf6fc46cab110c09cc06008cfebc0e6de62ad708a2d9"
+  },
+  "input_methods": {
+    "ResourceSeedAndGeneratedTail": 18,
+    "Mutate": 14,
+    "Generate": 4
+  },
+  "input_modes": {
+    "resource-valid": 18,
+    "ordinary": 18
+  },
+  "observed_native_verified_segments": 35,
+  "missing": {
+    "segment_coverage_or_feedback": 1
+  },
+  "mutation_input_records": 14,
+  "selected_distinct_parent_paths": 1,
+  "top_parent_fraction": 1.0,
+  "parent_selection_counts": [
+    {
+      "parent": "b1-w0-b8dc733414b89af9-bd1abb1d03910556.syz",
+      "selections": 14
+    }
+  ],
+  "first_admission_weight_reconstructed_from_current_code": 16749,
+  "corpus_files": 33,
+  "unique_corpus_program_hashes": 25,
+  "duplicate_corpus_files": 8,
+  "cumulative_admitted_names": 33,
+  "joint_admitted_names": 8,
+  "last_new_pc_segment": 34,
+  "last_new_ext4_jbd2_pc_segment": 32,
+  "last_new_formula_point_segment": 14,
+  "coverage_milestones": [
+    {
+      "segment": 0,
+      "total_pcs": 7105,
+      "new_pcs": 7105,
+      "total_ext4_jbd2_pcs": 2411,
+      "new_formula_points": 101,
+      "formula_points": 101,
+      "corpus_size": 2
+    },
+    {
+      "segment": 1,
+      "total_pcs": 7217,
+      "new_pcs": 112,
+      "total_ext4_jbd2_pcs": 2438,
+      "new_formula_points": 0,
+      "formula_points": 101,
+      "corpus_size": 4
+    },
+    {
+      "segment": 10,
+      "total_pcs": 8513,
+      "new_pcs": 81,
+      "total_ext4_jbd2_pcs": 2906,
+      "new_formula_points": 0,
+      "formula_points": 101,
+      "corpus_size": 16
+    },
+    {
+      "segment": 34,
+      "total_pcs": 9355,
+      "new_pcs": 7,
+      "total_ext4_jbd2_pcs": 3014,
+      "new_formula_points": 0,
+      "formula_points": 107,
+      "corpus_size": 33
+    }
+  ],
+  "final_feedback": {
+    "schema": 3,
+    "expected_samples": 35,
+    "received_samples": 35,
+    "complete_samples": 35,
+    "saturated_samples": 0,
+    "invalid_samples": 0,
+    "missing_samples": 0,
+    "unexpected_samples": 0,
+    "samples": 35,
+    "total_coverage": 9355,
+    "corpus_size": 33,
+    "total_ext4_coverage": 3014,
+    "samples_complete": true,
+    "feedback_complete": true,
+    "gaps": [],
+    "joint_feedback": {
+      "formula_points": 107,
+      "mismatch_signatures": 0,
+      "unverified_signatures": 0
+    }
+  },
+  "first_segment_evidence": {
+    "segment": "segment-000000",
+    "formula_point_keys": 101,
+    "stable_snapshot_keys": [
+      "BEGIN:SNAPSHOT.MEMORY.STABLE",
+      "R-BG:SNAPSHOT.MEMORY.STABLE",
+      "R-IG:SNAPSHOT.MEMORY.STABLE",
+      "R-IH:SNAPSHOT.MEMORY.STABLE",
+      "R-BSUM:SNAPSHOT.MEMORY.STABLE",
+      "R-ISUM:SNAPSHOT.MEMORY.STABLE",
+      "R-USUM:SNAPSHOT.MEMORY.STABLE",
+      "R-UG:SNAPSHOT.MEMORY.STABLE",
+      "R-USUM.NS:SNAPSHOT.MEMORY.STABLE",
+      "R-LINK:SNAPSHOT.MEMORY.STABLE",
+      "XATTR-REF:SNAPSHOT.MEMORY.STABLE",
+      "O-LIFE-FREE:SNAPSHOT.MEMORY.STABLE",
+      "END:SNAPSHOT.MEMORY.STABLE"
+    ],
+    "event_sources": {
+      "counts": {
+        "background_unattributed": 629,
+        "stable_snapshot": 2086,
+        "seed_setup": 413,
+        "generated_syscall": 234,
+        "cleanup": 622
+      },
+      "total_events": 3984,
+      "issues": [],
+      "format": "explicit_phases",
+      "source_attribution_complete": false
+    },
+    "note": "Point keys and source counts are separate aggregates; no per-program causal attribution is inferred."
+  },
+  "limits": [
+    "Historical metadata audit, not a new fuzzing experiment.",
+    "PC counts have no total-instrumentable-PC denominator.",
+    "ext4 PC labeling follows the existing ext4_/__ext4_/jbd2_ symbol-prefix filter.",
+    "No claim that a different scheduler would improve coverage without a controlled experiment."
+  ]
+}

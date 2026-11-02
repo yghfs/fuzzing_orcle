@@ -1,0 +1,11 @@
+{
+  "version": "6.12.1",
+  "archive_sha256": "0193b1d86dd372ec891bae799f6da20deef16fc199f30080a4ea9de8cef0c619",
+  "source_tree": "kernel/linux-6.12.1",
+  "entries": 92438,
+  "regular_files": 86618,
+  "verification": "All extracted regular files and symlinks match official tarball; no extra files",
+  "checker_c_present": false,
+  "config_present": false,
+  "built_image_present": false
+}
