@@ -1,5 +1,7 @@
 # 无注入 rename / JBD2 `-ENOSPC` 补测（2026-10-31）
 
+> 证据状态核对（2026-11-11）：下文三个 natural-rename 运行目录目前不存在；命令、数字和结论是历史摘要，不作为本轮重验或可打开的原始日志。未观察到自然 ENOSPC 不证明该错误路径不可达。
+
 ## 目的
 
 验证普通 ext4 `rename()` 是否能在不写 fault 控制文件、不调用
@@ -28,9 +30,9 @@ guest 程序为 [`natural-rename-stress.c`](tests/natural-rename-stress.c)，只
 
 | 运行 | 挂载模式 | 时长 / worker | renameat2 | `ENOSPC` | JBD2 `errcode -28` | fsck/remount |
 |---|---|---:|---:|---:|---:|---|
-| [`final-20s`](results/natural-rename-jbd2-20261031/final-20s) | ordered | 20 s / 4 | 11,622 普通 + 3,874 exchange | 0 | 0 | clean / pass |
-| [`ordered-60s`](results/natural-rename-jbd2-20261031/ordered-60s) | ordered | 60 s / 4 | 33,834 普通 + 11,278 exchange | 0 | 0 | clean / pass |
-| [`data-journal-30s`](results/natural-rename-jbd2-20261031/data-journal-30s) | `data=journal` | 30 s / 4 | 17,856 普通 + 5,952 exchange | 0 | 0 | clean / pass |
+| `final-20s`（原路径 `results/natural-rename-jbd2-20261031/final-20s`，已清理） | ordered | 20 s / 4 | 11,622 普通 + 3,874 exchange | 0 | 0 | clean / pass |
+| `ordered-60s`（原路径 `results/natural-rename-jbd2-20261031/ordered-60s`，已清理） | ordered | 60 s / 4 | 33,834 普通 + 11,278 exchange | 0 | 0 | clean / pass |
+| `data-journal-30s`（原路径 `results/natural-rename-jbd2-20261031/data-journal-30s`，已清理） | `data=journal` | 30 s / 4 | 17,856 普通 + 5,952 exchange | 0 | 0 | clean / pass |
 
 随后根据 JBD2 handle trace 继续调节了 workload：
 

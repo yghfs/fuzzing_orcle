@@ -1,5 +1,7 @@
 # 三组单 worker 随机错误注入 campaign 对比
 
+> 证据状态核对（2026-11-11）：原始 lhze、yk、dzq campaign 目录已清理，本文件保留历史审计摘要。文中 eviction 残留实例不再列为已确认 bug；最终定性以 [bug-adjudication.md](lhze-candidates/bug-adjudication.md) 为准。当前保留运行见 [覆盖审计](../2026-11-11-target-coverage/README.md)。
+
 分析日期：2026-10-31，时区 UTC+08:00。简称 `lhze`、`yk`、`dzq` 分别对应
 `campaign-lhze43mu`、`campaign-yk3_8nzt`、`campaign-dzq91z1h`。
 
@@ -401,14 +403,14 @@ write/pwrite64 的即时转换密度低也可能因为 delalloc 和后台归因�
 - [结构化指标](metrics.json)：总体、逐小时、质量、hook、episode、定点复核统计。
 - [逐 segment 数据](segments.csv)：1995 个 segment 的 hit/pass/reset/snapshot 口径。
 - [复算脚本](compare_campaigns.py)：Python 标准库；运行后重建 JSON/CSV，内置总数核对。
-- [lhze campaign report](../../results/campaign-lhze43mu/campaign-report.json)
-- [yk campaign report](../../results/campaign-yk3_8nzt/campaign-report.json)
-- [dzq campaign report](../../results/campaign-dzq91z1h/campaign-report.json)
-- [yk 定点复核说明](../../results/campaign-yk3_8nzt/CANDIDATE-REPRO-ANALYSIS.md)
-- [dzq segment 3 chain manifest](../../results/campaign-dzq91z1h/segments/segment-000003/analysis/chain-manifest.json)
-- [dzq segment 909 manifest](../../results/campaign-dzq91z1h/segments/segment-000909/manifest.json)
-- [dzq segment 910 manifest](../../results/campaign-dzq91z1h/segments/segment-000910/manifest.json)
-- [dzq retained reset script](../../results/campaign-dzq91z1h/evidence/tests/guest-campaign.sh)
+- lhze campaign report（原路径 `../../results/campaign-lhze43mu/campaign-report.json`，已清理）
+- yk campaign report（原路径 `../../results/campaign-yk3_8nzt/campaign-report.json`，已清理）
+- dzq campaign report（原路径 `../../results/campaign-dzq91z1h/campaign-report.json`，已清理）
+- yk 定点复核说明（原路径 `../../results/campaign-yk3_8nzt/CANDIDATE-REPRO-ANALYSIS.md`，已清理）
+- dzq segment 3 chain manifest（原路径 `../../results/campaign-dzq91z1h/segments/segment-000003/analysis/chain-manifest.json`，已清理）
+- dzq segment 909 manifest（原路径 `../../results/campaign-dzq91z1h/segments/segment-000909/manifest.json`，已清理）
+- dzq segment 910 manifest（原路径 `../../results/campaign-dzq91z1h/segments/segment-000910/manifest.json`，已清理）
+- dzq retained reset script（原路径 `../../results/campaign-dzq91z1h/evidence/tests/guest-campaign.sh`，已清理）
 
 本分析读取已有报告并抽查对应 raw trace 边界、snapshot、代码和 fsck 文本；没有重新
 运行 QEMU、重新执行 fsck 或将旧版本全部证据用当前 analyzer 重分析。不同版本

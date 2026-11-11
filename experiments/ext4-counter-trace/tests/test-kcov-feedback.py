@@ -2,6 +2,7 @@
 import json
 import hashlib
 import importlib.util
+import os
 import pathlib
 import struct
 import sys
@@ -136,6 +137,133 @@ class KcovFeedbackTests(unittest.TestCase):
         body += struct.pack('<Q', len(ranges))
         body += b''.join(struct.pack('<QQ', *item) for item in ranges)
         path.write_bytes(body)
+
+    def effect_campaign(self, run, call, target_device='253,16', require_target_success=False):
+        folder = run / 'segment-000000'
+        sample_dir = folder / 'coverage'
+        program_dir = folder / 'syz-programs/b1-w0'
+        sample_dir.mkdir(parents=True)
+        program_dir.mkdir(parents=True)
+        (program_dir / 'program.syz').write_text('openat(AT_FDCWD, "file")\n')
+        self.sample_v5(sample_dir / 'b1-w0.bin',
+                       [(10, 0), (10, 0), (20, 0), (10, 20)],
+                       [(0, 1), (1, 3)], raw_count=4)
+        corpus = FeedbackCorpus(run, feedback_mode='pc_edge', target_scope='ext4_jbd2',
+                                effect_aware_admission=True,
+                                require_target_success=require_target_success)
+        corpus.ext4_ranges = [(1, 30, 'ext4_file_operation')]
+        corpus.collect(folder, dict(segment_id=0, expected_programs=['b1-w0']))
+        calls = []
+        for index in range(2):
+            row = dict(program='b1-w0', call_index=index, verified=True,
+                       object_dev=os.makedev(253, 16), raw_result=0, errno=0,
+                       repaired=0, adapted=0,
+                       original_fd=3, executed_fd=3,
+                       original_length=4096, executed_length=4096)
+            row.update(call)
+            row.update(program='b1-w0', call_index=index, verified=True)
+            calls.append(row)
+        result = corpus.augment(folder, dict(native_syscalls=calls), target_device=target_device)
+        coverage = json.loads((folder / 'coverage.json').read_text())
+        return corpus, result, coverage['programs'][0]
+
+    def test_effect_feedback_admits_unmodified_target_success_per_call(self):
+        with tempfile.TemporaryDirectory() as temp:
+            corpus, result, row = self.effect_campaign(pathlib.Path(temp), {})
+            self.assertEqual(row['calls'][0]['effect'], 'target_success_unmodified')
+            self.assertTrue(row['admitted'])
+            self.assertEqual(row['target_success_calls'], 2)
+            self.assertEqual(result['campaign_summary']['effect_target_pc_coverage'], 2)
+            self.assertEqual(result['campaign_summary']['target_edge_coverage'], 1)
+            self.assertEqual(result['campaign_summary']['effect_target_edge_coverage'], 1)
+            self.assertEqual(row['calls'][1]['effect_new_target_edges'], 1)
+            self.assertEqual(corpus.effect_pc_coverage, {10, 20})
+
+    def test_effect_feedback_keeps_raw_coverage_but_excludes_repaired_and_adapted_calls(self):
+        for change in (dict(repaired=1), dict(adapted=1)):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temp:
+                corpus, _result, row = self.effect_campaign(pathlib.Path(temp), change)
+                self.assertEqual(row['calls'][1]['effect'], 'target_success_adapted')
+                self.assertEqual(row['calls'][1]['effect_new_target_edges'], 0)
+                self.assertFalse(row['admitted'])
+                self.assertEqual(len(corpus.coverage), 2)
+                self.assertEqual(corpus.effect_pc_coverage, set())
+
+    def test_effect_feedback_distinguishes_target_failure_and_can_require_success(self):
+        failed = dict(raw_result=-1, errno=5)
+        with tempfile.TemporaryDirectory() as temp:
+            _corpus, result, row = self.effect_campaign(pathlib.Path(temp), failed)
+            self.assertEqual(row['calls'][1]['effect'], 'target_failure_unmodified')
+            self.assertTrue(row['admitted'])
+            self.assertEqual(result['campaign_summary']['call_effect_counts']
+                             ['target_failure_unmodified'], 2)
+        with tempfile.TemporaryDirectory() as temp:
+            _corpus, _result, row = self.effect_campaign(
+                pathlib.Path(temp), failed, require_target_success=True)
+            self.assertFalse(row['admitted'])
+            self.assertFalse(row['effect_eligible'])
+
+    def test_effect_feedback_rejects_non_target_or_unidentified_calls(self):
+        cases = ((dict(object_dev=os.makedev(253, 32)), '253,16', 'non_target'),
+                 ({}, None, 'unverified'))
+        for options, target, expected in cases:
+            with self.subTest(options=options, target=target), tempfile.TemporaryDirectory() as temp:
+                corpus, _result, row = self.effect_campaign(pathlib.Path(temp), options,
+                                                             target_device=target)
+                self.assertEqual(row['calls'][1]['effect'], expected)
+                self.assertFalse(row['admitted'])
+                self.assertEqual(len(corpus.coverage), 2)
+
+    def test_resource_parent_pool_only_selects_typed_resource_programs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run = pathlib.Path(temp)
+            resource_dir = run / 'segment/syz-programs/resource'
+            ordinary_dir = run / 'segment/syz-programs/ordinary'
+            resource_dir.mkdir(parents=True)
+            ordinary_dir.mkdir(parents=True)
+            resource = resource_dir / 'program.syz'
+            ordinary = ordinary_dir / 'program.syz'
+            resource.write_text('openat$dir\n')
+            ordinary.write_text('openat\n')
+            (resource_dir / 'program.json').write_text(json.dumps(
+                dict(input_mode='resource-valid', resource_template='file-state')))
+            (ordinary_dir / 'program.json').write_text(json.dumps(
+                dict(input_mode='ordinary')))
+            corpus = FeedbackCorpus(run)
+            corpus._admit_parent(resource, dict(admission_signals=['pc']))
+            corpus._admit_parent(ordinary, dict(admission_signals=['pc']))
+            candidate = corpus.parent_candidate(resource_only=True)
+            self.assertIsNotNone(candidate)
+            self.assertTrue(candidate['resource_parent'])
+            self.assertEqual(json.loads(candidate['path'].with_suffix('.json').read_text()),
+                             json.loads((resource_dir / 'program.json').read_text()))
+            self.assertEqual(corpus.parent_candidate(resource_only=True)['path'],
+                             corpus.corpus / (hashlib.sha256(resource.read_bytes()).hexdigest() + '.syz'))
+
+    def test_resource_admission_upgrades_existing_corpus_sidecar(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run = pathlib.Path(temp)
+            ordinary_dir = run / 'segment/ordinary'
+            resource_dir = run / 'segment/resource'
+            ordinary_dir.mkdir(parents=True)
+            resource_dir.mkdir(parents=True)
+            ordinary = ordinary_dir / 'program.syz'
+            resource = resource_dir / 'program.syz'
+            ordinary.write_text('openat$dir\n')
+            resource.write_text(ordinary.read_text())
+            (ordinary_dir / 'program.json').write_text(json.dumps(
+                dict(input_mode='ordinary', resource_template='auto')))
+            (resource_dir / 'program.json').write_text(json.dumps(
+                dict(input_mode='resource-valid', resource_template='namespace',
+                     resource_seed_sha256='seed-hash', resource_seed_calls=15,
+                     resource_prefix_calls=7)))
+            corpus = FeedbackCorpus(run)
+            target = corpus._admit_parent(ordinary, dict(admission_signals=['pc']))
+            corpus._admit_parent(resource, dict(admission_signals=['pc']))
+            metadata = json.loads(target.with_suffix('.json').read_text())
+            self.assertEqual(metadata['input_mode'], 'resource-valid')
+            self.assertEqual(metadata['resource_template'], 'namespace')
+            self.assertEqual(corpus.parent_candidate(resource_only=True)['path'], target)
 
     def test_parser_rejects_truncation_and_overflow_is_reported(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -477,6 +605,28 @@ class KcovFeedbackTests(unittest.TestCase):
             self.assertEqual(corpus._eligible_parent_indices(), [0])
             corpus.selection_count = 16
             self.assertEqual(corpus._eligible_parent_indices(), [0, 1])
+
+    def test_resource_parent_pool_cools_zero_target_yield_under_uniform_scheduler(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run = pathlib.Path(temp)
+            corpus = FeedbackCorpus(run, scheduler_policy='uniform_round_robin')
+            productive, exhausted = run / 'productive.syz', run / 'exhausted.syz'
+            productive.write_text('productive')
+            exhausted.write_text('exhausted')
+            corpus.parents = [productive, exhausted]
+            hashes = {path: hashlib.sha256(path.read_bytes()).hexdigest()
+                      for path in corpus.parents}
+            corpus.resource_parent_hashes = set(hashes.values())
+            corpus.parent_stats = {
+                hashes[productive]: {'zero_target_yield_streak': 0},
+                hashes[exhausted]: {'zero_target_yield_streak': 3},
+            }
+            corpus.selection_count = 1
+            self.assertEqual(
+                corpus._eligible_parent_indices(
+                    [0, 1], enforce_cooldown=True), [0])
+            candidate = corpus.parent_candidate(resource_only=True)
+            self.assertEqual(pathlib.Path(candidate['path']), productive)
 
     def test_auxiliary_yield_does_not_mask_target_pc_cooling(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -111,5 +111,6 @@ schema 1 缺少实际 namespace 转换和锁内 descriptor 顺序，不能升级
 
 通用跨线程因果传播仍未实现。并发/后台轨迹按记录顺序保留，不能声称 observer seq
 代表跨 CPU 实际修改的先后。目录 dir_nlink sentinel、EA/保留 inode、快照规模上限等
-保留明确覆盖限制；`BLOCK_UNINIT` 磁盘布局仍未建模。长时轮转、持续收集与资源治理现已
+保留明确覆盖限制；离线 `BLOCK_UNINIT` 已按受支持的 metadata/flex/短末组布局重算，
+`META_BG` descriptor placement 明确拒绝。bigalloc 特性识别于 2026-11-11 修正。长时轮转、持续收集与资源治理现已
 由 [SECOND-CHAIN.md](SECOND-CHAIN.md) 中的受控运行链接入，本篇描述有限活动期链。

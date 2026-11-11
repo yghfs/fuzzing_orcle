@@ -12,6 +12,41 @@ checker=importlib.util.module_from_spec(spec);spec.loader.exec_module(checker)
 
 
 class LazyDiskTests(unittest.TestCase):
+    def check_bigalloc_feature_layout(self, bigalloc, flex_bg):
+        with tempfile.TemporaryDirectory() as temp:
+            image = pathlib.Path(temp) / 'features.raw'
+            with image.open('wb') as fp:
+                fp.truncate(128 * 1024**2)
+            features = ['extent', 'bigalloc' if bigalloc else '^bigalloc',
+                        'flex_bg' if flex_bg else '^flex_bg']
+            options = ['-C', '65536'] if bigalloc else []
+            subprocess.run(['mke2fs', '-q', '-F', '-t', 'ext4', '-b', '4096',
+                            '-N', '256', '-O', ','.join(features),
+                            *options, str(image)], check=True)
+            view = checker.Image(image)
+            try:
+                self.assertEqual(view.bigalloc, bigalloc)
+                self.assertEqual(view.cluster_ratio, 16 if bigalloc else 1)
+                # A 128 MiB, 4 KiB-block image has 32768 blocks. Its bitmap
+                # represents 2048 clusters only when bigalloc is enabled.
+                self.assertEqual(view.valid_clusters(0), 2048 if bigalloc else 32768)
+                report = view.check()
+                self.assertTrue(report['valid'], report)
+            finally:
+                view.fp.close()
+
+    def test_regular_with_flex_bg_is_not_bigalloc(self):
+        self.check_bigalloc_feature_layout(bigalloc=False, flex_bg=True)
+
+    def test_regular_without_flex_bg(self):
+        self.check_bigalloc_feature_layout(bigalloc=False, flex_bg=False)
+
+    def test_bigalloc_with_flex_bg(self):
+        self.check_bigalloc_feature_layout(bigalloc=True, flex_bg=True)
+
+    def test_bigalloc_without_flex_bg(self):
+        self.check_bigalloc_feature_layout(bigalloc=True, flex_bg=False)
+
     def test_real_layouts_and_opposite_descriptor_changes(self):
         with tempfile.TemporaryDirectory() as temp:
             for name,size,options in [

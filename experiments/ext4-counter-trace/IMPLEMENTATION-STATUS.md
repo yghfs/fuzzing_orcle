@@ -1,5 +1,7 @@
 # Implementation status
 
+Updated: 2026-11-11 (Asia/Shanghai). Current evidence inventory: [documentation audit](../../DOCUMENTATION-AUDIT-20261111.md).
+
 The formula families added after the original counter chain are implemented in
 the development tree and have a passing bounded relation run. The authoritative
 scope, evidence and limits are documented in
@@ -8,12 +10,16 @@ The original bounded relation run directory has been pruned. Historical directed
 validation does not prove that every fault-injection exit has executed.
 
 The Linux 6.12.1 counter-trace implementation, source audit, schema-3 write
-audit, and no-trace build are complete. Directed lifecycle, disk-layout,
-syzkaller, KCOV, and campaign-governance tests pass.
+audit, and no-trace build have historical passing records. The source/build
+binding was checked again on 2026-11-11 and passed. The disk-layout regression
+checks were rerun for the bigalloc correction; the older lifecycle, syzkaller,
+KCOV and campaign test results are historical, not fresh runs of this audit.
 
-Historical chain, smoke, and superseded campaign run directories have been pruned. The
-retained long runs are `results/campaign-lhze43mu` (single-worker fault-injection run)
-and `results/campaign-k3gxmeex` with its post-report (two-worker concurrent run).
+Historical chain, smoke, and superseded campaign run directories have been pruned.
+`results/campaign-lhze43mu`, `results/campaign-k3gxmeex`, its post-report,
+and `results/campaign-fmxs5w3e` are absent on the audited host. Their remaining
+written summaries must not be presented as available raw evidence. Current
+retained coverage runs are indexed in [the coverage audit](research/2026-11-11-target-coverage/README.md).
 The fast-commit claim-retry comparison was also historical material and its result directory
 has been pruned; only the source-level conclusion is retained in `BUG-INVENTORY.md`.
 
@@ -46,8 +52,12 @@ retained.
 After a random hit the target filesystem is marked tainted. The next segment
 that would use it runs an in-guest `mke2fs`/mount reset before collecting a new
 workload; the reset evidence is retained and its counter epoch boundary is
-explicitly accepted by campaign aggregation. A hit therefore never causes the
-next workload to inherit an unreviewed filesystem state.
+accepted by campaign aggregation as a reset boundary. This does not prove that
+every per-segment lifecycle carry handles the new epoch correctly: the retained
+twelve-hour PC-only/full-feedback runs have 7/3 analysis failures immediately
+after reset, with epoch/sequence and device-identity issues. Their KCOV samples
+are complete but overall coverage/lifecycle validation is not. A tainted
+filesystem is reset before reuse; continuity across that reset still needs validation.
 
 The ext4 per-mount rule selects one operation, errno and count, with an optional
 target PID. `program` and `call_index` are captured trace labels; they do not

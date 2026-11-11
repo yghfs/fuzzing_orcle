@@ -148,7 +148,8 @@ def correlate_syscalls(lines):
                 else:
                     if any(start.get(key) != marker.get(key) for key in
                            ('nr', 'name', 'program', 'call_index', 'object_ino', 'object_dev',
-                            'object_is_dir')):
+                            'object_is_dir', 'repaired', 'adapted', 'original_fd',
+                            'executed_fd', 'original_length', 'executed_length')):
                         problems.append({'pid': pid, 'line': line['line'], 'reason': 'syscall_marker_identity_changed'})
                     envelopes.append((start, marker))
     for start in opened.values():
@@ -170,7 +171,10 @@ def correlate_syscalls(lines):
                 'object_ino': begin.get('object_ino'), 'object_dev': begin.get('object_dev'),
                 'object_is_dir': begin.get('object_is_dir'),
                 'repaired': int(begin.get('repaired', 0)),
+                'adapted': int(begin.get('adapted', 0)),
                 'original_fd': begin.get('original_fd'), 'executed_fd': begin.get('executed_fd'),
+                'original_length': begin.get('original_length'),
+                'executed_length': begin.get('executed_length'),
                 'repair_version': begin.get('repair_version'),
                 'marker_begin_line': begin['line'], 'marker_end_line': end['line'],
                 'user_result': int(end['ret']), 'user_errno': int(end['errno']),

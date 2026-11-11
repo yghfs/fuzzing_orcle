@@ -71,6 +71,23 @@ def program_input_plan(object_sharing, ordinal, resource_every):
     return 'ordinary', 'auto'
 
 
+def select_program_input(object_sharing, ordinal, resource_every, fresh_every):
+    """Choose an input lane, giving private fresh slots precedence."""
+    input_mode, resource_template = program_input_plan(
+        object_sharing, ordinal, resource_every)
+    force_fresh = bool(fresh_every and ordinal % fresh_every == 0)
+    if force_fresh and object_sharing != 'shared':
+        return 'ordinary', 'auto', True
+    return input_mode, resource_template, False
+
+
+def split_ordinary_slot_is_fresh(input_mode, force_fresh, resource_mutation_mode):
+    """Keep split-arm ordinary slots out of the corpus-parent mutation lane."""
+    return bool(force_fresh or (
+        input_mode == 'ordinary' and
+        resource_mutation_mode in ('seed_only', 'parent_only')))
+
+
 def validate_guest_trace_cpus(requested, cpu_stats):
     """Require every requested vCPU to be online and represented in tracefs."""
     actual = len(cpu_stats)
@@ -150,16 +167,42 @@ def stable_snapshot_health(path):
     observation = dict(path=path.name, snapshot_id=snapshot.get('snapshot_id'),
                        reason=snapshot.get('reason'), valid=snapshot.get('valid'),
                        namespace_valid=snapshot.get('namespace_valid'),
-                       relations_valid=snapshot.get('relations_valid'), **counts)
+                       namespace_reason=snapshot.get('namespace_reason'),
+                       relations_valid=snapshot.get('relations_valid'),
+                       relations_reason=snapshot.get('relations_reason'),
+                       observation_stable=snapshot.get('observation_stable'),
+                       quiescent=snapshot.get('quiescent'), **counts)
+    # Preserve formula/object labels when a snapshot carries them.  They are
+    # needed later to merge a stable finding with lifecycle and fsck evidence.
+    for key in ('formula', 'point', 'operation', 'postcondition', 'category',
+                'finding_category', 'ino', 'group', 'block', 'slot', 'object_ino'):
+        if key in snapshot:
+            observation[key] = snapshot[key]
     checks = ('valid', 'namespace_valid', 'relations_valid')
     reason = str(snapshot.get('reason') or '')
+    # A namespace scan is part of the oracle envelope.  If it is absent or
+    # false, counter disagreement cannot be promoted to a finding.
+    if snapshot.get('namespace_valid') is not True:
+        observation['status'] = 'unverified'
+        return observation
+    if (snapshot.get('relations_valid') is None or
+            (snapshot.get('relations_valid') is not True and
+             not int(snapshot.get('relations_mismatches', 0) or 0))):
+        observation['status'] = 'unverified'
+        return observation
+    if snapshot.get('observation_stable') is False or snapshot.get('quiescent') is False:
+        observation['status'] = 'unverified'
+        return observation
     # A false validity bit can mean either a measured formula mismatch or an
     # interrupted/unsupported observation.  Only the former is a candidate.
+    reason = ' '.join(str(snapshot.get(key) or '') for key in
+                      ('reason', 'namespace_reason', 'relations_reason'))
     observation_failure = any(token in reason.lower()
                               for token in ('unverified', 'interrupted', 'timeout',
                                             'missing', 'read_failed', 'unsupported',
                                             'busy', 'unstable',
-                                            'concurrent_or_unhealthy'))
+                                            'concurrent_or_unhealthy',
+                                            'namespace_scan_invalid'))
     measured_mismatch = (any(counts.values()) or
                          (any(snapshot.get(key) is False for key in checks) and
                           not observation_failure) or
@@ -474,7 +517,9 @@ class Runner:
         self.carry = None
         self.feedback = FeedbackCorpus(self.run, scheduler_policy=args.scheduler_policy,
                                        feedback_mode=args.feedback_mode, seed=args.seed,
-                                       target_scope=args.target_scope)
+                                       target_scope=args.target_scope,
+                                       effect_aware_admission=getattr(args, 'effect_aware_admission', True),
+                                       require_target_success=getattr(args, 'require_target_success', False))
         self.ledger = QuotaLedger(self.run)
         self.timings = {}
         self.segment_timings = {}
@@ -782,7 +827,7 @@ class Runner:
         for file in ('campaign.py', 'campaign_runner.py', 'analyze-campaign.py', 'run-campaign.sh',
                      'trace_lifecycle.py', 'formula_relations.py', 'point_report.py', 'analyze-lifecycle.py', 'check-disk.py',
                      'syz_workload.py', 'kcov_feedback.py', 'quota_ledger.py', 'source_audit.py',
-                     'performance_report.py', 'run-feedback-study.py'):
+                     'performance_report.py'):
             shutil.copy2(PROJECT / 'scripts' / file, evidence / 'scripts' / file)
         for file in ('campaign-workload.c', 'chain-workload.c', 'guest-campaign.sh', 'test-campaign.py', 'test-disk-layouts.py',
                      'syz-runtime.h', 'syz-launcher.c', 'test-syzkaller.py', 'test-kcov-feedback.py'):
@@ -837,6 +882,10 @@ class Runner:
                       self.run / 'root.qcow2'])
         template_dir = self.root / 'work/ext4-counter-start-images' / f'seed-{self.args.seed}'
         template_dir.mkdir(parents=True, exist_ok=True)
+        comparison_image = pathlib.Path(self.args.comparison_seed_image).resolve() \
+            if getattr(self.args, 'comparison_seed_image', None) else None
+        if comparison_image and not comparison_image.is_file():
+            raise CampaignError('comparison_seed_image_missing:' + str(comparison_image))
         with (template_dir / '.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             for kind in KINDS:
@@ -861,6 +910,12 @@ class Runner:
                 self.meta.setdefault('start_images', {})[kind] = dict(
                     path=str(template), sha256=digest(image))
             fcntl.flock(lock, fcntl.LOCK_UN)
+        if comparison_image:
+            regular_image = self.run / 'regular.raw'
+            self.command(['cp', '--sparse=always', comparison_image, regular_image])
+            self.meta['start_images']['regular'] = dict(
+                path=str(comparison_image), sha256=digest(regular_image),
+                comparison_seed_image=True)
         common = ['-i', str(self.root / 'work/debian.id_rsa'), '-o', 'BatchMode=yes',
                   '-o', 'ConnectTimeout=3', '-o', 'ServerAliveInterval=5', '-o', 'ServerAliveCountMax=2',
                   '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null', '-o', 'LogLevel=ERROR']
@@ -918,7 +973,8 @@ class Runner:
         self.record_time('vm_boot', time.monotonic() - boot_start)
         self.push([self.run / 'ct-syz-launcher', evidence / 'tests/guest-campaign.sh'],
                   'root@127.0.0.1:/tmp/', timeout=120)
-        self.guest('init', self.args.buffer_kb, getattr(self.args, 'scenario', 'baseline'))
+        self.guest('init', self.args.buffer_kb, getattr(self.args, 'scenario', 'baseline'),
+                   'comparison-seed' if comparison_image else 'standard')
         self.fetch(BASE, self.run / 'initial')
         kallsyms = self.run / 'initial' / 'kallsyms.txt'
         if kallsyms.is_file():
@@ -938,8 +994,12 @@ class Runner:
         folder = self.run / 'segments' / ident
         folder.mkdir(parents=True, exist_ok=True)
         selection = self.args.mode
-        kind_index = (index//2 if selection == 'matrix' else index) % len(KINDS)
-        kind = KINDS[kind_index]
+        target_kind = getattr(self.args, 'target_kind', 'all')
+        if target_kind == 'all':
+            kind_index = (index//2 if selection == 'matrix' else index) % len(KINDS)
+            kind = KINDS[kind_index]
+        else:
+            kind = target_kind
         tainted = set(getattr(self, 'tainted_kinds', set()))
         mode = ('single' if index % 2 == 0 else 'concurrent') if selection == 'matrix' else selection
         workers = 1 if mode == 'single' else self.args.workers
@@ -977,14 +1037,45 @@ class Runner:
                     (batch-1)*m['workers'] + worker
                 resource_every = getattr(self.args, 'resource_valid_every', 2)
                 fresh_every = getattr(self.args, 'fresh_generate_every', 5)
-                input_mode, resource_template = program_input_plan(
-                    m.get('object_sharing', 'private'), ordinal, resource_every)
-                force_fresh = bool(fresh_every and ordinal % fresh_every == 0)
+                resource_mutation_mode = getattr(
+                    self.args, 'resource_mutation_mode', 'combined')
+                input_mode, resource_template, force_fresh = select_program_input(
+                    m.get('object_sharing', 'private'), ordinal,
+                    resource_every, fresh_every)
                 candidate = None
-                if input_mode == 'resource-valid':
-                    task = 'resource_valid'
-                elif force_fresh:
+                # A configured fresh slot is an exploration lane and must be
+                # able to override the resource cadence.  Previously the
+                # resource branch ran first, so resource_valid_every=1 made
+                # fresh_generate_every ineffective for every private slot.
+                if split_ordinary_slot_is_fresh(
+                        input_mode, force_fresh, resource_mutation_mode):
+                    # Split-treatment arms must not dilute the treatment with
+                    # ordinary corpus mutations on their non-typed slots.
+                    # Those slots are a fixed-cost Generate lane, so the only
+                    # parent mutation in parent_only is a resource-valid
+                    # ResourceMutate on a typed slot.
                     task = 'fresh_generate'
+                elif input_mode == 'resource-valid':
+                    # The split experiment arms make the source of typed-input
+                    # gains explicit.  A seed-only arm never consumes a
+                    # feedback parent.  A parent-only arm may need one typed
+                    # seed to bootstrap the resource-parent corpus; that
+                    # exceptional slot is recorded as a bootstrap, not hidden
+                    # inside the combined policy.
+                    if resource_mutation_mode == 'seed_only':
+                        candidate = None
+                        task = 'resource_valid_seed'
+                    else:
+                        candidate = self.feedback.parent_candidate(resource_only=True)
+                        task = ('resource_mutate' if candidate else
+                                ('resource_parent_bootstrap' if
+                                 resource_mutation_mode == 'parent_only' else
+                                 'resource_valid_seed'))
+                    if candidate:
+                        parent_meta_path = pathlib.Path(str(candidate['path'])).with_suffix('.json')
+                        if parent_meta_path.is_file():
+                            parent_meta = read_json(parent_meta_path)
+                            resource_template = parent_meta.get('resource_template', resource_template)
                 else:
                     candidate = self.feedback.parent_candidate()
                     task = 'mutate' if candidate else 'generate_no_corpus'
@@ -994,11 +1085,14 @@ class Runner:
                     budget_candidate, self.args.syz_calls, self.args.max_mutation_calls)
                 decision = dict(ordinal=ordinal, resource_valid_every=resource_every,
                                 fresh_generate_every=fresh_every, input_mode=input_mode,
+                                resource_mutation_mode=resource_mutation_mode,
                                 force_fresh=force_fresh, task=task,
                                 resource_template=resource_template,
                                 scheduler_policy=self.args.scheduler_policy,
                                 feedback_mode=self.args.feedback_mode,
                                 mutation_budget_policy=self.args.mutation_budget_policy,
+                                effect_aware_admission=getattr(self.args, 'effect_aware_admission', True),
+                                require_target_success=getattr(self.args, 'require_target_success', False),
                                 requested_calls=call_budget,
                                 rarity_score=candidate.get('rarity_score') if candidate else None,
                                 rarity_components=candidate.get('rarity_components') if candidate else None,
@@ -1022,10 +1116,12 @@ class Runner:
                                            runtime_path=self.run / 'evidence/tests/syz-runtime.h',
                                            input_mode=input_mode, decision=decision,
                                            resource_template=resource_template)
-                actual_mutation = bool(candidate and program.get('method') == 'Mutate')
+                actual_mutation = bool(candidate and program.get('method') in
+                                       ('Mutate', 'ResourceMutate'))
                 if actual_mutation:
                     self.feedback.commit_parent(candidate)
-                program['task'] = 'mutate' if actual_mutation else (
+                program['task'] = ('resource_mutate' if input_mode == 'resource-valid'
+                                   else 'mutate') if actual_mutation else (
                     'generate_fallback' if candidate else task)
                 program['scheduler_policy'] = self.args.scheduler_policy
                 program['parent_sha256'] = candidate['sha256'] if actual_mutation else None
@@ -1190,6 +1286,8 @@ class Runner:
         else:
             segment_status = 'guest_error'
         m.update(status=segment_status, end_wall_ns=time.time_ns(), guest_exit=rc)
+        if hasattr(self, 'collection_start_monotonic'):
+            m['collection_elapsed_seconds'] = time.monotonic() - self.collection_start_monotonic
         progress = dict(re.findall(r'^(\w+)=(\d+)$', (folder / 'progress.txt').read_text(), re.M)) if (folder / 'progress.txt').exists() else {}
         m['batches'] = int(progress.get('batches', 0))
         m['segment_elapsed_seconds'] = round(time.monotonic()-segment_start, 6)
@@ -1513,7 +1611,8 @@ class Runner:
         native_execution_verified = not m.get('syzkaller_execution_issues')
         m['joint_feedback'] = self.feedback.augment(
             folder, report, native_execution_verified=native_execution_verified,
-            timeline_path=analysis / 'lifecycle/timeline.jsonl', mode=m.get('mode', 'single'))
+            timeline_path=analysis / 'lifecycle/timeline.jsonl', mode=m.get('mode', 'single'),
+            target_device=self.meta.get('devices', {}).get(m.get('kind')))
         self.persist_feedback_summary()
         self.compact_segment_artifacts(folder)
         self.progress(f'KCOV FEEDBACK segment={folder.name} native_verified={native_execution_verified} '
@@ -1571,9 +1670,13 @@ class Runner:
         findings = {key: counts.get(key, 0)
                     for key in ('operation_exit_mismatch', 'persistent_mismatch')
                     if counts.get(key, 0)}
-        if findings:
+        object_findings = []
+        for interval in report.get('runs', []):
+            object_findings.extend((interval.get('object_checks') or {}).get('findings', []))
+        if findings or object_findings:
             fault['lifecycle_candidate'] = dict(
-                classification_counts=findings, issues=report.get('issues', []))
+                classification_counts=findings, object_findings=object_findings,
+                issues=report.get('issues', []))
             manifest['fault_injection'] = fault
             atomic_json(folder / 'manifest.json', manifest)
 
@@ -1771,6 +1874,9 @@ class Runner:
         try:
             self.prepare()
             active_start = time.monotonic()
+            self.collection_start_monotonic = active_start
+            self.meta['collection_start_wall_ns'] = time.time_ns()
+            self.meta['collection_clock'] = 'monotonic'
             previous = None
             for index in range(self.args.segments):
                 # Do not create a new manifest after a bounded resource stop.
@@ -2020,15 +2126,24 @@ def main():
     p.add_argument('--syzkaller-calls', dest='syz_calls', type=int, default=32,
                    help='generated calls per worker program')
     p.add_argument('--resource-valid-every', type=int, default=2,
-                   help='use typed valid namespace prefix every N program slots; 0 disables (default 50 percent)')
+                   help='schedule a resource-valid typed seed or parent mutation every N program slots; 0 disables (default 50 percent)')
     p.add_argument('--fresh-generate-every', type=int, default=5,
                    help='force fresh ordinary Generate every N slots; 0 disables')
+    p.add_argument('--resource-mutation-mode',
+                   choices=('combined', 'seed_only', 'parent_only'),
+                   default='combined',
+                   help='typed resource policy: combined seed/parent, seed_only, '
+                        'or parent_only with an auditable bootstrap seed')
     p.add_argument('--scheduler-policy', choices=('uniform_round_robin', 'rarity_fair'),
                    default='uniform_round_robin')
     p.add_argument('--feedback-mode', choices=('pc', 'pc_edge', 'pc_semantic', 'pc_edge_semantic', 'none'),
                    default='pc_edge_semantic', help='signals allowed to admit corpus programs')
     p.add_argument('--target-scope', choices=('all', 'ext4_jbd2'), default='all',
                    help='PC admission scope; ext4_jbd2 makes target PCs the primary signal')
+    p.add_argument('--effect-aware-admission', action=argparse.BooleanOptionalAction, default=True,
+                   help='admit corpus feedback only from native-verified calls on the target filesystem')
+    p.add_argument('--require-target-success', action='store_true',
+                   help='require at least one successful unmodified target-filesystem call for corpus admission')
     p.add_argument('--strict-kcov-feedback', action='store_true',
                    help='stop at the next segment boundary after any KCOV feedback gap and fail the campaign')
     p.add_argument('--mutation-budget-policy', choices=('fixed', 'dynamic'), default='fixed')
@@ -2038,6 +2153,10 @@ def main():
                    help='persistent resource profile for long-lived and pressure experiments')
     p.add_argument('--predecessor', help='previous interrupted run; evidence remains in its own directory')
     p.add_argument('--rootfs-backing', help='raw root filesystem backing image (defaults to work/debian-clean-smalljournal.img, then work/debian.img)')
+    p.add_argument('--target-kind', choices=('all', 'regular', 'bigalloc', 'inline'), default='all',
+                   help='restrict segment scheduling to one filesystem kind; disk creation and validation remain unchanged')
+    p.add_argument('--comparison-seed-image',
+                   help='preformatted regular ext4 image shared byte-for-byte with the syz-manager seed')
     a = p.parse_args()
     bounds = dict(segments=(1,100000), duration_seconds=(1,43200), target_syscalls=(0,10000000), segment_seconds=(1,300),
                   max_batches=(1,20), batch_timeout=(1,300), boot_timeout=(30,600), analysis_timeout=(10,600), workers=(1,8),
@@ -2052,8 +2171,14 @@ def main():
     shared_concurrency = a.workers > 1 and a.mode in ('concurrent', 'matrix')
     if (a.resource_valid_every or shared_concurrency) and a.syz_calls < 16:
         p.error("typed seed and shared-contention modes require --syzkaller-calls >= 16")
+    if a.resource_mutation_mode != 'combined' and not a.resource_valid_every:
+        p.error('--resource-mutation-mode seed_only/parent_only requires --resource-valid-every > 0')
+    if a.resource_mutation_mode == 'parent_only' and a.fresh_generate_every:
+        p.error('--resource-mutation-mode parent_only requires --fresh-generate-every 0')
     if a.mutation_budget_policy == 'dynamic' and a.scheduler_policy != 'rarity_fair':
         p.error('--mutation-budget-policy dynamic requires --scheduler-policy rarity_fair')
+    if a.comparison_seed_image and (a.target_kind != 'regular' or a.scenario != 'baseline'):
+        p.error('--comparison-seed-image requires --target-kind regular and --scenario baseline')
     try:
         validate_random_fault_mode(a)
     except CampaignError as error:

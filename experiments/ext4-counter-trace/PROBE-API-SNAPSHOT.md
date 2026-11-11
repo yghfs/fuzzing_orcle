@@ -131,8 +131,10 @@ bitmap 转换与 global 发布增量及稳定快照之间的实际总量差；�
   强制检查全部点位；普通增量分析仍将这些事件分类隔离。
 - 错误/恢复镜像、online resize 和 bigalloc rereserve 专用定向验证：implemented；special
   runner 保留双启动 FC replay、resize、corruption 和 bigalloc trace/snapshot 证据。
-- `P-DISK` 自定义离线解析器：implemented；`BLOCK_UNINIT` 的 flex_bg metadata layout
-  仍标记 unverified，不以磁盘 bitmap 零值冒充逻辑空闲量。
+- `P-DISK` 自定义离线解析器：implemented；`BLOCK_UNINIT` 通过 metadata 布局、flex placement、
+  短末组和 metadata 共用 cluster 独立重算，不直接统计未初始化磁盘位。`META_BG`
+  descriptor placement 明确拒绝。2026-11-11 修正 BIGALLOC 的 ro-compat 字段识别；
+  regular/bigalloc 与 flex_bg 开关的四种真实镜像组合通过离线检查。
 
 ## Schema 2 生命周期链
 

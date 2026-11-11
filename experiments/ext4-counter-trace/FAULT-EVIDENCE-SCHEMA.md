@@ -80,20 +80,20 @@ stable anchor，并在 manifest 中记录 `missing_carry_trace`；这是局部�
 
 分类：
 
-| 分类 | 含义 |
-| --- | --- |
-| `not_triggered` | 计划/arm/kernel hit 缺失或不匹配 |
-| `wrong_return` | 真实调用结果不符合计划 |
-| `unstable` | 稳定观察无效、有 trace loss 或 worker 范围错误 |
-| `oracle_unverified` | 计划要求的公式事件没有有效观测或状态不匹配 |
-| `association_invalid` | hit、目标 syscall、公式事件、对象或稳定快照的原始关联索引无法重建 |
-| `persistence_mismatch` | 持久化证据缺失、修复后检查失败或未满足计划恢复判据 |
+| 分类                                            | 含义                                                                                                         |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `not_triggered`                               | 计划/arm/kernel hit 缺失或不匹配                                                                             |
+| `wrong_return`                                | 真实调用结果不符合计划                                                                                       |
+| `unstable`                                    | 稳定观察无效、有 trace loss 或 worker 范围错误                                                               |
+| `oracle_unverified`                           | 计划要求的公式事件没有有效观测或状态不匹配                                                                   |
+| `association_invalid`                         | hit、目标 syscall、公式事件、对象或稳定快照的原始关联索引无法重建                                            |
+| `persistence_mismatch`                        | 持久化证据缺失、修复后检查失败或未满足计划恢复判据                                                           |
 | `injected_journal_abort_no_persistent_damage` | 真实 helper 错误已命中，syscall 返回符合源码传播，故障后内存观察可失效，但卸载前 raw fsck 与独立磁盘检查干净 |
-| `injected_persistent_postcondition_violation` | 真实 helper 错误已命中，且卸载前 raw fsck 或独立磁盘检查已经观察到持久化后置条件违例 |
-| `finding_reproduced_recovered` | 预期公式不一致被真实观测，且计划定义的离线恢复检查通过 |
-| `passed` | 注入执行后公式状态符合预期，且稳定/持久化验收通过 |
-| `matched_control` | 同一 fixture 在 fault arm 关闭时 syscall、稳定快照和离线镜像均通过 |
-| `blkdebug_io_error_propagated` | 独立 QEMU blkdebug 读写控制确认 I/O errno 传播且镜像未改变 |
+| `injected_persistent_postcondition_violation` | 真实 helper 错误已命中，且卸载前 raw fsck 或独立磁盘检查已经观察到持久化后置条件违例                         |
+| `finding_reproduced_recovered`                | 预期公式不一致被真实观测，且计划定义的离线恢复检查通过                                                       |
+| `passed`                                      | 注入执行后公式状态符合预期，且稳定/持久化验收通过                                                            |
+| `matched_control`                             | 同一 fixture 在 fault arm 关闭时 syscall、稳定快照和离线镜像均通过                                           |
+| `blkdebug_io_error_propagated`                | 独立 QEMU blkdebug 读写控制确认 I/O errno 传播且镜像未改变                                                   |
 
 `finding_reproduced_recovered` 只表示 fixture 复现了错误并通过其明示的恢复检查。对本次 inode eviction 结果，恢复指 offline `e2fsck -fy` 后的 `e2fsck -fn` 与 disk checker；不指内核自动恢复。
 

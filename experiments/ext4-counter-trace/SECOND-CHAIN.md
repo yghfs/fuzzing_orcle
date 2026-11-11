@@ -1,5 +1,7 @@
 # 第二条链：长时采集、分段分析与资源治理
 
+> 状态同步（2026-11-11）：文末九小时及早期十二小时尝试属于已清理的历史结果。当前保留的十二小时 PC-only/full-feedback 运行 KCOV 完整，但存在 reset/carry 生命周期失败；详见 [覆盖审计](research/2026-11-11-target-coverage/README.md)。本次未重跑长实验。
+
 普通活动期的第一条链保持不变，第二条链把有限观测窗口连接成受控长时实验。
 内核不需要再次改动，开发/官方树和主线项目保持独立。
 
@@ -17,9 +19,10 @@ campaign 默认使用 `syzgen` 生成的 syzkaller typed 程序。生成器位�
 预生成的批次不一定全部执行，`manifest.json` 的 batches 才是实际批次数。
 每个候选程序必须至少包含一个 `write`、`pwrite64`、`fallocate`、`ftruncate`、
 `fsync` 或 `fdatasync`；不满足时从同一 seed 重新生成，`program.json` 保存
-`accepted_attempt` 和 `has_data_call`。运行时还会为每个 worker 建立独立的
-`w<worker>-<pid>` 工作目录，预置 `file0/file0` 等稳定路径，避免并发 worker
-互相删除路径。
+`accepted_attempt` 和 `has_data_call`。single 模式使用 worker 私有的
+`w<worker>-<pid>` 工作目录。concurrent 且 workers > 1 时使用共享对象、共享目录与
+同步启动屏障，允许 rename/unlink 等操作相互争用；`manifest.json` 的 `object_sharing`
+和 `synchronized_worker_start` 记录实际模式，不能假定所有 worker 路径互相隔离。
 syzkaller 变异偶尔会产生无法被 C exporter 接受的复合参数（例如不完整的 xattr
 union）；`ct-syzgen` 会从同一父程序重新反序列化并最多重试 64 个 seed，仍失败时
 使用新的 `Generate` 程序填充该 slot，并在 `program.json` 标记
@@ -28,8 +31,8 @@ union）；`ct-syzgen` 会从同一父程序重新反序列化并最多重试 64
 仍保留用于审计。
 完整性检查要求每个实际程序的每个 call index 恰好执行一次、调用名称/号码吻合且
 原生返回验证通过，包括正常的 ENOENT/EINVAL 等失败返回。超时/程序崩溃拒绝完整结论。
-生成程序在所选镜像的 worker 专属 `syz-work/w<worker>-<pid>` 目录执行，
-程序结束后删除该目录。若生成的 fd 为空、失效或指向不适合数据操作的对象，
+生成程序在所选镜像的 `syz-work` 下执行：私有模式为 `w<worker>-<pid>`，
+共享模式为 `shared`，共享初始化和清理由 launcher 在整批 worker 边界管理。若生成的 fd 为空、失效或指向不适合数据操作的对象，
 运行时只对数据类调用使用预置普通文件 fd 兜底，并在 `CT_SYSCALL repaired=1`、
 `CT_WORKLOAD_SUMMARY data_calls=N fd_repairs=M` 和 `program.json` 的
 `fd_repair_policy` 中明确记录。报告中的 `data_success` 统计 native 返回值，
@@ -38,8 +41,10 @@ union）；`ct-syzgen` 会从同一父程序重新反序列化并最多重试 64
 `syscall_name`；同段的 `syz-programs/<program>/program.syz` 是对应操作序列。
 setup 和内核后台事件没有生成调用坐标时保持为空。
 
-这是可复现的生成/变异链，已接入本子项目自有的 KCOV MVP，但不包含 syzkaller manager 的完整覆盖反馈闭环；因此
-报告应把它称为 syzkaller-generated sequence，而不是 coverage-guided fuzzing。
+当前单 VM campaign 已实现 KCOV 驱动的 corpus 准入、父程序选择与后续变异，
+可称为自定义覆盖反馈 fuzzing；它使用 syzkaller typed API 生成程序，但不是 upstream
+syz-manager 的多 VM 反馈服务。native syz-manager 作为独立对照臂运行。反馈口径见
+[KCOV-FEEDBACK.md](KCOV-FEEDBACK.md)，不能将接通反馈链等同于已证明覆盖收益。
 
 ## 运行方式
 
@@ -224,8 +229,9 @@ bash experiments/ext4-counter-trace/scripts/run-campaign.sh --predecessor <旧ru
 
 长时运行基础设施可用，不意味着已经完成数小时/数天 soak 或证明不存在长期异常。
 有效稳定快照才支持 persistent_mismatch，运行时长、EOF 或超时均不构成持续异常证明。
-并发/后台归属仍按第一条链保留 ambiguous；BLOCK_UNINIT 布局、
-通用跨线程 parent 和 special 域统一时间序列仍是独立的后续工作。
+并发/后台归属仍按第一条链保留 ambiguous；通用跨线程 parent 和 special 域统一时间序列
+仍是独立的后续工作。离线 `BLOCK_UNINIT` 的受支持布局已建模，`META_BG` 明确拒绝；
+bigalloc 特性字段于 2026-11-11 修正，见根目录文档审计。
 
 ## 本轮证据
 

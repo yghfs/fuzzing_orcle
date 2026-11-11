@@ -1,6 +1,6 @@
 # 新增公式实现与下一步路线
 
-更新时间：2026-10-16（Asia/Shanghai）
+历史定向验证：2026-10-16；状态核对：2026-11-11（Asia/Shanghai）
 
 根目录 `公式.md` 新增的四组运行时关系已经接入独立的 Linux 6.12.1 开发树。插桩只位于 `experiments/ext4-counter-trace/dev/linux-6.12.1/`，不会修改主项目或官方 pristine 源码。
 
@@ -9,7 +9,7 @@
 | 公式 | 独立观测来源 | 主要插桩点 | 适用边界 |
 | --- | --- | --- | --- |
 | `R-IH` inode 表高水位 | inode bitmap 与 `bg_itable_unused` | `INODE.ALLOC.HIGHWATER`、稳定快照 | 需要 descriptor checksum 且 group 不是 `INODE_UNINIT`；旧格式返回 `unverified` |
-| `R-IEVICT` 最终释放位 | eviction 前后目标 inode bitmap bit | `INODE.EVICT.TARGET.BEFORE/EXIT` | 只对普通、非坏 inode 的最后一次 eviction 判定 |
+| `R-IEVICT` 最终释放位 | eviction 前后目标 inode bitmap bit | `INODE.EVICT.TARGET.BEFORE/EXIT` | 普通、非坏 inode 的最后一次 eviction；final dirty 失败时保留 bitmap 是保守恢复语义，记录异常不直接确认 bug |
 | `R-IDELTA-EVICT` 释放增量 | 同一目标 group descriptor 与 global free-inode counter | `INODE.EVICT.DESCRIPTOR.EXIT`、`INODE.EVICT.GLOBAL.EXIT` | 只在同一 writer 窗口、没有其他 inode 转换时判定；否则 `unverified` |
 | `O-LIFE` orphan 生命周期 | orphan slot 内容与 inode orphan owner | `ORPHAN.FILE.SLOT.ADD`、`ORPHAN.FILE.ADD.EXIT`、`ORPHAN.FILE.DELETE.EXIT`、稳定扫描 | 只适用于启用 orphan-file 的文件系统；旧链表模式不声称覆盖此关系 |
 | `O-LIFE-DELTA` 空槽增量 | 删除前后的 orphan slot 和 `ob_free_entries` | `ORPHAN.FILE.SLOT.DELETE`、`ORPHAN.FILE.FREE.EXIT` | 内存状态后置条件；不等同于 journal 已写入磁盘 |
@@ -41,7 +41,7 @@
 截至 2026-10-16，四项门槛均已完成实现并通过当前源码构建的短时验收；本节记录可复核的实测结果，不把它等同于 12 小时稳定性结论。
 
 1. **资源关系有效的操作序列：通过受控等量 A/B。** 该短测结果目录已清理；保留的汇总显示普通与 resource-valid/stateful 两组各生成并核验 640 条 syscall，两组计数器 campaign 通过，KCOV 样本完整。普通组观察到 23 次独立公式转换（3.59%），resource-valid 组观察到 183 次（28.59%）。`linkat/unlinkat/rmdir/renameat2` 成功数分别为普通组 `0/0/0/0`、resource-valid 组 `20/22/40/81`。这是一组固定 seed 的短测，证明方向有效，不代表统计置信区间或长期吞吐。
-2. **联合反馈与语料调度：MVP 已实现。** 完整、且所有 syscall 坐标经 native trace 核验的样本才能更新覆盖集合或进入语料；未核验样本不会改变公式稀有度/mismatch 签名。父程序按新普通 PC、新 ext4 PC、罕见公式点、可复现 mismatch 和 unverified 信号加权轮转。`tests/test-kcov-feedback.py` 覆盖准入门槛、mismatch 信号和加权选择；A/B campaign 实际记录了 PC 集合、语料增长和非零联合反馈分数。尚未接入 syzkaller manager、多 VM corpus 合并或 CMP feedback。
+2. **联合反馈与语料调度：MVP 已实现。** 完整、且所有 syscall 坐标经 native trace 核验的样本才能更新覆盖集合或进入语料；未核验样本不会改变公式稀有度/mismatch 签名。当前父程序调度支持 uniform_round_robin 或 rarity_fair，并按所选 feedback mode 使用 PC、edge 与有效语义特征；unverified 事件不作为可确认公式差值。`tests/test-kcov-feedback.py` 覆盖准入门槛、mismatch 信号和加权选择；A/B campaign 实际记录了 PC 集合、语料增长和非零联合反馈分数。尚未接入 syzkaller manager、多 VM corpus 合并或 CMP feedback。
 3. **场景矩阵：通过历史短 campaign 与定向 VM。** 六段 `scenario=all` 短 campaign 目录已清理；历史汇总显示 192 条生成 syscall 全部 native 核验，KCOV 六个样本完整，regular/bigalloc/inline 三个镜像均通过稳定快照、独立磁盘 checker 和 `e2fsck`。relations 和 special 定向场景分别覆盖 orphan/xattr/inode eviction、bigalloc、resize、corruption 和 fast-commit replay。
 4. **新增公式：通过当前源码的定向 VM 检查。** 根目录 `公式.md` 中 `R-IH`、`R-IEVICT`、`R-IDELTA-EVICT`、`O-LIFE`、`O-LIFE-DELTA`、`O-LIFE-FREE`、`XATTR-REF`、`XATTR-REF-DELTA` 和 xattr checksum 已进入 runtime/offline checker、trace 与定向测试。定向运行目录已清理，范围和限制以本文件为唯一摘要。
 
@@ -51,9 +51,9 @@ syzkaller 生成器现将 `-calls N` 补齐为恰好 N 个 syscall，而不把 s
 
 ## 仍未完成的研究边界
 
-- `BLOCK_UNINIT` 磁盘布局仍有未支持形态；checker 对这些布局返回 `unverified`。
+- 离线 `BLOCK_UNINIT` 已按受支持布局重算；`META_BG` descriptor placement 明确拒绝，不能报告有效通过。bigalloc 特性识别于 2026-11-11 修正。
 - worker 外的后台释放/跨线程 parent-operation 因果仍不能完整归属；相关事件保持 ambiguous/unverified。
-- eviction、orphan、xattr journal 错误出口还缺独立 fault-injection fixture；现有 VM 命中证明正常转换路径，不证明这些错误出口。
-- 多 VM syzkaller manager、自动恢复长跑和 12 小时持续性/吞吐趋势需要后续独立实现或实验。
+- eviction、orphan、xattr 错误出口已有独立注入与复核摘要，原始旧定点运行已清理；不能再称为尚无 fixture，也不能据此确认独立持久化 bug。适用结论见根目录 `BUG-INVENTORY.md`。
+- 自定义反馈尚无多 VM corpus 合并或跨重启自动恢复。当前有十二小时两臂运行和吞吐审计，但生命周期未通过，不能宣称完整十二小时公式链验收；见 [覆盖审计](research/2026-11-11-target-coverage/README.md)。
 
 这些边界不阻止受控单 VM 长跑启动，但不应被写成已覆盖或已验证。

@@ -328,6 +328,7 @@ int main(int argc, char **argv)
         ct_phase("END", "seed_setup");
       }
       if (setenv("CT_ROOT", worker_root, 1)) _exit(90);
+      if (chdir(worker_root) < 0) _exit(90);
       char binary[PATH_MAX], ident[80];
       if (snprintf(ident,sizeof(ident),"b%s-w%d",batch,i)>=(int)sizeof(ident) ||
           snprintf(binary,sizeof(binary),"%s/%s/workload",programs,ident)>=(int)sizeof(binary)) _exit(90);

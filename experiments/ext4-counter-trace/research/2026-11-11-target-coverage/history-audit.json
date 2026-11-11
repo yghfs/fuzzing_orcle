@@ -1,0 +1,1893 @@
+{
+  "arms": {
+    "full_feedback": {
+      "all_template_counts": {
+        "auto": 1097,
+        "file-state": 300
+      },
+      "consistency_checks": {
+        "effect_novelty_sum_matches_final_target": true,
+        "raw_novelty_sum_matches_final_target": true,
+        "scanned_calls_match_aggregate_effects": true,
+        "scanned_program_count_matches_samples": true,
+        "segment_count_matches_expected_samples": true,
+        "semantic_novelty_sum_matches_final": true
+      },
+      "coverage": {
+        "complete_samples": 1397,
+        "corpus_size": 76,
+        "corpus_target_pc_coverage": 3256,
+        "effect_target_edge_coverage": 3549,
+        "effect_target_pc_coverage": 3256,
+        "expected_samples": 1397,
+        "ext4_pc_coverage": 3324,
+        "invalid_samples": 0,
+        "jbd2_pc_coverage": 344,
+        "joint_feedback": {
+          "formula_points": 90,
+          "mismatch_signatures": 0,
+          "unverified_signatures": 83
+        },
+        "missing_samples": 0,
+        "saturated_samples": 0,
+        "target_edge_coverage": 4076,
+        "target_pc_coverage": 3668,
+        "total_semantic_features": 116
+      },
+      "effect_counts": {
+        "non_target": 8179,
+        "target_failure_adapted": 990,
+        "target_failure_unmodified": 4471,
+        "target_success_adapted": 4234,
+        "target_success_unmodified": 4456
+      },
+      "effect_percent_of_recorded_calls": {
+        "non_target": 36.628,
+        "target_failure_adapted": 4.433,
+        "target_failure_unmodified": 20.022,
+        "target_success_adapted": 18.961,
+        "target_success_unmodified": 19.955
+      },
+      "execution": {
+        "classification_counts": {
+          "concurrent_or_ambiguous": 424,
+          "operation_exit_mismatch": 0,
+          "persistent_mismatch": 0,
+          "transient_mismatch": 389746,
+          "unsupported_or_unverified": 0
+        },
+        "collection_elapsed_seconds": 43202.663,
+        "event_sources": {
+          "background_unattributed": 3828405,
+          "cleanup": 951790,
+          "generated_syscall": 40120,
+          "runtime_init": 22353,
+          "seed_setup": 554676,
+          "stable_snapshot": 719379
+        },
+        "fd_repairs": 5210,
+        "generated_syscalls": 22352,
+        "independent_transition_calls": 2846,
+        "native_success": 9173,
+        "native_verified": 22330,
+        "syscall_stats": {
+          "close": {
+            "errors": {
+              "9": 442
+            },
+            "executions": 830,
+            "failed": 442,
+            "independent_transition_calls": 26,
+            "repaired": 0,
+            "successful": 388
+          },
+          "fallocate": {
+            "errors": {
+              "22": 269,
+              "9": 5,
+              "95": 318
+            },
+            "executions": 674,
+            "failed": 592,
+            "independent_transition_calls": 71,
+            "repaired": 584,
+            "successful": 82
+          },
+          "fchmod": {
+            "errors": {
+              "9": 4
+            },
+            "executions": 716,
+            "failed": 4,
+            "independent_transition_calls": 0,
+            "repaired": 623,
+            "successful": 712
+          },
+          "fdatasync": {
+            "errors": {
+              "5": 1,
+              "9": 107
+            },
+            "executions": 1255,
+            "failed": 108,
+            "independent_transition_calls": 584,
+            "repaired": 632,
+            "successful": 1147
+          },
+          "fremovexattr": {
+            "errors": {
+              "13": 35,
+              "22": 3,
+              "34": 79,
+              "61": 287,
+              "9": 568,
+              "95": 129
+            },
+            "executions": 1113,
+            "failed": 1101,
+            "independent_transition_calls": 0,
+            "repaired": 0,
+            "successful": 12
+          },
+          "fsetxattr": {
+            "errors": {
+              "14": 1,
+              "17": 6,
+              "22": 37,
+              "34": 21,
+              "61": 325,
+              "7": 4,
+              "9": 3,
+              "95": 200
+            },
+            "executions": 775,
+            "failed": 597,
+            "independent_transition_calls": 156,
+            "repaired": 575,
+            "successful": 178
+          },
+          "fsync": {
+            "errors": {
+              "30": 2,
+              "9": 49
+            },
+            "executions": 687,
+            "failed": 51,
+            "independent_transition_calls": 440,
+            "repaired": 524,
+            "successful": 636
+          },
+          "ftruncate": {
+            "errors": {
+              "22": 18,
+              "9": 2
+            },
+            "executions": 1015,
+            "failed": 20,
+            "independent_transition_calls": 427,
+            "repaired": 942,
+            "successful": 995
+          },
+          "linkat": {
+            "errors": {
+              "1": 1,
+              "17": 119,
+              "2": 126,
+              "20": 109,
+              "22": 87,
+              "36": 26,
+              "9": 918
+            },
+            "executions": 1387,
+            "failed": 1386,
+            "independent_transition_calls": 1,
+            "repaired": 0,
+            "successful": 1
+          },
+          "mkdirat": {
+            "errors": {
+              "17": 127,
+              "2": 6,
+              "20": 99,
+              "36": 1,
+              "9": 918
+            },
+            "executions": 1256,
+            "failed": 1151,
+            "independent_transition_calls": 105,
+            "repaired": 0,
+            "successful": 105
+          },
+          "openat": {
+            "errors": {
+              "17": 6,
+              "2": 103,
+              "20": 119,
+              "21": 72,
+              "22": 398,
+              "36": 3,
+              "9": 1084
+            },
+            "executions": 2568,
+            "failed": 1785,
+            "independent_transition_calls": 227,
+            "repaired": 0,
+            "successful": 783
+          },
+          "openat$dir": {
+            "errors": {
+              "14": 1,
+              "17": 43,
+              "2": 53,
+              "20": 20,
+              "21": 1028,
+              "22": 394,
+              "36": 10
+            },
+            "executions": 3741,
+            "failed": 1549,
+            "independent_transition_calls": 166,
+            "repaired": 0,
+            "successful": 2192
+          },
+          "pwrite64": {
+            "errors": {
+              "14": 2,
+              "22": 35,
+              "27": 2,
+              "9": 27
+            },
+            "executions": 729,
+            "failed": 66,
+            "independent_transition_calls": 12,
+            "repaired": 664,
+            "successful": 663
+          },
+          "read": {
+            "errors": {
+              "14": 2,
+              "21": 230,
+              "22": 44,
+              "9": 610
+            },
+            "executions": 924,
+            "failed": 886,
+            "independent_transition_calls": 21,
+            "repaired": 0,
+            "successful": 38
+          },
+          "removexattr": {
+            "errors": {
+              "13": 3,
+              "2": 34,
+              "22": 5,
+              "34": 17,
+              "36": 5,
+              "61": 317,
+              "95": 259
+            },
+            "executions": 647,
+            "failed": 640,
+            "independent_transition_calls": 0,
+            "repaired": 0,
+            "successful": 7
+          },
+          "renameat2": {
+            "errors": {
+              "14": 1,
+              "17": 5,
+              "2": 11,
+              "20": 23,
+              "22": 116,
+              "36": 3,
+              "9": 488
+            },
+            "executions": 705,
+            "failed": 647,
+            "independent_transition_calls": 47,
+            "repaired": 0,
+            "successful": 58
+          },
+          "rmdir": {
+            "errors": {
+              "2": 6,
+              "20": 35,
+              "36": 1,
+              "39": 92
+            },
+            "executions": 206,
+            "failed": 134,
+            "independent_transition_calls": 72,
+            "repaired": 0,
+            "successful": 72
+          },
+          "setxattr": {
+            "errors": {
+              "14": 2,
+              "17": 3,
+              "2": 9,
+              "20": 2,
+              "22": 9,
+              "34": 18,
+              "36": 13,
+              "61": 69,
+              "7": 3,
+              "95": 197
+            },
+            "executions": 429,
+            "failed": 325,
+            "independent_transition_calls": 89,
+            "repaired": 0,
+            "successful": 104
+          },
+          "symlinkat": {
+            "errors": {
+              "17": 204,
+              "2": 9,
+              "20": 38,
+              "36": 36,
+              "9": 638
+            },
+            "executions": 987,
+            "failed": 925,
+            "independent_transition_calls": 62,
+            "repaired": 0,
+            "successful": 62
+          },
+          "unlinkat": {
+            "errors": {
+              "2": 32,
+              "20": 269,
+              "21": 27,
+              "22": 2,
+              "39": 4,
+              "9": 297
+            },
+            "executions": 904,
+            "failed": 631,
+            "independent_transition_calls": 273,
+            "repaired": 0,
+            "successful": 273
+          },
+          "write": {
+            "errors": {
+              "14": 8,
+              "22": 66,
+              "9": 43
+            },
+            "executions": 782,
+            "failed": 117,
+            "independent_transition_calls": 67,
+            "repaired": 666,
+            "successful": 665
+          }
+        },
+        "transitions_per_collection_hour": 237.152,
+        "verified_syscalls_per_collection_hour": 1860.719
+      },
+      "fault_and_analysis": {
+        "all_failures_immediately_follow_fault": true,
+        "analysis_failed_segments": [
+          326,
+          1089,
+          1298
+        ],
+        "failures": [
+          {
+            "blockers": [
+              "regular-single:invalid_trace",
+              "regular-single:no_valid_stable_confirmation"
+            ],
+            "carry": {
+              "carry_available": true,
+              "carry_source": "segment-000325"
+            },
+            "filesystem_reset_before": true,
+            "filesystem_reset_completed": true,
+            "immediately_after_fault": true,
+            "invalid_runs": [
+              {
+                "dev": null,
+                "end_seq": 1542,
+                "epoch": 72967721654,
+                "integrity_issues": [
+                  "sequence_missing_duplicate_or_wrong_epoch",
+                  "device_identity_not_unique"
+                ],
+                "name": "regular-single",
+                "start_seq": 409906
+              }
+            ],
+            "loss_stats": {
+              "cpu0-stats.txt": {
+                "commit overrun": 0,
+                "dropped events": 0,
+                "overrun": 0
+              }
+            },
+            "new_raw_start": {
+              "active": 0,
+              "epoch": 10270952760495,
+              "seq": 285,
+              "version": 86
+            },
+            "segment_id": 326,
+            "source": "experiments/ext4-counter-trace/results/campaign-fyubc_lv/segments/segment-000326/analysis/lifecycle/report.json.gz"
+          },
+          {
+            "blockers": [
+              "regular-single:invalid_trace",
+              "regular-single:no_valid_stable_confirmation"
+            ],
+            "carry": {
+              "carry_available": true,
+              "carry_source": "segment-001088"
+            },
+            "filesystem_reset_before": true,
+            "filesystem_reset_completed": true,
+            "immediately_after_fault": true,
+            "invalid_runs": [
+              {
+                "dev": null,
+                "end_seq": 1544,
+                "epoch": 10270952760495,
+                "integrity_issues": [
+                  "sequence_missing_duplicate_or_wrong_epoch",
+                  "device_identity_not_unique"
+                ],
+                "name": "regular-single",
+                "start_seq": 952993
+              }
+            ],
+            "loss_stats": {
+              "cpu0-stats.txt": {
+                "commit overrun": 0,
+                "dropped events": 0,
+                "overrun": 0
+              }
+            },
+            "new_raw_start": {
+              "active": 0,
+              "epoch": 33966117614755,
+              "seq": 285,
+              "version": 86
+            },
+            "segment_id": 1089,
+            "source": "experiments/ext4-counter-trace/results/campaign-fyubc_lv/segments/segment-001089/analysis/lifecycle/report.json.gz"
+          },
+          {
+            "blockers": [
+              "regular-single:invalid_trace",
+              "regular-single:no_valid_stable_confirmation"
+            ],
+            "carry": {
+              "carry_available": true,
+              "carry_source": "segment-001297"
+            },
+            "filesystem_reset_before": true,
+            "filesystem_reset_completed": true,
+            "immediately_after_fault": true,
+            "invalid_runs": [
+              {
+                "dev": null,
+                "end_seq": 1689,
+                "epoch": 33966117614755,
+                "integrity_issues": [
+                  "sequence_missing_duplicate_or_wrong_epoch",
+                  "device_identity_not_unique"
+                ],
+                "name": "regular-single",
+                "start_seq": 257408
+              }
+            ],
+            "loss_stats": {
+              "cpu0-stats.txt": {
+                "commit overrun": 0,
+                "dropped events": 0,
+                "overrun": 0
+              }
+            },
+            "new_raw_start": {
+              "active": 0,
+              "epoch": 40273037911135,
+              "seq": 285,
+              "version": 86
+            },
+            "segment_id": 1298,
+            "source": "experiments/ext4-counter-trace/results/campaign-fyubc_lv/segments/segment-001298/analysis/lifecycle/report.json.gz"
+          }
+        ],
+        "fault_segments": [
+          325,
+          1088,
+          1297
+        ]
+      },
+      "final_curve_point": {
+        "complete_samples": 1397,
+        "corpus_target_pc_coverage": 3256,
+        "effect_target_pc_coverage": 3256,
+        "elapsed_seconds": 43202.662,
+        "segment_id": 1396,
+        "target_pc_coverage": 3668,
+        "total_semantic_features": 116
+      },
+      "hourly_curve": [
+        {
+          "checkpoint_hour": 1,
+          "complete_samples": 121,
+          "corpus_target_pc_coverage": 2372,
+          "effect_target_pc_coverage": 2372,
+          "elapsed_seconds": 3567.945,
+          "segment_id": 120,
+          "target_pc_coverage": 2855,
+          "total_semantic_features": 82
+        },
+        {
+          "checkpoint_hour": 2,
+          "complete_samples": 233,
+          "corpus_target_pc_coverage": 2380,
+          "effect_target_pc_coverage": 2380,
+          "elapsed_seconds": 7180.584,
+          "segment_id": 232,
+          "target_pc_coverage": 3030,
+          "total_semantic_features": 85
+        },
+        {
+          "checkpoint_hour": 3,
+          "complete_samples": 345,
+          "corpus_target_pc_coverage": 2476,
+          "effect_target_pc_coverage": 2476,
+          "elapsed_seconds": 10794.902,
+          "segment_id": 344,
+          "target_pc_coverage": 3301,
+          "total_semantic_features": 89
+        },
+        {
+          "checkpoint_hour": 4,
+          "complete_samples": 453,
+          "corpus_target_pc_coverage": 2716,
+          "effect_target_pc_coverage": 2716,
+          "elapsed_seconds": 14376.421,
+          "segment_id": 452,
+          "target_pc_coverage": 3321,
+          "total_semantic_features": 89
+        },
+        {
+          "checkpoint_hour": 5,
+          "complete_samples": 563,
+          "corpus_target_pc_coverage": 2997,
+          "effect_target_pc_coverage": 2997,
+          "elapsed_seconds": 17979.706,
+          "segment_id": 562,
+          "target_pc_coverage": 3510,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 6,
+          "complete_samples": 685,
+          "corpus_target_pc_coverage": 3067,
+          "effect_target_pc_coverage": 3067,
+          "elapsed_seconds": 21576.876,
+          "segment_id": 684,
+          "target_pc_coverage": 3564,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 7,
+          "complete_samples": 804,
+          "corpus_target_pc_coverage": 3079,
+          "effect_target_pc_coverage": 3079,
+          "elapsed_seconds": 25171.746,
+          "segment_id": 803,
+          "target_pc_coverage": 3606,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 8,
+          "complete_samples": 923,
+          "corpus_target_pc_coverage": 3101,
+          "effect_target_pc_coverage": 3101,
+          "elapsed_seconds": 28787.704,
+          "segment_id": 922,
+          "target_pc_coverage": 3611,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 9,
+          "complete_samples": 1040,
+          "corpus_target_pc_coverage": 3200,
+          "effect_target_pc_coverage": 3200,
+          "elapsed_seconds": 32391.875,
+          "segment_id": 1039,
+          "target_pc_coverage": 3622,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 10,
+          "complete_samples": 1158,
+          "corpus_target_pc_coverage": 3209,
+          "effect_target_pc_coverage": 3209,
+          "elapsed_seconds": 35992.015,
+          "segment_id": 1157,
+          "target_pc_coverage": 3649,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 11,
+          "complete_samples": 1279,
+          "corpus_target_pc_coverage": 3253,
+          "effect_target_pc_coverage": 3253,
+          "elapsed_seconds": 39599.397,
+          "segment_id": 1278,
+          "target_pc_coverage": 3665,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 12,
+          "complete_samples": 1396,
+          "corpus_target_pc_coverage": 3256,
+          "effect_target_pc_coverage": 3256,
+          "elapsed_seconds": 43172.592,
+          "segment_id": 1395,
+          "target_pc_coverage": 3668,
+          "total_semantic_features": 116
+        }
+      ],
+      "last_novelty": {
+        "effect_target_pc": {
+          "elapsed_seconds": 41788.997,
+          "segment_id": 1349
+        },
+        "raw_target_pc": {
+          "elapsed_seconds": 42056.827,
+          "segment_id": 1358
+        },
+        "semantic": {
+          "elapsed_seconds": 16780.92,
+          "segment_id": 525
+        }
+      },
+      "missing_audit_inputs": [],
+      "parent_yields_by_admission_kind": {
+        "edge_only": {
+          "child_executions": 296,
+          "child_new_edges": 1763,
+          "child_new_ext4_pcs": 414,
+          "child_new_pcs": 426,
+          "child_new_semantic_features": 25,
+          "parents": 15,
+          "resource_parents": 2,
+          "selections": 296
+        },
+        "pc": {
+          "child_executions": 885,
+          "child_new_edges": 5138,
+          "child_new_ext4_pcs": 1009,
+          "child_new_pcs": 1112,
+          "child_new_semantic_features": 35,
+          "parents": 60,
+          "resource_parents": 2,
+          "selections": 885
+        },
+        "semantic_only": {
+          "child_executions": 15,
+          "child_new_edges": 0,
+          "child_new_ext4_pcs": 0,
+          "child_new_pcs": 0,
+          "child_new_semantic_features": 0,
+          "parents": 1,
+          "resource_parents": 0,
+          "selections": 15
+        }
+      },
+      "performance_stages": {
+        "aggregate": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "total": 0
+        },
+        "analysis": {
+          "count": 1396,
+          "p50": 2.498539,
+          "p95": 2.731714,
+          "total": 3494.321737
+        },
+        "compilation": {
+          "count": 1397,
+          "p50": 0.307311,
+          "p95": 0.319788,
+          "total": 432.083144
+        },
+        "feedback": {
+          "count": 1397,
+          "p50": 0.045336,
+          "p95": 0.07062,
+          "total": 65.635589
+        },
+        "fetch": {
+          "count": 1397,
+          "p50": 1.668654,
+          "p95": 1.824037,
+          "total": 2349.422067
+        },
+        "finish_disk": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "total": 0
+        },
+        "generation": {
+          "count": 1397,
+          "p50": 0.914321,
+          "p95": 0.922656,
+          "total": 1279.607127
+        },
+        "guest_execution": {
+          "count": 1397,
+          "p50": 22.658912,
+          "p95": 27.070133,
+          "total": 31599.129762
+        },
+        "quota_reconciliation": {
+          "count": 142,
+          "p50": 0.467267,
+          "p95": 0.943156,
+          "total": 68.493862
+        },
+        "upload": {
+          "count": 1397,
+          "p50": 1.530382,
+          "p95": 1.685601,
+          "total": 2211.394039
+        }
+      },
+      "program_tasks": {
+        "fresh_generate": {
+          "admitted_programs": 15,
+          "effect_new_target_pcs": 1715,
+          "new_semantic_features": 56,
+          "non_target": 1328,
+          "programs": 200,
+          "raw_new_target_pcs": 2106,
+          "recorded_calls": 3200,
+          "target_failure_adapted": 180,
+          "target_failure_unmodified": 601,
+          "target_success_adapted": 619,
+          "target_success_unmodified": 472
+        },
+        "mutate": {
+          "admitted_programs": 57,
+          "effect_new_target_pcs": 1536,
+          "new_semantic_features": 60,
+          "non_target": 5012,
+          "programs": 897,
+          "raw_new_target_pcs": 1170,
+          "recorded_calls": 14340,
+          "target_failure_adapted": 518,
+          "target_failure_unmodified": 2995,
+          "target_success_adapted": 2466,
+          "target_success_unmodified": 3349
+        },
+        "resource_mutate": {
+          "admitted_programs": 3,
+          "effect_new_target_pcs": 2,
+          "new_semantic_features": 0,
+          "non_target": 1833,
+          "programs": 299,
+          "raw_new_target_pcs": 103,
+          "recorded_calls": 4774,
+          "target_failure_adapted": 291,
+          "target_failure_unmodified": 872,
+          "target_success_adapted": 1145,
+          "target_success_unmodified": 633
+        },
+        "resource_valid_seed": {
+          "admitted_programs": 1,
+          "effect_new_target_pcs": 3,
+          "new_semantic_features": 0,
+          "non_target": 6,
+          "programs": 1,
+          "raw_new_target_pcs": 289,
+          "recorded_calls": 16,
+          "target_failure_adapted": 1,
+          "target_failure_unmodified": 3,
+          "target_success_adapted": 4,
+          "target_success_unmodified": 2
+        }
+      },
+      "resource_templates": {
+        "file-state": {
+          "admitted_programs": 4,
+          "effect_new_target_pcs": 5,
+          "new_semantic_features": 0,
+          "non_target": 1839,
+          "programs": 300,
+          "raw_new_target_pcs": 392,
+          "recorded_calls": 4790,
+          "target_failure_adapted": 292,
+          "target_failure_unmodified": 875,
+          "target_success_adapted": 1149,
+          "target_success_unmodified": 635
+        }
+      },
+      "settings": {
+        "cpus": 1,
+        "duration_seconds": 43200,
+        "fault_isolation": true,
+        "feedback_mode": "pc_edge_semantic",
+        "fresh_generate_every": 7,
+        "guest_memory_mb": 1024,
+        "qemu_cpu": "qemu64",
+        "random_fault_injection": true,
+        "random_fault_probability_ppm": 1000,
+        "resource_valid_every": 4,
+        "scenario": "baseline",
+        "scheduler_policy": "rarity_fair",
+        "seed": 20261024,
+        "syz_calls": 16,
+        "target_kind": "regular",
+        "target_scope": "ext4_jbd2"
+      },
+      "source": "experiments/ext4-counter-trace/results/campaign-fyubc_lv",
+      "sources": {
+        "aggregate": "campaign-report.json",
+        "coverage": "feedback/coverage.json",
+        "per_program": "segments/segment-*/syz-programs/*/program.json",
+        "per_segment_coverage": "segments/segment-*/coverage.json",
+        "per_segment_feedback": "segments/segment-*/feedback.json",
+        "performance": "performance-report.json",
+        "scheduler": "feedback/scheduler.json",
+        "segments": "segment-summary.jsonl.gz"
+      },
+      "validity": {
+        "counter_validation_passed": false,
+        "coverage_complete": false,
+        "kcov_feedback_complete": true,
+        "passed": false,
+        "raw_coverage_complete": true,
+        "source_attribution_complete": false,
+        "status": "candidate_review_required"
+      }
+    },
+    "pc_only": {
+      "all_template_counts": {
+        "auto": 1189,
+        "file-state": 2,
+        "namespace": 322
+      },
+      "consistency_checks": {
+        "effect_novelty_sum_matches_final_target": true,
+        "raw_novelty_sum_matches_final_target": true,
+        "scanned_calls_match_aggregate_effects": true,
+        "scanned_program_count_matches_samples": true,
+        "segment_count_matches_expected_samples": true,
+        "semantic_novelty_sum_matches_final": true
+      },
+      "coverage": {
+        "complete_samples": 1513,
+        "corpus_size": 72,
+        "corpus_target_pc_coverage": 3636,
+        "effect_target_edge_coverage": 4031,
+        "effect_target_pc_coverage": 3636,
+        "expected_samples": 1513,
+        "ext4_pc_coverage": 3455,
+        "invalid_samples": 0,
+        "jbd2_pc_coverage": 364,
+        "joint_feedback": {
+          "formula_points": 97,
+          "mismatch_signatures": 0,
+          "unverified_signatures": 62
+        },
+        "missing_samples": 0,
+        "saturated_samples": 0,
+        "target_edge_coverage": 4290,
+        "target_pc_coverage": 3819,
+        "total_semantic_features": 141
+      },
+      "effect_counts": {
+        "non_target": 7287,
+        "target_failure_adapted": 582,
+        "target_failure_unmodified": 4805,
+        "target_success_adapted": 3873,
+        "target_success_unmodified": 7625
+      },
+      "effect_percent_of_recorded_calls": {
+        "non_target": 30.146,
+        "target_failure_adapted": 2.408,
+        "target_failure_unmodified": 19.878,
+        "target_success_adapted": 16.023,
+        "target_success_unmodified": 31.545
+      },
+      "execution": {
+        "classification_counts": {
+          "concurrent_or_ambiguous": 213,
+          "operation_exit_mismatch": 0,
+          "persistent_mismatch": 0,
+          "transient_mismatch": 428142,
+          "unsupported_or_unverified": 4
+        },
+        "collection_elapsed_seconds": 43212.14,
+        "event_sources": {
+          "background_unattributed": 4079397,
+          "cleanup": 1032737,
+          "generated_syscall": 70426,
+          "runtime_init": 24209,
+          "seed_setup": 600796,
+          "stable_snapshot": 773830
+        },
+        "fd_repairs": 4454,
+        "generated_syscalls": 24208,
+        "independent_transition_calls": 3970,
+        "native_success": 11917,
+        "native_verified": 24172,
+        "syscall_stats": {
+          "close": {
+            "errors": {
+              "9": 681
+            },
+            "executions": 1611,
+            "failed": 681,
+            "independent_transition_calls": 8,
+            "repaired": 0,
+            "successful": 930
+          },
+          "fallocate": {
+            "errors": {
+              "22": 44,
+              "9": 3,
+              "95": 131
+            },
+            "executions": 253,
+            "failed": 178,
+            "independent_transition_calls": 45,
+            "repaired": 195,
+            "successful": 75
+          },
+          "fchmod": {
+            "errors": {
+              "9": 14
+            },
+            "executions": 1241,
+            "failed": 14,
+            "independent_transition_calls": 0,
+            "repaired": 940,
+            "successful": 1227
+          },
+          "fdatasync": {
+            "errors": {
+              "30": 1,
+              "9": 136
+            },
+            "executions": 1023,
+            "failed": 137,
+            "independent_transition_calls": 433,
+            "repaired": 470,
+            "successful": 886
+          },
+          "fremovexattr": {
+            "errors": {
+              "13": 15,
+              "22": 1,
+              "34": 6,
+              "61": 163,
+              "9": 330,
+              "95": 98
+            },
+            "executions": 619,
+            "failed": 613,
+            "independent_transition_calls": 0,
+            "repaired": 0,
+            "successful": 6
+          },
+          "fsetxattr": {
+            "errors": {
+              "17": 2,
+              "22": 106,
+              "34": 8,
+              "61": 267,
+              "7": 3,
+              "9": 4,
+              "95": 188
+            },
+            "executions": 737,
+            "failed": 578,
+            "independent_transition_calls": 102,
+            "repaired": 457,
+            "successful": 159
+          },
+          "fsync": {
+            "errors": {
+              "30": 1,
+              "9": 30
+            },
+            "executions": 858,
+            "failed": 31,
+            "independent_transition_calls": 480,
+            "repaired": 457,
+            "successful": 827
+          },
+          "ftruncate": {
+            "errors": {
+              "22": 16,
+              "9": 1
+            },
+            "executions": 468,
+            "failed": 17,
+            "independent_transition_calls": 282,
+            "repaired": 436,
+            "successful": 451
+          },
+          "linkat": {
+            "errors": {
+              "1": 3,
+              "14": 1,
+              "17": 132,
+              "2": 189,
+              "20": 206,
+              "22": 48,
+              "9": 852
+            },
+            "executions": 1734,
+            "failed": 1431,
+            "independent_transition_calls": 303,
+            "repaired": 0,
+            "successful": 303
+          },
+          "mkdirat": {
+            "errors": {
+              "17": 210,
+              "2": 10,
+              "20": 75,
+              "36": 1,
+              "5": 1,
+              "9": 606
+            },
+            "executions": 1328,
+            "failed": 903,
+            "independent_transition_calls": 426,
+            "repaired": 0,
+            "successful": 425
+          },
+          "openat": {
+            "errors": {
+              "17": 5,
+              "2": 139,
+              "20": 95,
+              "21": 85,
+              "22": 223,
+              "36": 1,
+              "9": 539
+            },
+            "executions": 2077,
+            "failed": 1087,
+            "independent_transition_calls": 268,
+            "repaired": 0,
+            "successful": 990
+          },
+          "openat$dir": {
+            "errors": {
+              "17": 13,
+              "2": 76,
+              "20": 116,
+              "21": 413,
+              "22": 192,
+              "36": 5
+            },
+            "executions": 2906,
+            "failed": 815,
+            "independent_transition_calls": 81,
+            "repaired": 0,
+            "successful": 2091
+          },
+          "pwrite64": {
+            "errors": {
+              "14": 3,
+              "22": 48,
+              "27": 2,
+              "9": 31
+            },
+            "executions": 618,
+            "failed": 84,
+            "independent_transition_calls": 6,
+            "repaired": 541,
+            "successful": 534
+          },
+          "read": {
+            "errors": {
+              "14": 1,
+              "21": 69,
+              "22": 46,
+              "9": 560
+            },
+            "executions": 715,
+            "failed": 676,
+            "independent_transition_calls": 42,
+            "repaired": 0,
+            "successful": 39
+          },
+          "removexattr": {
+            "errors": {
+              "13": 1,
+              "2": 8,
+              "20": 1,
+              "22": 5,
+              "34": 2,
+              "36": 5,
+              "61": 61,
+              "95": 59
+            },
+            "executions": 149,
+            "failed": 142,
+            "independent_transition_calls": 0,
+            "repaired": 0,
+            "successful": 7
+          },
+          "renameat2": {
+            "errors": {
+              "14": 2,
+              "16": 38,
+              "17": 25,
+              "2": 371,
+              "20": 295,
+              "21": 13,
+              "22": 232,
+              "36": 13,
+              "9": 753
+            },
+            "executions": 2954,
+            "failed": 1742,
+            "independent_transition_calls": 700,
+            "repaired": 0,
+            "successful": 1212
+          },
+          "rmdir": {
+            "errors": {
+              "2": 347,
+              "20": 625,
+              "22": 36,
+              "36": 1,
+              "39": 148
+            },
+            "executions": 1439,
+            "failed": 1157,
+            "independent_transition_calls": 282,
+            "repaired": 0,
+            "successful": 282
+          },
+          "setxattr": {
+            "errors": {
+              "14": 2,
+              "17": 3,
+              "2": 17,
+              "20": 2,
+              "22": 14,
+              "34": 2,
+              "61": 43,
+              "7": 1,
+              "95": 162
+            },
+            "executions": 326,
+            "failed": 246,
+            "independent_transition_calls": 68,
+            "repaired": 0,
+            "successful": 80
+          },
+          "symlinkat": {
+            "errors": {
+              "17": 157,
+              "2": 4,
+              "20": 40,
+              "36": 1,
+              "9": 459
+            },
+            "executions": 700,
+            "failed": 661,
+            "independent_transition_calls": 39,
+            "repaired": 0,
+            "successful": 39
+          },
+          "unlinkat": {
+            "errors": {
+              "2": 314,
+              "20": 266,
+              "21": 35,
+              "22": 25,
+              "36": 2,
+              "39": 7,
+              "9": 341
+            },
+            "executions": 1369,
+            "failed": 990,
+            "independent_transition_calls": 379,
+            "repaired": 0,
+            "successful": 379
+          },
+          "write": {
+            "errors": {
+              "14": 11,
+              "22": 27,
+              "9": 34
+            },
+            "executions": 1047,
+            "failed": 72,
+            "independent_transition_calls": 26,
+            "repaired": 958,
+            "successful": 975
+          }
+        },
+        "transitions_per_collection_hour": 330.74,
+        "verified_syscalls_per_collection_hour": 2013.767
+      },
+      "fault_and_analysis": {
+        "all_failures_immediately_follow_fault": true,
+        "analysis_failed_segments": [
+          97,
+          693,
+          954,
+          1089,
+          1278,
+          1298,
+          1465
+        ],
+        "failures": [
+          {
+            "blockers": [
+              "regular-single:invalid_trace",
+              "regular-single:no_valid_stable_confirmation"
+            ],
+            "carry": {
+              "carry_available": true,
+              "carry_source": "segment-000096"
+            },
+            "filesystem_reset_before": true,
+            "filesystem_reset_completed": true,
+            "immediately_after_fault": true,
+            "invalid_runs": [
+              {
+                "dev": null,
+                "end_seq": 1733,
+                "epoch": 72835648435,
+                "integrity_issues": [
+                  "sequence_missing_duplicate_or_wrong_epoch",
+                  "device_identity_not_unique"
+                ],
+                "name": "regular-single",
+                "start_seq": 124313
+              }
+            ],
+            "loss_stats": {
+              "cpu0-stats.txt": {
+                "commit overrun": 0,
+                "dropped events": 0,
+                "overrun": 0
+              }
+            },
+            "new_raw_start": {
+              "active": 0,
+              "epoch": 2860266443573,
+              "seq": 285,
+              "version": 86
+            },
+            "segment_id": 97,
+            "source": "experiments/ext4-counter-trace/results/campaign-9chz7m3j/segments/segment-000097/analysis/lifecycle/report.json.gz"
+          },
+          {
+            "blockers": [
+              "regular-single:invalid_trace",
+              "regular-single:no_valid_stable_confirmation"
+            ],
+            "carry": {
+              "carry_available": true,
+              "carry_source": "segment-000692"
+            },
+            "filesystem_reset_before": true,
+            "filesystem_reset_completed": true,
+            "immediately_after_fault": true,
+            "invalid_runs": [
+              {
+                "dev": null,
+                "end_seq": 1715,
+                "epoch": 2860266443573,
+                "integrity_issues": [
+                  "sequence_missing_duplicate_or_wrong_epoch",
+                  "device_identity_not_unique"
+                ],
+                "name": "regular-single",
+                "start_seq": 754927
+              }
+            ],
+            "loss_stats": {
+              "cpu0-stats.txt": {
+                "commit overrun": 0,
+                "dropped events": 0,
+                "overrun": 0
+              }
+            },
+            "new_raw_start": {
+              "active": 0,
+              "epoch": 20516545877240,
+              "seq": 285,
+              "version": 86
+            },
+            "segment_id": 693,
+            "source": "experiments/ext4-counter-trace/results/campaign-9chz7m3j/segments/segment-000693/analysis/lifecycle/report.json.gz"
+          },
+          {
+            "blockers": [
+              "regular-single:invalid_trace",
+              "regular-single:no_valid_stable_confirmation"
+            ],
+            "carry": {
+              "carry_available": true,
+              "carry_source": "segment-000953"
+            },
+            "filesystem_reset_before": true,
+            "filesystem_reset_completed": true,
+            "immediately_after_fault": true,
+            "invalid_runs": [
+              {
+                "dev": null,
+                "end_seq": 1498,
+                "epoch": 20516545877240,
+                "integrity_issues": [
+                  "sequence_missing_duplicate_or_wrong_epoch",
+                  "device_identity_not_unique"
+                ],
+                "name": "regular-single",
+                "start_seq": 323181
+              }
+            ],
+            "loss_stats": {
+              "cpu0-stats.txt": {
+                "commit overrun": 0,
+                "dropped events": 0,
+                "overrun": 0
+              }
+            },
+            "new_raw_start": {
+              "active": 0,
+              "epoch": 27701173243991,
+              "seq": 285,
+              "version": 86
+            },
+            "segment_id": 954,
+            "source": "experiments/ext4-counter-trace/results/campaign-9chz7m3j/segments/segment-000954/analysis/lifecycle/report.json.gz"
+          },
+          {
+            "blockers": [
+              "regular-single:invalid_trace",
+              "regular-single:no_valid_stable_confirmation"
+            ],
+            "carry": {
+              "carry_available": true,
+              "carry_source": "segment-001088"
+            },
+            "filesystem_reset_before": true,
+            "filesystem_reset_completed": true,
+            "immediately_after_fault": true,
+            "invalid_runs": [
+              {
+                "dev": null,
+                "end_seq": 1512,
+                "epoch": 27701173243991,
+                "integrity_issues": [
+                  "sequence_missing_duplicate_or_wrong_epoch",
+                  "device_identity_not_unique"
+                ],
+                "name": "regular-single",
+                "start_seq": 169337
+              }
+            ],
+            "loss_stats": {
+              "cpu0-stats.txt": {
+                "commit overrun": 0,
+                "dropped events": 0,
+                "overrun": 0
+              }
+            },
+            "new_raw_start": {
+              "active": 0,
+              "epoch": 31429724476093,
+              "seq": 285,
+              "version": 86
+            },
+            "segment_id": 1089,
+            "source": "experiments/ext4-counter-trace/results/campaign-9chz7m3j/segments/segment-001089/analysis/lifecycle/report.json.gz"
+          },
+          {
+            "blockers": [
+              "regular-single:invalid_trace",
+              "regular-single:no_valid_stable_confirmation"
+            ],
+            "carry": {
+              "carry_available": true,
+              "carry_source": "segment-001277"
+            },
+            "filesystem_reset_before": true,
+            "filesystem_reset_completed": true,
+            "immediately_after_fault": true,
+            "invalid_runs": [
+              {
+                "dev": null,
+                "end_seq": 1715,
+                "epoch": 31429724476093,
+                "integrity_issues": [
+                  "sequence_missing_duplicate_or_wrong_epoch",
+                  "device_identity_not_unique"
+                ],
+                "name": "regular-single",
+                "start_seq": 237354
+              }
+            ],
+            "loss_stats": {
+              "cpu0-stats.txt": {
+                "commit overrun": 0,
+                "dropped events": 0,
+                "overrun": 0
+              }
+            },
+            "new_raw_start": {
+              "active": 0,
+              "epoch": 36641529705820,
+              "seq": 285,
+              "version": 86
+            },
+            "segment_id": 1278,
+            "source": "experiments/ext4-counter-trace/results/campaign-9chz7m3j/segments/segment-001278/analysis/lifecycle/report.json.gz"
+          },
+          {
+            "blockers": [
+              "regular-single:invalid_trace",
+              "regular-single:no_valid_stable_confirmation"
+            ],
+            "carry": {
+              "carry_available": true,
+              "carry_source": "segment-001297"
+            },
+            "filesystem_reset_before": true,
+            "filesystem_reset_completed": true,
+            "immediately_after_fault": true,
+            "invalid_runs": [
+              {
+                "dev": null,
+                "end_seq": 1641,
+                "epoch": 36641529705820,
+                "integrity_issues": [
+                  "sequence_missing_duplicate_or_wrong_epoch",
+                  "device_identity_not_unique"
+                ],
+                "name": "regular-single",
+                "start_seq": 25713
+              }
+            ],
+            "loss_stats": {
+              "cpu0-stats.txt": {
+                "commit overrun": 0,
+                "dropped events": 0,
+                "overrun": 0
+              }
+            },
+            "new_raw_start": {
+              "active": 0,
+              "epoch": 37223247874734,
+              "seq": 285,
+              "version": 86
+            },
+            "segment_id": 1298,
+            "source": "experiments/ext4-counter-trace/results/campaign-9chz7m3j/segments/segment-001298/analysis/lifecycle/report.json.gz"
+          },
+          {
+            "blockers": [
+              "regular-single:invalid_trace",
+              "regular-single:no_valid_stable_confirmation"
+            ],
+            "carry": {
+              "carry_available": true,
+              "carry_source": "segment-001464"
+            },
+            "filesystem_reset_before": true,
+            "filesystem_reset_completed": true,
+            "immediately_after_fault": true,
+            "invalid_runs": [
+              {
+                "dev": null,
+                "end_seq": 1630,
+                "epoch": 37223247874734,
+                "integrity_issues": [
+                  "sequence_missing_duplicate_or_wrong_epoch",
+                  "device_identity_not_unique"
+                ],
+                "name": "regular-single",
+                "start_seq": 210394
+              }
+            ],
+            "loss_stats": {
+              "cpu0-stats.txt": {
+                "commit overrun": 0,
+                "dropped events": 0,
+                "overrun": 0
+              }
+            },
+            "new_raw_start": {
+              "active": 0,
+              "epoch": 41969308630974,
+              "seq": 285,
+              "version": 86
+            },
+            "segment_id": 1465,
+            "source": "experiments/ext4-counter-trace/results/campaign-9chz7m3j/segments/segment-001465/analysis/lifecycle/report.json.gz"
+          }
+        ],
+        "fault_segments": [
+          96,
+          692,
+          953,
+          1088,
+          1277,
+          1297,
+          1464
+        ]
+      },
+      "final_curve_point": {
+        "complete_samples": 1513,
+        "corpus_target_pc_coverage": 3636,
+        "effect_target_pc_coverage": 3636,
+        "elapsed_seconds": 43212.138,
+        "segment_id": 1512,
+        "target_pc_coverage": 3819,
+        "total_semantic_features": 141
+      },
+      "hourly_curve": [
+        {
+          "checkpoint_hour": 1,
+          "complete_samples": 124,
+          "corpus_target_pc_coverage": 2838,
+          "effect_target_pc_coverage": 2838,
+          "elapsed_seconds": 3573.458,
+          "segment_id": 123,
+          "target_pc_coverage": 3138,
+          "total_semantic_features": 91
+        },
+        {
+          "checkpoint_hour": 2,
+          "complete_samples": 245,
+          "corpus_target_pc_coverage": 2857,
+          "effect_target_pc_coverage": 2857,
+          "elapsed_seconds": 7199.05,
+          "segment_id": 244,
+          "target_pc_coverage": 3366,
+          "total_semantic_features": 91
+        },
+        {
+          "checkpoint_hour": 3,
+          "complete_samples": 364,
+          "corpus_target_pc_coverage": 2890,
+          "effect_target_pc_coverage": 2890,
+          "elapsed_seconds": 10788.545,
+          "segment_id": 363,
+          "target_pc_coverage": 3417,
+          "total_semantic_features": 91
+        },
+        {
+          "checkpoint_hour": 4,
+          "complete_samples": 482,
+          "corpus_target_pc_coverage": 2908,
+          "effect_target_pc_coverage": 2908,
+          "elapsed_seconds": 14396.386,
+          "segment_id": 481,
+          "target_pc_coverage": 3436,
+          "total_semantic_features": 94
+        },
+        {
+          "checkpoint_hour": 5,
+          "complete_samples": 603,
+          "corpus_target_pc_coverage": 2937,
+          "effect_target_pc_coverage": 2937,
+          "elapsed_seconds": 17974.762,
+          "segment_id": 602,
+          "target_pc_coverage": 3450,
+          "total_semantic_features": 94
+        },
+        {
+          "checkpoint_hour": 6,
+          "complete_samples": 736,
+          "corpus_target_pc_coverage": 3208,
+          "effect_target_pc_coverage": 3208,
+          "elapsed_seconds": 21599.574,
+          "segment_id": 735,
+          "target_pc_coverage": 3598,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 7,
+          "complete_samples": 866,
+          "corpus_target_pc_coverage": 3229,
+          "effect_target_pc_coverage": 3229,
+          "elapsed_seconds": 25178.318,
+          "segment_id": 865,
+          "target_pc_coverage": 3619,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 8,
+          "complete_samples": 996,
+          "corpus_target_pc_coverage": 3389,
+          "effect_target_pc_coverage": 3389,
+          "elapsed_seconds": 28789.445,
+          "segment_id": 995,
+          "target_pc_coverage": 3650,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 9,
+          "complete_samples": 1127,
+          "corpus_target_pc_coverage": 3389,
+          "effect_target_pc_coverage": 3389,
+          "elapsed_seconds": 32393.32,
+          "segment_id": 1126,
+          "target_pc_coverage": 3651,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 10,
+          "complete_samples": 1258,
+          "corpus_target_pc_coverage": 3502,
+          "effect_target_pc_coverage": 3502,
+          "elapsed_seconds": 35992.129,
+          "segment_id": 1257,
+          "target_pc_coverage": 3702,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 11,
+          "complete_samples": 1387,
+          "corpus_target_pc_coverage": 3519,
+          "effect_target_pc_coverage": 3519,
+          "elapsed_seconds": 39599.584,
+          "segment_id": 1386,
+          "target_pc_coverage": 3704,
+          "total_semantic_features": 116
+        },
+        {
+          "checkpoint_hour": 12,
+          "complete_samples": 1512,
+          "corpus_target_pc_coverage": 3636,
+          "effect_target_pc_coverage": 3636,
+          "elapsed_seconds": 43185.445,
+          "segment_id": 1511,
+          "target_pc_coverage": 3819,
+          "total_semantic_features": 141
+        }
+      ],
+      "last_novelty": {
+        "effect_target_pc": {
+          "elapsed_seconds": 41879.852,
+          "segment_id": 1464
+        },
+        "raw_target_pc": {
+          "elapsed_seconds": 41879.852,
+          "segment_id": 1464
+        },
+        "semantic": {
+          "elapsed_seconds": 41879.852,
+          "segment_id": 1464
+        }
+      },
+      "missing_audit_inputs": [],
+      "parent_yields_by_admission_kind": {
+        "pc": {
+          "child_executions": 1292,
+          "child_new_edges": 6836,
+          "child_new_ext4_pcs": 1129,
+          "child_new_pcs": 1265,
+          "child_new_semantic_features": 62,
+          "parents": 72,
+          "resource_parents": 14,
+          "selections": 1292
+        }
+      },
+      "performance_stages": {
+        "aggregate": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "total": 0
+        },
+        "analysis": {
+          "count": 1512,
+          "p50": 2.378929,
+          "p95": 2.671483,
+          "total": 3619.678203
+        },
+        "compilation": {
+          "count": 1513,
+          "p50": 0.306934,
+          "p95": 0.319529,
+          "total": 467.082118
+        },
+        "feedback": {
+          "count": 1513,
+          "p50": 0.047777,
+          "p95": 0.079129,
+          "total": 73.482716
+        },
+        "fetch": {
+          "count": 1513,
+          "p50": 1.526405,
+          "p95": 1.688801,
+          "total": 2392.499485
+        },
+        "finish_disk": {
+          "count": 0,
+          "p50": null,
+          "p95": null,
+          "total": 0
+        },
+        "generation": {
+          "count": 1513,
+          "p50": 0.914855,
+          "p95": 0.923169,
+          "total": 1386.713239
+        },
+        "guest_execution": {
+          "count": 1513,
+          "p50": 20.384039,
+          "p95": 26.856351,
+          "total": 31214.696203
+        },
+        "quota_reconciliation": {
+          "count": 142,
+          "p50": 0.501164,
+          "p95": 1.044696,
+          "total": 73.694476
+        },
+        "upload": {
+          "count": 1513,
+          "p50": 1.514977,
+          "p95": 1.667858,
+          "total": 2267.257004
+        }
+      },
+      "program_tasks": {
+        "fresh_generate": {
+          "admitted_programs": 10,
+          "effect_new_target_pcs": 1664,
+          "new_semantic_features": 49,
+          "non_target": 1447,
+          "programs": 217,
+          "raw_new_target_pcs": 1989,
+          "recorded_calls": 3472,
+          "target_failure_adapted": 197,
+          "target_failure_unmodified": 656,
+          "target_success_adapted": 657,
+          "target_success_unmodified": 515
+        },
+        "mutate": {
+          "admitted_programs": 48,
+          "effect_new_target_pcs": 978,
+          "new_semantic_features": 36,
+          "non_target": 4700,
+          "programs": 972,
+          "raw_new_target_pcs": 782,
+          "recorded_calls": 15541,
+          "target_failure_adapted": 327,
+          "target_failure_unmodified": 3126,
+          "target_success_adapted": 2525,
+          "target_success_unmodified": 4863
+        },
+        "resource_mutate": {
+          "admitted_programs": 13,
+          "effect_new_target_pcs": 287,
+          "new_semantic_features": 26,
+          "non_target": 1116,
+          "programs": 320,
+          "raw_new_target_pcs": 284,
+          "recorded_calls": 5095,
+          "target_failure_adapted": 57,
+          "target_failure_unmodified": 1013,
+          "target_success_adapted": 679,
+          "target_success_unmodified": 2230
+        },
+        "resource_valid_seed": {
+          "admitted_programs": 1,
+          "effect_new_target_pcs": 707,
+          "new_semantic_features": 30,
+          "non_target": 24,
+          "programs": 4,
+          "raw_new_target_pcs": 764,
+          "recorded_calls": 64,
+          "target_failure_adapted": 1,
+          "target_failure_unmodified": 10,
+          "target_success_adapted": 12,
+          "target_success_unmodified": 17
+        }
+      },
+      "resource_templates": {
+        "file-state": {
+          "admitted_programs": 0,
+          "effect_new_target_pcs": 0,
+          "new_semantic_features": 0,
+          "non_target": 12,
+          "programs": 2,
+          "raw_new_target_pcs": 378,
+          "recorded_calls": 32,
+          "target_failure_adapted": 1,
+          "target_failure_unmodified": 7,
+          "target_success_adapted": 9,
+          "target_success_unmodified": 3
+        },
+        "namespace": {
+          "admitted_programs": 14,
+          "effect_new_target_pcs": 994,
+          "new_semantic_features": 56,
+          "non_target": 1128,
+          "programs": 322,
+          "raw_new_target_pcs": 670,
+          "recorded_calls": 5127,
+          "target_failure_adapted": 57,
+          "target_failure_unmodified": 1016,
+          "target_success_adapted": 682,
+          "target_success_unmodified": 2244
+        }
+      },
+      "settings": {
+        "cpus": 1,
+        "duration_seconds": 43200,
+        "fault_isolation": true,
+        "feedback_mode": "pc",
+        "fresh_generate_every": 7,
+        "guest_memory_mb": 1024,
+        "qemu_cpu": "qemu64",
+        "random_fault_injection": true,
+        "random_fault_probability_ppm": 1000,
+        "resource_valid_every": 4,
+        "scenario": "baseline",
+        "scheduler_policy": "rarity_fair",
+        "seed": 20261024,
+        "syz_calls": 16,
+        "target_kind": "regular",
+        "target_scope": "ext4_jbd2"
+      },
+      "source": "experiments/ext4-counter-trace/results/campaign-9chz7m3j",
+      "sources": {
+        "aggregate": "campaign-report.json",
+        "coverage": "feedback/coverage.json",
+        "per_program": "segments/segment-*/syz-programs/*/program.json",
+        "per_segment_coverage": "segments/segment-*/coverage.json",
+        "per_segment_feedback": "segments/segment-*/feedback.json",
+        "performance": "performance-report.json",
+        "scheduler": "feedback/scheduler.json",
+        "segments": "segment-summary.jsonl.gz"
+      },
+      "validity": {
+        "counter_validation_passed": false,
+        "coverage_complete": false,
+        "kcov_feedback_complete": true,
+        "passed": false,
+        "raw_coverage_complete": true,
+        "source_attribution_complete": false,
+        "status": "candidate_review_required"
+      }
+    }
+  },
+  "audit_date": "2026-11-11",
+  "full_minus_pc_target_coverage": {
+    "corpus_target_pc_coverage": -380,
+    "effect_target_pc_coverage": -380,
+    "target_pc_coverage": -151
+  },
+  "limitations": [
+    "This is a descriptive audit of one historical seed, not a causal efficacy comparison.",
+    "PC counts use the historical symbol-based ext4/JBD2 scope, without a total target-PC denominator.",
+    "target_fraction is not filesystem coverage percentage and is intentionally omitted.",
+    "Novelty credit depends on execution order; template associations do not establish causality.",
+    "Hourly checkpoints use segment end wall timestamps; the final point is reported separately.",
+    "Performance quantiles are copied from the existing performance report; nested stages must not be summed.",
+    "Semantic features are the historical implementation's features, not unique bugs or complete difference trajectories.",
+    "KCOV completeness and formula lifecycle completeness are independent audit fields.",
+    "The native syz-manager arm is not audited by this script; see the original comparison.json for its validity gates."
+  ],
+  "schema": 1
+}

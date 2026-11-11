@@ -44,6 +44,15 @@ func must(err error) {
 		os.Exit(1)
 	}
 }
+
+func serializedCalls(p *prog.Prog) []string {
+	text := strings.TrimSpace(string(p.Serialize()))
+	if text == "" {
+		return nil
+	}
+	return strings.Split(text, "\n")
+}
+
 func main() {
 	seed := flag.Int64("seed", 1, "generation/mutation seed")
 	count := flag.Int("calls", 64, "maximum program calls")
@@ -62,8 +71,21 @@ func main() {
 		must(fmt.Errorf("unknown resource template %s", *resourceTemplate))
 	}
 	resourceTemplateName := *resourceTemplate
-	if *mode == "resource-valid" && (*count < 16 || *input != "") {
-		must(fmt.Errorf("typed target modes require at least 16 calls and use their own seed"))
+	if *mode == "resource-valid" && *input != "" && resourceTemplateName == "auto" {
+		metaPath := strings.TrimSuffix(*input, filepath.Ext(*input)) + ".json"
+		metadata, readErr := os.ReadFile(metaPath)
+		if readErr == nil {
+			var parentMeta map[string]any
+			must(json.Unmarshal(metadata, &parentMeta))
+			if template, ok := parentMeta["resource_template"].(string); ok {
+				resourceTemplateName = template
+			}
+		} else if !os.IsNotExist(readErr) {
+			must(readErr)
+		}
+	}
+	if *mode == "resource-valid" && *count < 16 {
+		must(fmt.Errorf("typed target modes require at least 16 calls"))
 	}
 	target, err := prog.GetTarget("linux", "amd64")
 	must(err)
@@ -87,6 +109,7 @@ func main() {
 	resourcePrefixCalls := 0
 	resourceHash := ""
 	var resourcePrefix *prog.Prog
+	var seedLines []string
 	if *mode == "resource-valid" {
 		// Preserve typed resource dependencies while alternating between a
 		// namespace operation sequence and a shorter data/extent state sequence.
@@ -110,22 +133,51 @@ func main() {
 		resourcePrefix, err = target.Deserialize([]byte(seedText), prog.Strict)
 		must(err)
 		resourcePrefixCalls = len(resourcePrefix.Calls)
+		seedLines = serializedCalls(resourcePrefix)
 		hash := sha256.Sum256([]byte(seedText))
 		resourceHash = fmt.Sprintf("%x", hash)
-		method = "TypedSeedAndGeneratedTail"
-		if *mode == "resource-valid" {
-			method = "ResourceSeedAndGeneratedTail"
-		}
+		method = "ResourceSeedMutate"
 	}
 	attempts := 0
 	acceptedAttempt := 0
 	hasDataCall := false
 	hasRegularOpenat := false
 	inputData := []byte(nil)
+	var mutationBaseLines []string
+	parentSeedHash := ""
+	parentPrefixCalls := 0
+	parentSeedCalls := 0
 	if *input != "" {
 		inputData, err = os.ReadFile(*input)
 		must(err)
+		if *mode == "resource-valid" {
+			metaPath := strings.TrimSuffix(*input, filepath.Ext(*input)) + ".json"
+			if metadata, readErr := os.ReadFile(metaPath); readErr == nil {
+				var parentMeta map[string]any
+				must(json.Unmarshal(metadata, &parentMeta))
+				if parentMeta["input_mode"] != "resource-valid" ||
+					parentMeta["resource_template"] != resourceTemplateName {
+					must(fmt.Errorf("resource parent template/metadata mismatch"))
+				}
+				if value, ok := parentMeta["resource_seed_sha256"].(string); ok {
+					parentSeedHash = value
+				}
+				if value, ok := parentMeta["resource_prefix_calls"].(float64); ok {
+					parentPrefixCalls = int(value)
+				}
+				if value, ok := parentMeta["resource_seed_calls"].(float64); ok {
+					parentSeedCalls = int(value)
+				}
+			} else if !os.IsNotExist(readErr) {
+				must(readErr)
+			}
+			parent, decodeErr := target.Deserialize(inputData, prog.Strict)
+			must(decodeErr)
+			mutationBaseLines = serializedCalls(parent)
+			method = "ResourceMutate"
+		}
 	}
+	independentFillStart := *count
 	// Mutate can occasionally produce an argument shape that the C exporter
 	// rejects (for example an incomplete xattr union). Retry from the original
 	// serialized parent so a bad attempt cannot poison the next one.
@@ -150,12 +202,8 @@ func main() {
 			} else {
 				if resourcePrefix != nil {
 					p = resourcePrefix.Clone()
-					remaining := *count - resourcePrefixCalls
-					if remaining > 0 {
-						tail := target.Generate(rs, remaining, ct)
-						tail.Mutate(rand.NewSource(baseSeed+int64(attempt)+500000), remaining, ct, nil, nil)
-						p.Calls = append(p.Calls, tail.Calls...)
-					}
+					mutationBaseLines = serializedCalls(p)
+					p.Mutate(rand.NewSource(baseSeed+int64(attempt)+500000), *count, ct, nil, nil)
 				} else {
 					p = target.Generate(rs, *count, ct)
 				}
@@ -163,6 +211,7 @@ func main() {
 			// syzkaller's call limit is a maximum, but the campaign's syscall
 			// budget is an exact exposure count. Extend short programs with fresh
 			// generated fragments before serialization and native-call indexing.
+			independentFillStart = len(p.Calls)
 			for fill := 0; len(p.Calls) < *count && fill < 64; fill++ {
 				remaining := *count - len(p.Calls)
 				extra := target.Generate(rand.NewSource(baseSeed+int64(attempt)*1000+int64(fill)+900000), remaining, ct)
@@ -214,12 +263,63 @@ func main() {
 	if *input != "" && method == "Generate" {
 		method = "Mutate"
 	}
+	if parentSeedHash != "" && method != "GenerateFallback" {
+		resourceHash = parentSeedHash
+	}
+	usedParent := *input != "" && method != "GenerateFallback"
+	freshGenerate := *input == "" && resourcePrefix == nil && method != "GenerateFallback"
+	finalLines := serializedCalls(p)
+	callOrigins := make([]string, len(p.Calls))
+	seedRetained := 0
+	resourcePrefixRetained := 0
+	mutableCalls := 0
+	for index := range p.Calls {
+		switch {
+		case index >= independentFillStart:
+			callOrigins[index] = "independent_fill"
+		case freshGenerate:
+			callOrigins[index] = "fresh_generate"
+		case index < len(mutationBaseLines) && finalLines[index] == mutationBaseLines[index]:
+			if !usedParent {
+				callOrigins[index] = "seed_retained"
+				seedRetained++
+			} else {
+				callOrigins[index] = "parent_retained"
+			}
+		case index < len(seedLines) && !usedParent && finalLines[index] == seedLines[index]:
+			callOrigins[index] = "seed_retained"
+			seedRetained++
+		default:
+			callOrigins[index] = "typed_mutation"
+		}
+		if callOrigins[index] == "typed_mutation" {
+			mutableCalls++
+		}
+	}
+	prefixLines := seedLines
+	prefixLimit := len(seedLines)
+	if usedParent {
+		prefixLines = mutationBaseLines
+		prefixLimit = parentPrefixCalls
+		if parentSeedCalls > 0 {
+			resourcePrefixCalls = parentSeedCalls
+		}
+	}
+	if prefixLimit > len(prefixLines) {
+		prefixLimit = len(prefixLines)
+	}
+	for index := 0; index < prefixLimit && index < len(finalLines); index++ {
+		if finalLines[index] != prefixLines[index] {
+			break
+		}
+		resourcePrefixRetained++
+	}
 	calls := make([]map[string]any, 0, len(p.Calls))
 	for index, call := range p.Calls {
 		if !enabled[call.Meta] {
 			must(fmt.Errorf("generated call outside allowlist: %s", call.Meta.Name))
 		}
-		calls = append(calls, map[string]any{"index": index, "name": call.Meta.Name, "native_name": call.Meta.CallName, "nr": call.Meta.NR})
+		calls = append(calls, map[string]any{"index": index, "name": call.Meta.Name, "native_name": call.Meta.CallName, "nr": call.Meta.NR, "origin": callOrigins[index]})
 	}
 	must(os.MkdirAll(*out, 0755))
 	must(os.WriteFile(filepath.Join(*out, "program.syz"), data, 0644))
@@ -231,9 +331,15 @@ func main() {
 		"fd_repair_policy":   "stable_regular_file_fallback",
 		"mutation_fallback":  method == "GenerateFallback", "target": "linux/amd64",
 		"input_mode": *mode, "resource_contract": "private-worker-tree-v2",
-		"resource_template": resourceTemplateName,
-		"resource_prefix_calls": resourcePrefixCalls, "resource_seed_sha256": resourceHash,
-		"protected_prefix": resourcePrefixCalls > 0, "namespace_parameter_adaptation": false,
+		"resource_template":            resourceTemplateName,
+		"resource_seed_calls":          resourcePrefixCalls,
+		"resource_prefix_calls":        resourcePrefixRetained,
+		"resource_seed_retained_calls": seedRetained,
+		"resource_mutable_calls":       mutableCalls,
+		"resource_prefix_fraction":     float64(resourcePrefixRetained) / float64(len(p.Calls)),
+		"resource_seed_sha256":         resourceHash,
+		"resource_prefix_mutable":      true, "protected_prefix": false,
+		"namespace_parameter_adaptation": false, "call_origins": callOrigins,
 		"call_limit": *count, "allowlist": names, "calls": calls}, "", "  ")
 	must(err)
 	must(os.WriteFile(filepath.Join(*out, "program.json"), append(meta, '\n'), 0644))

@@ -82,9 +82,14 @@ ssize_t __wrap_write(int fd, const void *data, size_t length)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <unistd.h>
 int main(void)
 {
+  char cwd[PATH_MAX];
+  assert(getcwd(cwd, sizeof(cwd)));
+  assert(!strcmp(cwd, getenv("CT_ROOT")));
+  assert(access("./file0/file0", F_OK) == 0);
   char policy[4096];
   FILE *file = fopen(getenv("CT_FAULT_POLICY_EVIDENCE"), "r");
   assert(file && fgets(policy, sizeof(policy), file)); fclose(file);
@@ -128,6 +133,7 @@ int main(void)
                                     env=env, cwd=temp, capture_output=True, text=True, timeout=15)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.count('worker_verified='), workers)
+
             self.assertEqual((temp / 'arms.log').read_text().splitlines(),
                              ['armed_after_setup'])
             if exercise_cleanup:
@@ -150,6 +156,98 @@ int main(void)
                     self.assertEqual(delta.count('CT_PHASE phase=END source=cleanup'), 1)
                 finally:
                     os.chmod(shared_root, 0o700)
+
+    def test_namespace_call_identity_uses_relative_parent_directory_device(self):
+        runtime = (ROOT / 'tests/syz-runtime.h').read_text()
+        with tempfile.TemporaryDirectory(prefix='ct-namespace-identity-') as temp:
+            source = pathlib.Path(temp) / 'namespace-identity.c'
+            binary = pathlib.Path(temp) / 'namespace-identity'
+            source.write_text(runtime + r'''
+#include <assert.h>
+int ioctl(int fd, unsigned long request, ...) { (void)fd; (void)request; return 0; }
+int main(void)
+{
+  char root[] = "/tmp/ct-ns-identity-XXXXXX";
+  assert(mkdtemp(root));
+  assert(chdir(root) == 0);
+  int rootfd = open(root, O_RDONLY | O_DIRECTORY);
+  assert(rootfd >= 0);
+  struct stat cwd;
+  assert(fstat(AT_FDCWD, &cwd) < 0); /* AT_FDCWD is a sentinel, not an fd. */
+  unsigned long long ino, dev;
+  int is_dir;
+  long mkdir_args[6] = {AT_FDCWD, (long)"child", 0755, 0, 0, 0};
+  ct_inode_identity("mkdirat", mkdir_args, &ino, &dev, &is_dir);
+  assert(ino != 0 && dev != 0 && is_dir == 1);
+  assert(mkdir("child", 0755) == 0);
+  long dir_open_args[6] = {rootfd, (long)"child", O_RDONLY | O_DIRECTORY, 0, 0, 0};
+  ct_inode_identity("openat$dir", dir_open_args, &ino, &dev, &is_dir);
+  assert(ino != 0 && is_dir == 1);
+  struct stat root_stat;
+  assert(fstat(rootfd, &root_stat) == 0 && (dev_t)dev == root_stat.st_dev);
+  struct stat child_stat;
+  assert(fstatat(rootfd, "child", &child_stat, 0) == 0);
+  assert(ino == child_stat.st_ino && (dev_t)dev == child_stat.st_dev);
+  long regular_open_args[6] = {rootfd, (long)"child/file", O_CREAT | O_RDWR, 0600, 0, 0};
+  ct_inode_identity("openat", regular_open_args, &ino, &dev, &is_dir);
+  assert(ino != 0 && is_dir == 1 && (dev_t)dev == root_stat.st_dev);
+  int filefd = openat(rootfd, "child/file", O_CREAT | O_RDWR, 0600);
+  assert(filefd >= 0);
+  struct stat file_stat;
+  assert(fstat(filefd, &file_stat) == 0);
+  long existing_open_args[6] = {rootfd, (long)"child/file", O_RDWR, 0, 0, 0};
+  ct_inode_identity("openat", existing_open_args, &ino, &dev, &is_dir);
+  assert(ino == file_stat.st_ino && (dev_t)dev == file_stat.st_dev && is_dir == 0);
+  long read_args[6] = {filefd, 0, 0, 0, 0, 0};
+  ct_inode_identity("read", read_args, &ino, &dev, &is_dir);
+  assert(fstat(filefd, &file_stat) == 0 && ino == file_stat.st_ino && (dev_t)dev == file_stat.st_dev);
+  ct_inode_identity("close", read_args, &ino, &dev, &is_dir);
+  assert(ino == file_stat.st_ino && (dev_t)dev == file_stat.st_dev);
+  long rename_args[6] = {rootfd, (long)"child/file", rootfd,
+                         (long)"child/renamed", 0, 0};
+  ct_inode_identity("renameat2", rename_args, &ino, &dev, &is_dir);
+  assert(ino != 0 && dev != 0 && is_dir == 1 && (dev_t)dev == root_stat.st_dev);
+  long link_args[6] = {rootfd, (long)"child/renamed", rootfd,
+                       (long)"child/linked", 0, 0};
+  ct_inode_identity("linkat", link_args, &ino, &dev, &is_dir);
+  assert(ino != 0 && dev != 0 && is_dir == 1 && (dev_t)dev == root_stat.st_dev);
+  long symlink_args[6] = {(long)"renamed", rootfd, (long)"child/sym", 0, 0, 0};
+  ct_inode_identity("symlinkat", symlink_args, &ino, &dev, &is_dir);
+  assert(ino != 0 && dev != 0 && is_dir == 1 && (dev_t)dev == root_stat.st_dev);
+  assert(symlinkat("file", rootfd, "child/sym") == 0);
+  long nofollow_args[6] = {rootfd, (long)"child/sym", O_RDONLY | O_NOFOLLOW, 0, 0, 0};
+  ct_inode_identity("openat", nofollow_args, &ino, &dev, &is_dir);
+  struct stat symlink_stat;
+  assert(lstat("child/sym", &symlink_stat) == 0);
+  assert(ino == symlink_stat.st_ino && (dev_t)dev == symlink_stat.st_dev && is_dir == 0);
+  long follow_args[6] = {rootfd, (long)"child/sym", O_RDONLY, 0, 0, 0};
+  ct_inode_identity("openat", follow_args, &ino, &dev, &is_dir);
+  assert(ino == file_stat.st_ino && (dev_t)dev == file_stat.st_dev && is_dir == 0);
+  long unlink_args[6] = {rootfd, (long)"child/linked", 0, 0, 0, 0};
+  ct_inode_identity("unlinkat", unlink_args, &ino, &dev, &is_dir);
+  assert(ino != 0 && is_dir == 1 && (dev_t)dev == root_stat.st_dev);
+  long rmdir_args[6] = {(long)"child", 0, 0, 0, 0, 0};
+  ct_inode_identity("rmdir", rmdir_args, &ino, &dev, &is_dir);
+  assert(ino != 0 && is_dir == 1 && (dev_t)dev == root_stat.st_dev);
+  struct stat dir;
+  assert(stat(".", &dir) == 0);
+  assert(root_stat.st_ino == dir.st_ino && root_stat.st_dev == dir.st_dev);
+  long absolute_args[6] = {AT_FDCWD, (long)"/tmp/other", 0, 0, 0, 0};
+  ct_inode_identity("mkdirat", absolute_args, &ino, &dev, &is_dir);
+  struct stat tmpdir;
+  assert(stat("/tmp", &tmpdir) == 0);
+  assert(ino != 0 && (dev_t)dev == tmpdir.st_dev && is_dir == 1);
+  long invalid_unlink_args[6] = {rootfd, -1, 0, 0, 0, 0};
+  ct_inode_identity("unlinkat", invalid_unlink_args, &ino, &dev, &is_dir);
+  assert(ino == 0 && dev == 0 && is_dir == 0);
+  long invalid_open_args[6] = {rootfd, 0x7fffdead0000L, O_RDONLY, 0, 0, 0};
+  ct_inode_identity("openat", invalid_open_args, &ino, &dev, &is_dir);
+  assert(ino == 0 && dev == 0 && is_dir == 0);
+  return 0;
+}
+''')
+            subprocess.run(['gcc', '-O0', '-o', str(binary), str(source)], check=True)
+            subprocess.run([str(binary)], check=True, timeout=10)
 
     def test_single_fault_arms_worker_pid_after_seed_setup(self):
         self.run_launcher(shared=False, exercise_cleanup=True)
@@ -385,6 +483,7 @@ int main(void)
         self.assertGreaterEqual(maximum, default)
         self.assertLessEqual(maximum, parser_maximum + 1)
         self.assertIn('CT_FALLOCATE_MAX_BYTES', guest)
+        self.assertIn('CT_IO_MAX_BYTES', guest)
 
     def test_fault_isolation_restores_counter_event_for_following_segments(self):
         guest = (ROOT / 'tests/guest-campaign.sh').read_text()
@@ -417,6 +516,29 @@ int main(void)
             subprocess.run(['gcc', '-O0', '-pthread', '-o', str(binary), str(source)], check=True)
             subprocess.run([str(binary)], check=True, timeout=10)
 
+    def test_runtime_bounds_pathological_io_length(self):
+        runtime = (ROOT / 'tests/syz-runtime.h').read_text()
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / 'io-bound.c'
+            binary = pathlib.Path(temp) / 'io-bound'
+            source.write_text(runtime + r'''
+#include <assert.h>
+int main(void)
+{
+  int adapted = 0;
+  ct_io_max_bytes = 1024 * 1024ULL;
+  assert(ct_bound_io_length(0x100000000L, &adapted) ==
+         (long)(1024 * 1024ULL));
+  assert(adapted == 1);
+  adapted = 0;
+  assert(ct_bound_io_length(0x1000L, &adapted) == 0x1000L);
+  assert(adapted == 0);
+  return 0;
+}
+''')
+            subprocess.run(['gcc', '-O0', '-pthread', '-o', str(binary), str(source)], check=True)
+            subprocess.run([str(binary)], check=True, timeout=10)
+
     def test_mutation_and_changed_seed_preserve_exact_calls(self):
         with tempfile.TemporaryDirectory() as temp:
             a, b = pathlib.Path(temp) / 'a', pathlib.Path(temp) / 'b'
@@ -428,6 +550,14 @@ int main(void)
             self.assertNotEqual((a / 'program.syz').read_bytes(), (b / 'program.syz').read_bytes())
             self.assertTrue(all(c['name'] in meta['allowlist'] for c in meta['calls']))
 
+    def test_ordinary_generate_has_distinct_call_origin(self):
+        with tempfile.TemporaryDirectory() as temp:
+            out = pathlib.Path(temp) / 'ordinary'
+            subprocess.run([str(GEN), '-out', str(out), '-seed', '7001', '-calls', '16'], check=True)
+            meta = json.loads((out / 'program.json').read_text())
+            self.assertEqual(meta['method'], 'Generate')
+            self.assertEqual(meta['call_origins'], ['fresh_generate'] * 16)
+
     def test_resource_valid_seed_keeps_contract_and_budget(self):
         with tempfile.TemporaryDirectory() as temp:
             out = pathlib.Path(temp) / 'resource'
@@ -436,14 +566,39 @@ int main(void)
             meta = json.loads((out / 'program.json').read_text())
             self.assertEqual(meta['input_mode'], 'resource-valid')
             self.assertEqual(meta['resource_contract'], 'private-worker-tree-v2')
-            self.assertTrue(meta['protected_prefix'])
+            self.assertFalse(meta['protected_prefix'])
+            self.assertTrue(meta['resource_prefix_mutable'])
             self.assertEqual(meta['resource_template'], 'namespace')
-            self.assertEqual(meta['resource_prefix_calls'], 15)
+            self.assertEqual(meta['method'], 'ResourceSeedMutate')
+            self.assertEqual(meta['resource_seed_calls'], 15)
+            self.assertLessEqual(meta['resource_prefix_calls'], 15)
             self.assertLessEqual(len(meta['calls']), 24)
             self.assertEqual(len(meta['calls']), 24)
+            self.assertEqual(len(meta['call_origins']), len(meta['calls']))
             self.assertFalse(meta['namespace_parameter_adaptation'])
             self.assertTrue(meta['has_data_call'])
-            self.assertIn('openat$dir', [call['name'] for call in meta['calls']])
+            self.assertTrue(any(origin == 'typed_mutation' for origin in meta['call_origins']))
+
+    def test_resource_valid_parent_continues_with_typed_mutation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            seed, child = root / 'seed', root / 'child'
+            subprocess.run([str(GEN), '-out', str(seed), '-seed', '424243', '-calls', '24',
+                            '-input-mode', 'resource-valid', '-resource-template', 'file-state'], check=True)
+            subprocess.run([str(GEN), '-out', str(child), '-seed', '424244', '-calls', '24',
+                            '-input-mode', 'resource-valid', '-resource-template', 'auto',
+                            '-mutate', str(seed / 'program.syz')], check=True)
+            meta = json.loads((child / 'program.json').read_text())
+            self.assertEqual(meta['method'], 'ResourceMutate')
+            self.assertEqual(meta['resource_template'], 'file-state')
+            self.assertEqual(len(meta['calls']), 24)
+            self.assertEqual(len(meta['call_origins']), 24)
+            self.assertLess(meta['resource_prefix_calls'], 8)
+            self.assertTrue(any(origin == 'typed_mutation' for origin in meta['call_origins']))
+            self.assertNotEqual((seed / 'program.syz').read_bytes(),
+                                (child / 'program.syz').read_bytes())
+            self.assertTrue(all(call['name'] in meta['allowlist'] for call in meta['calls']))
+            self.assertTrue(meta['has_data_call'])
 
     def test_shared_contention_seed_fallocate_targets_shared_source(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -454,8 +609,9 @@ int main(void)
             meta = json.loads((out / 'program.json').read_text())
             names = [call['name'] for call in meta['calls']]
             self.assertEqual(meta['resource_template'], 'shared-contention')
-            self.assertEqual(meta['resource_prefix_calls'], 16)
-            self.assertEqual(names[:5], ['openat$dir', 'openat', 'write', 'fallocate', 'linkat'])
+            self.assertEqual(meta['resource_seed_calls'], 16)
+            self.assertLessEqual(meta['resource_prefix_calls'], 16)
+            self.assertEqual(len(meta['call_origins']), 16)
             source = (out / 'program.syz').read_text()
             self.assertIn("'source\\x00'", source)
             self.assertIn('0x1000000', source)
@@ -469,9 +625,9 @@ int main(void)
             meta = json.loads((out / 'program.json').read_text())
             names = [call['name'] for call in meta['calls']]
             self.assertEqual(meta['resource_template'], 'file-state')
-            self.assertEqual(meta['resource_prefix_calls'], 8)
-            self.assertEqual(names[:8], ['openat$dir', 'openat', 'write', 'fallocate',
-                                         'fsync', 'ftruncate', 'close', 'close'])
+            self.assertEqual(meta['resource_seed_calls'], 8)
+            self.assertLessEqual(meta['resource_prefix_calls'], 8)
+            self.assertEqual(len(meta['call_origins']), 16)
             self.assertEqual(len(names), 16)
             self.assertTrue(meta['has_data_call'])
 

@@ -33,6 +33,45 @@ stable()
     done
     return 1
 }
+checkpoint_capture()
+{
+    # The target filesystems stay quiescent until the host trace is sealed.
+    # In particular, periodic superblock publication must not advance seq
+    # between a device's final state read and the global terminal marker.
+    frozen_mounts=""
+    checkpoint_thaw()
+    {
+        for frozen in $frozen_mounts; do fsfreeze --unfreeze "$frozen"; done
+        frozen_mounts=""
+    }
+    trap 'checkpoint_thaw' EXIT
+    trap 'exit 1' HUP INT TERM
+    for pair in $pairs; do
+        kind=${pair%:*}
+        printf 'CT_PROGRESS phase=CHECKPOINT_FREEZE kind=%s\n' "$kind"
+        fsfreeze --freeze "/mnt/ct-$kind"
+        frozen_mounts="/mnt/ct-$kind $frozen_mounts"
+    done
+    allow_invalid=0
+    [ ! -e "$base/random-fault-enabled" ] || allow_invalid=1
+    for pair in $pairs; do
+        kind=${pair%:*}; dev=${pair#*:}
+        stable "$dev" "$base/$kind-final.json" "$allow_invalid"
+    done
+    stats "$base"
+    dmesg > "$base/dmesg.txt"
+    for pair in $pairs; do
+        kind=${pair%:*}; dev=${pair#*:}
+        state "$dev" "$base/$kind-final-state.json"
+    done
+    echo 'CT_CAMPAIGN TERMINAL' > "$trace/trace_marker"
+    echo 0 > "$trace/tracing_on"
+    checkpoint_thaw
+    trap - EXIT HUP INT TERM
+    sync
+    touch "$base/checkpoint.done"
+    for kind in regular bigalloc inline; do umount "/mnt/ct-$kind"; done
+}
 stats()
 {
     scenario=$(cat "$base/scenario.txt" 2>/dev/null || printf 'baseline\n')
@@ -183,7 +222,13 @@ case "${1:-}" in
 init)
     buffer=$2
     scenario=${3:-baseline}
+    init_mode=${4:-standard}
     case "$scenario" in baseline|stateful|large-dir|pressure|all) ;; *) exit 2;; esac
+    case "$init_mode" in standard|comparison-seed) ;; *) exit 2;; esac
+    if [ "$init_mode" = comparison-seed ] && [ "$scenario" != baseline ]; then
+        echo 'comparison seed mode requires baseline scenario' >&2
+        exit 2
+    fi
     printf '%s\n' "$scenario" > "$base/scenario.txt"
     rm -f "$base/checkpoint.done"
     mount -t tracefs tracefs "$trace" 2>/dev/null || true
@@ -208,6 +253,17 @@ init)
         kind=${pair%:*}; dev=${pair#*:}
         mkdir -p "/mnt/ct-$kind"
         mount -o noatime "/dev/$dev" "/mnt/ct-$kind"
+        if [ "$kind" = regular ] && [ "$init_mode" = comparison-seed ]; then
+            test -s "/mnt/ct-$kind/syz-work/file0/file0" || {
+                echo 'comparison seed image is missing syz-work/file0/file0' >&2
+                exit 70
+            }
+            grep -qx 'counter-trace-seed' "/mnt/ct-$kind/syz-work/file0/file0" || {
+                echo 'comparison seed file content mismatch' >&2
+                exit 70
+            }
+            continue
+        fi
         # Seed stable directory and file names used by syzkaller's generated
         # path arguments. This improves fd/path validity without changing the
         # per-segment workload or its trace filters.
@@ -334,6 +390,7 @@ segment)
                 export CT_KCOV_ENTRIES="${CT_KCOV_ENTRIES:-16777216}"
                 export CT_KCOV_FEATURE_SET="${CT_KCOV_FEATURE_SET:-1}"
                 export CT_FALLOCATE_MAX_BYTES="${CT_FALLOCATE_MAX_BYTES:-67108864}"
+                export CT_IO_MAX_BYTES="${CT_IO_MAX_BYTES:-1048576}"
                 export CT_PROGRESS_FD=3
                 exec timeout -k 2 "$work_timeout" /tmp/ct-syz-launcher \
                     "/mnt/ct-$kind" "/tmp/ct-syz-$id" "$batches" "$workers" "$memory" "$sharing"
@@ -375,6 +432,7 @@ segment)
              export CT_KCOV_ENTRIES="${CT_KCOV_ENTRIES:-16777216}"
              export CT_KCOV_FEATURE_SET="${CT_KCOV_FEATURE_SET:-1}"
              export CT_FALLOCATE_MAX_BYTES="${CT_FALLOCATE_MAX_BYTES:-67108864}"
+             export CT_IO_MAX_BYTES="${CT_IO_MAX_BYTES:-1048576}"
              export CT_PROGRESS_FD=3
              timeout -k 2 "$work_timeout" /tmp/ct-syz-launcher "/mnt/ct-$kind" "/tmp/ct-syz-$id" "$batches" "$workers" "$memory" "$sharing" \
                  3>&1 >> "$out/workload.txt" 2>&1) || rc=$?
@@ -458,20 +516,7 @@ checkpoint)
     # checkpoint idempotent so a host-side transport retry cannot rerun the
     # stable scans or unmount sequence.
     if [ -e "$base/checkpoint.done" ]; then exit 0; fi
-    allow_invalid=0
-    [ ! -e "$base/random-fault-enabled" ] || allow_invalid=1
-    for pair in $pairs; do
-        kind=${pair%:*}; dev=${pair#*:}
-        stable "$dev" "$base/$kind-final.json" "$allow_invalid"
-        state "$dev" "$base/$kind-final-state.json"
-    done
-    stats "$base"
-    dmesg > "$base/dmesg.txt"
-    echo 'CT_CAMPAIGN TERMINAL' > "$trace/trace_marker"
-    echo 0 > "$trace/tracing_on"
-    sync
-    touch "$base/checkpoint.done"
-    for kind in regular bigalloc inline; do umount "/mnt/ct-$kind"; done
+    checkpoint_capture
     ;;
 discard)
     # Host has persisted these files, and removes only guest spool evidence.

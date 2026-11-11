@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/syscall.h>
+#include <sys/uio.h>
 #include <linux/kcov.h>
 #include <limits.h>
 #include <stdint.h>
@@ -26,6 +28,7 @@
 #define CT_KCOV_MAX_TOTAL_PCS 16777216UL
 #define CT_KCOV_FEATURE_TABLE_SIZE 1048576UL
 #define CT_FALLOCATE_DEFAULT_MAX_BYTES (64ULL * 1024ULL * 1024ULL)
+#define CT_IO_DEFAULT_MAX_BYTES (1ULL * 1024ULL * 1024ULL)
 
 
 static void ct_phase(const char *edge, const char *source)
@@ -69,6 +72,8 @@ static unsigned long ct_fd_repairs;
 static unsigned long ct_data_calls;
 static unsigned long ct_fallocate_adaptations;
 static unsigned long long ct_fallocate_max_bytes = CT_FALLOCATE_DEFAULT_MAX_BYTES;
+static unsigned long long ct_io_max_bytes = CT_IO_DEFAULT_MAX_BYTES;
+static unsigned long ct_io_adaptations;
 static int ct_fault_stop_after_hit;
 
 /*
@@ -416,12 +421,98 @@ static int ct_primary_data_call(const char *name)
 
 static int ct_inode_fd_call(const char *name)
 {
-  return ct_data_fd_call(name) || !strcmp(name, "fremovexattr") ||
+  return ct_data_fd_call(name) || !strcmp(name, "read") ||
+         !strcmp(name, "close") || !strcmp(name, "fremovexattr") ||
          !strcmp(name, "fgetxattr") || !strcmp(name, "flistxattr") ||
          !strcmp(name, "fstat");
 }
 
-static void ct_inode_identity(const char *name, long fd,
+/* A generated pathname is an arbitrary fuzzed address. Read it through the
+ * kernel's self-process copy API so an invalid pointer becomes an attribution
+ * miss instead of a userspace SIGSEGV that aborts the whole campaign. */
+static int ct_copy_user_string(long path, char *buffer, size_t capacity)
+{
+  if (path <= 0 || !buffer || capacity < 2) return 0;
+  size_t copied = 0;
+  while (copied < capacity) {
+    size_t chunk = capacity - copied;
+    if (chunk > 256) chunk = 256;
+    if ((unsigned long)path > ULONG_MAX - copied) return 0;
+    struct iovec local = {.iov_base = buffer + copied, .iov_len = chunk};
+    struct iovec remote = {
+      .iov_base = (void *)(uintptr_t)((unsigned long)path + copied),
+      .iov_len = chunk,
+    };
+    long count = syscall(SYS_process_vm_readv, getpid(), &local, 1,
+                         &remote, 1, 0);
+    if (count <= 0) return 0;
+    char *terminator = memchr(buffer + copied, '\0', (size_t)count);
+    if (terminator) return 1;
+    copied += (size_t)count;
+  }
+  return 0;
+}
+
+static int ct_path_parent_identity(long dirfd, long path,
+                                  unsigned long long *ino,
+                                  unsigned long long *dev)
+{
+  char value[PATH_MAX];
+  if (dirfd < INT_MIN || dirfd > INT_MAX ||
+      !ct_copy_user_string(path, value, sizeof(value))) return 0;
+  char parent[PATH_MAX];
+  const char *slash = strrchr(value, '/');
+  if (!slash) {
+    strcpy(parent, ".");
+  } else if (slash == value) {
+    strcpy(parent, "/");
+  } else {
+    size_t length = (size_t)(slash - value);
+    if (length >= sizeof(parent)) return 0;
+    memcpy(parent, value, length);
+    parent[length] = '\0';
+  }
+  struct stat st;
+  if (fstatat((int)dirfd, parent, &st, 0) < 0 || !S_ISDIR(st.st_mode)) return 0;
+  *ino = (unsigned long long)st.st_ino;
+  *dev = (unsigned long long)st.st_dev;
+  return 1;
+}
+
+static int ct_path_object_identity(long dirfd, long path,
+                                   unsigned long flags,
+                                   unsigned long long *ino,
+                                   unsigned long long *dev,
+                                   int *is_dir)
+{
+  char value[PATH_MAX];
+  struct stat st;
+  int stat_flags = (flags & O_NOFOLLOW) ? AT_SYMLINK_NOFOLLOW : 0;
+  if (dirfd < INT_MIN || dirfd > INT_MAX ||
+      !ct_copy_user_string(path, value, sizeof(value))) return 0;
+  if (fstatat((int)dirfd, value, &st, stat_flags) == 0) {
+    *ino = (unsigned long long)st.st_ino;
+    *dev = (unsigned long long)st.st_dev;
+    *is_dir = S_ISDIR(st.st_mode);
+    return 1;
+  }
+  /* For create paths that do not exist yet, attribute the operation to the
+   * directory in which the new object would be created. */
+  if (errno == ENOENT && ct_path_parent_identity(dirfd, path, ino, dev)) {
+    *is_dir = 1;
+    return 1;
+  }
+  return 0;
+}
+
+static int ct_inode_namespace_call(const char *name)
+{
+  return !strcmp(name, "mkdirat") || !strcmp(name, "rmdir") ||
+         !strcmp(name, "unlinkat") || !strcmp(name, "renameat2") ||
+         !strcmp(name, "linkat") || !strcmp(name, "symlinkat");
+}
+
+static void ct_inode_identity(const char *name, const long args[6],
                               unsigned long long *ino,
                               unsigned long long *dev, int *is_dir)
 {
@@ -429,14 +520,46 @@ static void ct_inode_identity(const char *name, long fd,
   *ino = 0;
   *dev = 0;
   *is_dir = 0;
-  if (!ct_inode_fd_call(name) || fd < 0 || fd > INT_MAX) return;
-  /* Capture identity before the syscall marker. The extra fstat is outside
-   * the generated call window and cannot be mistaken for the target syscall. */
-  if (fstat((int)fd, &st) == 0) {
-    *ino = (unsigned long long)st.st_ino;
-    *dev = (unsigned long long)st.st_dev;
-    *is_dir = S_ISDIR(st.st_mode);
+  if (ct_inode_fd_call(name)) {
+    long fd = args[0];
+    if (fd < 0 || fd > INT_MAX) return;
+    /* Capture identity before the syscall marker. The extra fstat is outside
+     * the generated call window and cannot be mistaken for the target syscall. */
+    if (fstat((int)fd, &st) == 0) {
+      *ino = (unsigned long long)st.st_ino;
+      *dev = (unsigned long long)st.st_dev;
+      *is_dir = S_ISDIR(st.st_mode);
+    }
+    return;
   }
+  if (!strcmp(name, "openat") || !strcmp(name, "openat$dir")) {
+    ct_path_object_identity(args[0], args[1], args[2], ino, dev, is_dir);
+    return;
+  }
+  if (!ct_inode_namespace_call(name)) return;
+
+  long dirfd = AT_FDCWD;
+  long path = args[0];
+  long second_dirfd = AT_FDCWD;
+  long second_path = 0;
+  if (!strcmp(name, "mkdirat") || !strcmp(name, "unlinkat")) {
+    dirfd = args[0]; path = args[1];
+  } else if (!strcmp(name, "renameat2") || !strcmp(name, "linkat")) {
+    dirfd = args[0]; path = args[1];
+    second_dirfd = args[2]; second_path = args[3];
+  } else if (!strcmp(name, "symlinkat")) {
+    dirfd = args[1]; path = args[2];
+  }
+  unsigned long long first_ino, first_dev;
+  if (!ct_path_parent_identity(dirfd, path, &first_ino, &first_dev)) return;
+  if (second_path) {
+    unsigned long long second_ino, second_dev;
+    if (!ct_path_parent_identity(second_dirfd, second_path, &second_ino, &second_dev) ||
+        first_dev != second_dev) return;
+  }
+  *ino = first_ino;
+  *dev = first_dev;
+  *is_dir = 1;
 }
 
 static int ct_regular_fd(int fd)
@@ -484,6 +607,19 @@ static long ct_bound_fallocate_length(long length, int *adapted)
   if (length > 0 && (unsigned long long)length > ct_fallocate_max_bytes) {
     if (adapted) *adapted = 1;
     return (long)ct_fallocate_max_bytes;
+  }
+  return length;
+}
+
+/* Keep a retained parent from turning one generated data call into a
+ * multi-gigabyte kernel walk.  The generated buffer is still fuzzed; only
+ * its requested transfer size is bounded for campaign stability. */
+static long ct_bound_io_length(long length, int *adapted)
+{
+  if (adapted) *adapted = 0;
+  if (length > 0 && (unsigned long long)length > ct_io_max_bytes) {
+    if (adapted) *adapted = 1;
+    return (long)ct_io_max_bytes;
   }
   return length;
 }
@@ -595,10 +731,11 @@ static void ct_kcov_finish(void)
   }
   if (fsync(out) < 0) { close(out); _exit(91); }
   close(out);
-  dprintf(2, "CT_WORKLOAD_SUMMARY data_calls=%lu fd_repairs=%lu fallocate_adaptations=%lu kcov_count=%zu "
+  dprintf(2, "CT_WORKLOAD_SUMMARY data_calls=%lu fd_repairs=%lu fallocate_adaptations=%lu io_adaptations=%lu kcov_count=%zu "
           "kcov_raw_count=%llu kcov_max_call_index=%u kcov_max_call_pcs=%zu "
           "saturation_flags=%llu\n",
-          ct_data_calls, ct_fd_repairs, ct_fallocate_adaptations, ct_kcov_count,
+          ct_data_calls, ct_fd_repairs, ct_fallocate_adaptations, ct_io_adaptations,
+          ct_kcov_count,
           (unsigned long long)ct_kcov_raw_count, ct_kcov_max_call_index,
           ct_kcov_max_call_pcs, (unsigned long long)ct_kcov_saturation_reasons);
   munmap(ct_kcov_area, (ct_kcov_entries + 1) * sizeof(uint64_t));
@@ -637,6 +774,13 @@ static void ct_init(void)
     if (!end || *end || value < 4096 || value > (1ULL << 30)) exit(91);
     ct_fallocate_max_bytes = value;
   }
+  const char *io_max_text = getenv("CT_IO_MAX_BYTES");
+  if (io_max_text && *io_max_text) {
+    char *end = NULL;
+    unsigned long long value = strtoull(io_max_text, &end, 10);
+    if (!end || *end || value < 4096 || value > (1ULL << 30)) exit(91);
+    ct_io_max_bytes = value;
+  }
   /* Keep enough room for a full typed 16-call program.  The host still
    * rejects samples above its independent parser limit. */
   if (entries < 1024 || entries > CT_KCOV_MAX_ENTRIES) exit(91);
@@ -669,19 +813,39 @@ static long ct_call(unsigned index, const char *name, long nr,
   ct_phase("BEGIN", "runtime_adaptation");
   ct_kcov_stop();
   long original_fd = a;
-  long original_length = d;
+  long original_length = (!strcmp(name, "write") || !strcmp(name, "pwrite64")) ? c :
+                         (!strcmp(name, "ftruncate") ? b : d);
+  long executed_length = original_length;
   int length_adapted = 0;
   /* Do not let a generated close invalidate the private fallback descriptors. */
   if (!strcmp(name, "close") && ct_reserved_fd((int)a)) a = -1;
   int fd_repaired = 0;
   a = ct_repair_fd(name, a, &fd_repaired);
-  if (!strcmp(name, "fallocate"))
+  if (!strcmp(name, "fallocate")) {
     d = ct_bound_fallocate_length(d, &length_adapted);
-  if (length_adapted) ct_fallocate_adaptations++;
+    if (length_adapted) ct_fallocate_adaptations++;
+  } else if (!strcmp(name, "write") || !strcmp(name, "pwrite64")) {
+    int io_adapted = 0;
+    c = ct_bound_io_length(c, &io_adapted);
+    executed_length = c;
+    if (io_adapted) {
+      length_adapted = 1;
+      ct_io_adaptations++;
+    }
+  } else if (!strcmp(name, "ftruncate")) {
+    int io_adapted = 0;
+    b = ct_bound_io_length(b, &io_adapted);
+    executed_length = b;
+    if (io_adapted) {
+      length_adapted = 1;
+      ct_io_adaptations++;
+    }
+  }
+  if (!strcmp(name, "fallocate")) executed_length = d;
   unsigned long long object_ino, object_dev;
   int object_is_dir;
-  ct_inode_identity(name, a, &object_ino, &object_dev, &object_is_dir);
   long args[] = {a,b,c,d,e,f};
+  ct_inode_identity(name, args, &object_ino, &object_dev, &object_is_dir);
   int fd = open("/sys/kernel/tracing/trace_marker", O_WRONLY | O_CLOEXEC);
   if (fd < 0) { perror("trace_marker"); exit(90); }
   /* A generated numeric fd must not close/write the marker. This high fd is
@@ -710,7 +874,8 @@ static long ct_call(unsigned index, const char *name, long nr,
   int size = snprintf(line, sizeof(line),
     "CT_SYSCALL phase=BEGIN id=%s-%ld-%u nr=%ld name=%s ret=0 errno=0 repaired=%d adapted=%d program=%s call_index=%u original_fd=%ld executed_fd=%ld original_length=%ld executed_length=%ld object_ino=%llu object_dev=%llu object_is_dir=%d repair_version=2\n",
     prefix, (long)getpid(), index+1, nr, name, fd_repaired, length_adapted,
-    program, index, original_fd, a, original_length, d, object_ino, object_dev, object_is_dir);
+    program, index, original_fd, a, original_length, executed_length,
+    object_ino, object_dev, object_is_dir);
   if (size < 0 || size >= (int)sizeof(line) || write(marker,line,size) != size) exit(90);
   ct_kcov_start(index);
   errno = 0;
@@ -720,7 +885,8 @@ static long ct_call(unsigned index, const char *name, long nr,
   size = snprintf(line, sizeof(line),
     "CT_SYSCALL phase=END id=%s-%ld-%u nr=%ld name=%s ret=%ld errno=%d repaired=%d adapted=%d program=%s call_index=%u original_fd=%ld executed_fd=%ld original_length=%ld executed_length=%ld object_ino=%llu object_dev=%llu object_is_dir=%d repair_version=2\n",
     prefix, (long)getpid(), index+1, nr, name, ret, error, fd_repaired, length_adapted,
-    program, index, original_fd, a, original_length, d, object_ino, object_dev, object_is_dir);
+    program, index, original_fd, a, original_length, executed_length,
+    object_ino, object_dev, object_is_dir);
   if (size < 0 || size >= (int)sizeof(line) || write(marker,line,size) != size) exit(90);
   close(marker);
   errno = error;

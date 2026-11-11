@@ -1,0 +1,8 @@
+diff --git a/executor/executor.cc b/executor/executor.cc
+--- a/executor/executor.cc
++++ b/executor/executor.cc
+@@ -120,3 +120,3 @@
+ const int kMaxOutputComparisons = 14 << 20; // executions with comparsions enabled are usually < 1% of all executions
+-const int kMaxOutputCoverage = 6 << 20; // coverage is needed in ~ up to 1/3 of all executions (depending on corpus rotation)
++const int kMaxOutputCoverage = 14 << 20; // match comparison output capacity for saturated raw KCOV programs
+ const int kMaxOutputSignal = 4 << 20;

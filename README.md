@@ -7,6 +7,10 @@ versioned. Official Linux source, compiler output, guest
 images, generated programs, SSH credentials, and raw campaign results are
 created locally and excluded from Git.
 
+Current implementation, retained evidence, and the 2026-11-11 offline bigalloc
+checker correction are indexed in [the documentation audit](DOCUMENTATION-AUDIT-20261111.md).
+Historical test summaries are distinguished there from locally available raw evidence.
+
 ## Build a Debian or Ubuntu host
 
 Use an x86-64 Debian or Ubuntu machine with at least 16 GB of RAM and 40 GB of

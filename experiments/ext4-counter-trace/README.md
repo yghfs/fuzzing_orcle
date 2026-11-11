@@ -1,18 +1,19 @@
 # ext4 公式检查与运行时追踪实验
 
-更新时间：2026-10-26（Asia/Shanghai）
+更新时间：2026-11-11（Asia/Shanghai）
 
 依据根目录 `公式.md` 和 `COUNTER-TRACE-IMPLEMENTATION.md`，在独立官方 Linux 6.12.1 上开发新的子项目 checker。主线项目中的历史 checker 仅作选择性复用参考，不要求完整移植或先运行历史 checker 回归。
 
 当前第一条“逐点差值 → 操作出口 → 稳定态”链已实现并完成有限 VM 验证。
-实现和适用边界见 [FIRST-CHAIN.md](FIRST-CHAIN.md)。旧的原始 chain 与短测目录已清理；
-保留的三小时单 worker 错误注入结果见
-[campaign report](results/campaign-lhze43mu/campaign-report.md)。
+实现和适用边界见 [FIRST-CHAIN.md](FIRST-CHAIN.md)。原始 chain、短测和三小时单 worker
+`campaign-lhze43mu` 目录已清理；其历史结论见根目录 `汇报.md` 和
+[候选复核摘要](research/2026-10-31-single-random-fault/lhze-candidates/bug-adjudication.md)。
 
 第二条“长时采集 → 轮转 → 分段/整轮分析 → 可靠持久化”运行链也已实现，
-说明见 [SECOND-CHAIN.md](SECOND-CHAIN.md)。十小时双 worker 共享对象并发的原始
-运行保留在 `results/campaign-k3gxmeex/`，补充聚合报告保留在
-`results/campaign-k3gxmeex-postreport/`；具体结论见根目录 `汇报.md`。
+说明见 [SECOND-CHAIN.md](SECOND-CHAIN.md)。历史双 worker 的
+`campaign-k3gxmeex`、其 postreport 和 `campaign-fmxs5w3e` 原始目录已清理。
+当前保留的一小时三臂对照和十二小时两条自定义臂审计见
+[覆盖审计](research/2026-11-11-target-coverage/README.md)；存在结果目录不等于整轮通过。
 
 根目录 `公式.md` 后续新增的 `R-IH`、`R-IEVICT`、`R-IDELTA-EVICT`、
 `O-LIFE`、`O-LIFE-DELTA`、`O-LIFE-FREE`、`XATTR-REF` 和
@@ -23,11 +24,28 @@
 当前 campaign 的批次操作序列由仓库内固定负载替换为 syzkaller 生成：
 `syzgen` 使用 upstream syzkaller 的 typed `Generate`/`Mutate` API，精确限制在
 文件系统相关 syscall 及其显式变体；每个批次保存 `program.syz`、原始/插桩 C、
-二进制、seed、调用号和 SHA256。运行时仍由 tracefs 的 native `sys_enter/sys_exit`
-与 `CT_SYSCALL` 成对校验，因此报告可以把差值命中关联到 program、worker 和 call index。
-这条路径是可复现的程序生成与变异，包含受控的 typed resource-valid seed 调度；它仍不是
-syzkaller manager 的多 VM 反馈服务。长时间运行前应先检查生成程序的 syscall 返回、资源关系和
-KCOV 累计完整性证据。
+二进制、seed、调用号、调用来源和 SHA256。`resource-valid` 槽首次从 typed seed 开始；
+resource parent 入库后，后续 resource-valid 槽通过 syzkaller 的 `Prog.Mutate` 继续变异
+父程序的资源图，不再把固定模板与独立生成的 tail 拼接。需要补足精确调用预算时，元数据将
+`typed_mutation` 与 `independent_fill` 分开记录；模板名从父程序 sidecar 继承。
+
+KCOV 与 native syscall 生命周期按 `(program, call_index)` 关联。默认 effect-aware admission
+区分目标设备上的成功/失败、修复/改写调用、非目标设备调用及未核验调用；只有目标设备上
+未修复/未改写调用的 PC、edge 和语义特征可作为 corpus 准入和父代收益。可启用
+`--require-target-success`，进一步要求至少有一个成功且未改写的目标设备调用。所有完整样本的
+原始覆盖仍单独保留作诊断。历史两段、32 syscall 的 VM 验证（`campaign-0_6qrnow`，原始目录已清理）记录为通过：
+2/2 KCOV 样本完整，0 个无效/缺失/饱和样本；32/32 个 native syscall 已核验。两个程序均满足
+effect 准入。第一段由 resource-valid typed seed 经 `ResourceSeedMutate` 产生，包含 5 个
+typed mutation 调用和 11 个保留 seed 调用；第二段从已准入资源父程序执行 `ResourceMutate`，
+资源父程序被选择 1 次，包含 3 个 typed mutation 调用和 13 个保留的父调用，连续未变 seed
+前缀分别为 11 和 1 个调用。32 个调用中，23 个为目标设备成功且未改写、1 个为目标设备失败且
+未改写、2 个为目标设备成功但经过改写、6 个为非目标；没有未核验调用。ext4/JBD2 原始、
+效果限定和已准入 corpus 目标覆盖均为 2,391 PC（ext4 2,115，JBD2 276）；全内核原始覆盖为
+6,550 PC，效果限定/准入 corpus 覆盖为 6,535 PC。此短测证明逐调用反馈和 typed mutation
+路径接通，不构成长时间覆盖收益结论。
+
+这条路径仍不是 syzkaller manager 的多 VM 反馈服务。长时间运行前应继续检查逐调用 syscall
+结果、目标设备身份、资源关系和 KCOV 累计完整性证据。
 
 `concurrent` campaign 段现在让多个 worker 共用一个预置工作目录；所有 worker 在 `ct_init`
 完成后经 barrier 同时开始。它们使用相同的 namespace seed 前缀，在共享目录中竞争 `source`、
@@ -36,16 +54,36 @@ launcher 清理共享目录并采集 post-cleanup 快照。生命周期报告记
 native syscall 和共同 inode/目录 inode；同 inode 状态遇到并发写入后会隔离，直到有效稳定扫描
 重新锚定。该路径已完成十小时双 worker VM 长跑，全局交错事件归因仍有待完善。
 
-KCOV 反馈闭环的说明见 [KCOV-FEEDBACK.md](KCOV-FEEDBACK.md)。策略依据、覆盖口径及
-12 小时记录中的父种子饥饿问题，见
-[2026-10-21 反馈调研与审计](research/2026-10-21-feedback/README.md)。
+## Native syz-manager ext4 覆盖对照
+
+三臂对照由 `scripts/run-target-coverage-comparison.sh` 并行运行 native `syz-manager`、
+PC-only 和 full-feedback 自定义单 worker。两条自定义臂启用相同的随机错误策略，默认
+`1000 ppm` 并在命中后隔离 workload；`--random-fault-probability-ppm` 可在短测中提高概率。
+native seed 用私有 seed-only syzkaller view，seed 内嵌 raw ext4 镜像与另外两臂的 regular
+image 做 SHA-256 对照。只有 seed 执行证据、非空目标 rawcover、完整自定义 KCOV 和目标文件
+系统操作证据均有效，比较报告才会标为完整；executor `SYZFAIL` 会阻止完整判定。
+
+上游 syzkaller 源码位于本机忽略目录 `tools/src/`。raw KCOV 饱和程序可能超过 executor
+原先 6 MiB 输出区；使用前先应用本仓库跟踪的补丁并同步重建 manager/executor：
+
+```sh
+cd tools/src/syzkaller-master
+patch -p1 < ../../../experiments/ext4-counter-trace/patches/0002-syzkaller-rawcover-output-buffer.patch
+make TARGETOS=linux TARGETARCH=amd64 manager executor
+```
+
+补丁把 coverage 输出区扩大到 14 MiB，匹配 executor comparison 输出容量。60 秒验证未再
+出现 `SYZFAIL: can't reallocate`；长跑仍需持续检查 executor failure 计数。
+
+KCOV 反馈闭环的实现说明见 [KCOV-FEEDBACK.md](KCOV-FEEDBACK.md)。旧的 E2/E3 协议、结果和历史
+运行记录已清理；后续的一小时三臂对照和十二小时自定义臂审计另见
+[覆盖审计](research/2026-11-11-target-coverage/README.md)。不同实验不得合并为一次有效性结论。
 反馈和 syzkaller 短测的历史运行目录已清理；当前保留的公式链和 campaign 报告只用于追踪器回归，
 不作为 bug 证据。
 
-按插桩点查看保留长跑的逐次一致/不一致结果，见
-[逐点汇总](results/campaign-lhze43mu/point-report.md) 和
-[交互报告](results/campaign-lhze43mu/point-report.html)。逐次 CSV/JSONL 记录差值及
-原始 trace 位置，现场和重建比较分别统计，带入锚点不重复计数。
+逐点报告由 `scripts/point_report.py` 生成，CSV/JSONL 保存差值及原始 trace 位置；
+现场和重建比较分别统计，带入锚点不重复计数。旧 `campaign-lhze43mu` 的
+point-report.md/html 已清理，当前可用结果以覆盖审计及实际存在的目录为准。
 
 ```sh
 bash experiments/ext4-counter-trace/scripts/build.sh
@@ -62,8 +100,8 @@ python3 experiments/ext4-counter-trace/tests/test-syzkaller.py
 ## 单 worker 随机错误注入
 
 长跑可启用按种子复现的运行时错误注入。默认只抽样已经完成单 worker 恢复闭环的
-`mballoc_mark` 和 `inode_evict_final_dirty` hook；概率按每次经过
-候选 hook 的调用计算，默认 `1000 ppm`（0.1%）。默认返回 `-EIO`，也可以按 hook 白名单选择 errno；
+`mballoc_mark`、`unlink_inode_dirty` 和 `inode_evict_final_dirty` hook；概率按每次经过
+候选 hook 的调用计算，默认 `1000 ppm`（0.1%）。默认 errno 策略是 `native`，也可以按 hook 白名单指定 errno；
 `native` 表示命中时从当前 hook 的错误集合中按种子选择。错误只影响命中的那次 ext4 调用，
 不代表发现漏洞。单 worker 随机注入默认启用命中隔离：触发 syscall 返回后立即截断当前
 workload，执行正常同步、卸载和该 segment 的离线 `e2fsck -fn`，再把受影响 filesystem
@@ -102,7 +140,7 @@ bash experiments/ext4-counter-trace/scripts/run-campaign.sh \
 `--random-fault-operations mballoc_mark,inode_evict_final_dirty`。`fast_commit_inode_claim` 需要
 crash/replay mount，不在这个普通 workload 随机池中。
 
-两类运行时 hook 的可选 errno 和来源见 [fault-errno-catalog.json](fault-errno-catalog.json)。
+各运行时 hook 的可选 errno 和来源见 [fault-errno-catalog.json](fault-errno-catalog.json)。
 `mballoc_mark` 支持 `EIO, ENOMEM, EINVAL, ENOSPC, EROFS, EFSCORRUPTED, EFSBADCRC`；
 `inode_evict_final_dirty` 支持 `EIO, ENOMEM, EINVAL, ENOSPC, EROFS, EFSCORRUPTED`。
 其中 `EUCLEAN` 是 `EFSCORRUPTED` 的内核别名，`EBADMSG` 是 `EFSBADCRC` 的内核别名，
@@ -128,7 +166,7 @@ crash/replay mount，不在这个普通 workload 随机池中。
 - 官方源码下载、官方 SHA256 比对、解压及逐文件校验已完成；结果见 `source/provenance.json` 和 `source/verification.json`。
 - 初版公式—源码覆盖矩阵已完成：`FORMULA-SOURCE-COVERAGE.md`。它按六类检查阶段列出权威字段、独立 expected、写入/发布点、锁和事务边界，以及 lazy init、corrupt group、resize、bigalloc、fast-commit replay 和 link-count 的特殊语义。
 - 矩阵 review、probe API 和稳定快照协议已实现第一版，见 [PROBE-API-SNAPSHOT.md](PROBE-API-SNAPSHOT.md)。开发树在 `dev/linux-6.12.1/`，官方原始树仍通过 SHA256 清单校验。
-- 新 checker 使用 `CONFIG_EXT4_COUNTER_TRACE`，已完成开启配置的完整 GCC 14 构建、关闭配置的 ext4 构建，以及普通/bigalloc/无 journal/lazy init 的 VM smoke。结果见 [VALIDATION.md](VALIDATION.md)。
+- 新 checker 使用 `CONFIG_EXT4_COUNTER_TRACE`，已完成开启配置的完整 GCC 14 构建、关闭配置的 ext4 构建，以及普通/bigalloc/无 journal/lazy init 的 VM smoke。这是历史构建/VM 验证摘要；当前源码与构建绑定以 `scripts/source_audit.py --require-build` 为准，证据状态见 [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md)。
 - 运行时全 filesystem `R-UG/R-LINK` 扫描已实现：`counter_snapshot` 会遍历 inode bitmap、
   `ext4_iget()` 读取每个 inode、统计目录 inode 并扫描目录数据块中的 dirent 引用，再与
   `i_nlink` 比较；扫描期间出现任何 writer（epoch/version/active 变化）时结果记为
@@ -139,7 +177,7 @@ crash/replay mount，不在这个普通 workload 随机池中。
   独立 `result`、inode generation/birth/death。
 - 特殊路径各自带独立 expected，并由 `scripts/run-special.sh` 做定向命中验证：
   bigalloc rereserve、online resize、fast-commit replay 和 corruption exclusion。
-  具体命中状态见 [VALIDATION.md](VALIDATION.md) 和矩阵文末。
+  历史命中范围见 [FORMULA-SOURCE-COVERAGE.md](FORMULA-SOURCE-COVERAGE.md) 和 [FORMULA-RELATIONS-IMPLEMENTATION.md](FORMULA-RELATIONS-IMPLEMENTATION.md)；已清理的原始运行不作为本轮重验。
 
 ## 第一版构建与验证
 

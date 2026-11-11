@@ -18,7 +18,7 @@ import sys
 SB = 1024
 EXT4_SUPER_MAGIC = 0xEF53
 EXT4_FEATURE_INCOMPAT_64BIT = 0x80
-EXT4_FEATURE_INCOMPAT_BIGALLOC = 0x200
+EXT4_FEATURE_RO_COMPAT_BIGALLOC = 0x0200
 EXT4_FEATURE_RO_COMPAT_GDT_CSUM = 0x0010
 EXT4_FEATURE_RO_COMPAT_DIR_NLINK = 0x0020
 EXT4_FEATURE_RO_COMPAT_METADATA_CSUM = 0x0400
@@ -40,7 +40,8 @@ class Image:
         self.block_size = 1024 << self.u32(24)
         cluster_log = struct.unpack_from("<i", self.sb, 28)[0]
         self.cluster_size = 1024 << cluster_log
-        self.bigalloc = bool(self.u32(96) & EXT4_FEATURE_INCOMPAT_BIGALLOC)
+        # BIGALLOC is a ro-compat feature; incompat bit 0x0200 is FLEX_BG.
+        self.bigalloc = bool(self.u32(100) & EXT4_FEATURE_RO_COMPAT_BIGALLOC)
         self.cluster_ratio = self.cluster_size // self.block_size
         self.desc_size = max(32, self.u16(254))
         if not (self.u32(96) & EXT4_FEATURE_INCOMPAT_64BIT):

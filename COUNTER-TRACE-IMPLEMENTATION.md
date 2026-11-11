@@ -1,6 +1,6 @@
 # ext4 公式检查与密集运行时追踪实施文档
 
-更新时间：2026-10-09
+设计起始：2026-10-09；状态核对：2026-11-11（Asia/Shanghai）
 
 ## 目标与实施依据
 
@@ -12,14 +12,14 @@
 
 ## 六类检查阶段与公式范围
 
-| 阶段 | 公式来源 | 观察与判定 |
-| --- | --- | --- |
-| 挂载初始化完成 | `M-B/M-I/M-U` | recovery、descriptor 准备及 percpu 初始化完成后，记录初始化来源与结果；独立 bitmap 检查另行计算 |
+| 阶段                           | 公式来源                                                                                      | 观察与判定                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 挂载初始化完成                 | `M-B/M-I/M-U`                                                                               | recovery、descriptor 准备及 percpu 初始化完成后，记录初始化来源与结果；独立 bitmap 检查另行计算            |
 | Runtime 写入、回滚、发布中间点 | `R-BG/R-BSUM/R-IG/R-ISUM/R-USUM` 与 `R-BDELTA/R-IDELTA/R-UDELTA`，目录引用涉及 `R-LINK` | 在锁安全的位置同步计算可计算的关系，保留一致与不一致；无法完整读取时保留 raw counters 与 unverified reason |
-| 操作返回边界 | 对应 Runtime 关系、完整窗口增量与操作状态 | 记录 begin/end、返回值、errno 与异步任务关联，判断相关更新/回滚是否完成 |
-| 稳定内存快照 | Runtime 总量、范围、`R-LINK`；`R-UG` 需独立完整 inode 扫描 | 不要求 sync，必须证明观测过程稳定；仅逐组加锁或重复读取不能保证全局同一时刻 |
-| superblock 汇总发布完成 | `P-SB` | 对应字段复制完成且计数未变化时检查内存 superblock；不等于磁盘已更新 |
-| 可靠持久化/恢复后的磁盘 | `P-DISK` 与适用的离线引用检查 | 采集干净卸载、正确冻结或成功 replay 后的镜像副本，比较 disk superblock/descriptor/逻辑 bitmap |
+| 操作返回边界                   | 对应 Runtime 关系、完整窗口增量与操作状态                                                     | 记录 begin/end、返回值、errno 与异步任务关联，判断相关更新/回滚是否完成                                    |
+| 稳定内存快照                   | Runtime 总量、范围、`R-LINK`；`R-UG` 需独立完整 inode 扫描                                | 不要求 sync，必须证明观测过程稳定；仅逐组加锁或重复读取不能保证全局同一时刻                                |
+| superblock 汇总发布完成        | `P-SB`                                                                                      | 对应字段复制完成且计数未变化时检查内存 superblock；不等于磁盘已更新                                        |
+| 可靠持久化/恢复后的磁盘        | `P-DISK` 与适用的离线引用检查                                                               | 采集干净卸载、正确冻结或成功 replay 后的镜像副本，比较 disk superblock/descriptor/逻辑 bitmap              |
 
 cluster、inode、目录计数及普通目录引用按新版公式纳入覆盖矩阵。EA inode、extent `i_blocks`、delayed reservation 等历史模型不作为新 checker 的必需组成部分。
 
@@ -27,12 +27,12 @@ cluster、inode、目录计数及普通目录引用按新版公式纳入覆盖�
 
 ## 旧实现的选择性复用
 
-| 内容 | 处理方式 |
-| --- | --- |
-| bitmap 解释、descriptor getter、单位转换 | 对照官方 6.12.1 核对语义后采用；优先使用上游 helper |
-| debugfs、事件缓冲、dropped 统计 | 可参考或复用，补齐稳定 ID、时间、操作上下文和明确的未验证事件 |
-| global/group 与 bitmap 比较 | 按新版公式重新审查独立依据、并发和初始化处理 |
-| shadow、过滤、操作关联与 reset | 根据密集追踪重新设计；不直接沿用中间态过滤或 `op_id=event_seq` |
+| 内容                                                   | 处理方式                                                               |
+| ------------------------------------------------------ | ---------------------------------------------------------------------- |
+| bitmap 解释、descriptor getter、单位转换               | 对照官方 6.12.1 核对语义后采用；优先使用上游 helper                    |
+| debugfs、事件缓冲、dropped 统计                        | 可参考或复用，补齐稳定 ID、时间、操作上下文和明确的未验证事件          |
+| global/group 与 bitmap 比较                            | 按新版公式重新审查独立依据、并发和初始化处理                           |
+| shadow、过滤、操作关联与 reset                         | 根据密集追踪重新设计；不直接沿用中间态过滤或 `op_id=event_seq`       |
 | EA、extent、reservation、历史后置条件与 JBD2 telemetry | 保留在主线项目快照中；仅在新公式关联需要且审查通过时选择性采用辅助代码 |
 
 每项复用需记录原文件/函数、原基线 hash、修改内容和为何满足新公式。可单独做旧 checker 对照实验，但它不阻塞新 checker 的实现与验收。
@@ -53,7 +53,7 @@ experiments/ext4-counter-trace/
   results/
 ```
 
-主线项目的 `kernel/`、`tests/`、`tools/` 和 `work/` 不删除、不移动、不覆盖。项目没有可用 Git 元数据，用 manifest、逐文件 SHA256 和独立归档保存。大镜像必须归档/复制或明确记录独立保存位置，不能只记录一个日后会被覆盖的原路径。
+主线项目的 `kernel/`、`tests/`、`tools/` 和 `work/` 不删除、不移动、不覆盖。早期准备阶段没有可用 Git 元数据，因此使用 manifest、逐文件 SHA256 和独立归档；当前项目已有 Git，源码/补丁/配置同时由版本控制管理，镜像与原始实验结果仍需独立保存。大镜像必须归档/复制或明确记录独立保存位置，不能只记录一个日后会被覆盖的原路径。
 
 主线项目继续独立维护；快照只固定某个时间点的参照状态，不表示主线项目停用或被新子项目替代。本次已保存的完整范围归档保留一份，后续无需在每轮实验重复归档整个主线项目。
 
@@ -152,7 +152,7 @@ unverified_reason snapshot_validity
 
 覆盖普通/bigalloc、命名空间和正常/资源失败路径；完成轨迹、出口/静止态分类及持久化检查报告。
 
-VM 验证已覆盖普通、bigalloc、无 journal、lazy init、四 worker、并发扫描、非零保留分配、自然 ENOSPC 和命名空间操作。sync 前稳定快照、独立增量、轨迹完整性及卸载后 fsck 均通过；关机确认后由 `scripts/check-disk.py` 完成 `P-DISK` 与离线 `R-UG/R-LINK` 检查，四种镜像通过。运行时 `R-UG/R-LINK` 全 filesystem 稳定扫描、dirent/nlink 子步骤事件，以及 corruption、FC replay、resize、bigalloc rereserve 的独立 expected 和定向命中验证已实现并通过，详见 `experiments/ext4-counter-trace/VALIDATION.md`。跨线程 operation parent、准确 syscall 返回关联和 `BLOCK_UNINIT` 离线布局仍 pending；并发扫描不能证明稳定时按协议返回 `unverified`。
+VM 验证已覆盖普通、bigalloc、无 journal、lazy init、四 worker、并发扫描、非零保留分配、自然 ENOSPC 和命名空间操作。sync 前稳定快照、独立增量、轨迹完整性及卸载后 fsck 均通过；关机确认后由 `scripts/check-disk.py` 完成 `P-DISK` 与离线 `R-UG/R-LINK` 检查，四种镜像通过。运行时 `R-UG/R-LINK` 全 filesystem 稳定扫描、dirent/nlink 子步骤事件，以及 corruption、FC replay、resize、bigalloc rereserve 的独立 expected 和定向命中验证已实现并通过，以上为历史验证摘要；当前实现范围见 `FIRST-CHAIN.md`、`PROBE-API-SNAPSHOT.md`，证据可用性见根目录 `DOCUMENTATION-AUDIT-20261111.md`。准确的同线程原生 syscall 返回关联已实现；通用跨线程 parent 仍 pending。离线 `BLOCK_UNINIT` 已按布局重算受支持格式，META_BG 明确拒绝；2026-11-11 修正 bigalloc 特性字段并通过真实镜像回归。并发扫描不能证明稳定时按协议返回 `unverified`。
 
 最终验收：
 

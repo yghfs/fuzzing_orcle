@@ -1,5 +1,7 @@
 # ext4 运行时不变量检查器 MVP
 
+> 历史设计文档（2026-11-11 标注）：下文保留最初 MVP 方案和当时任务状态，不作为当前实现/验收清单。当前实现、保留证据和未完成事项见 [文档审计](DOCUMENTATION-AUDIT-20261111.md) 与 `experiments/ext4-counter-trace/IMPLEMENTATION-STATUS.md`。
+
 ## 1. 目标与决策
 
 ### 1.1 MVP 目标

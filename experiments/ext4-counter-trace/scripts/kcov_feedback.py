@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import pathlib
 import shutil
 import struct
@@ -436,7 +437,8 @@ COUNTS = ('expected_samples', 'received_samples', 'complete_samples',
 class FeedbackCorpus:
     def __init__(self, run: pathlib.Path, scheduler_policy='uniform_round_robin',
                  feedback_mode='pc_edge_semantic', seed=1,
-                 target_scope='all'):
+                 target_scope='all', effect_aware_admission=False,
+                 require_target_success=False):
         if target_scope not in ('all', 'ext4_jbd2'):
             raise ValueError('unknown target_scope:' + str(target_scope))
         self.run = pathlib.Path(run)
@@ -448,6 +450,7 @@ class FeedbackCorpus:
         self.edges: set[tuple[int, int]] = set()
         self.parents: list[pathlib.Path] = []
         self.parent_by_hash: dict[str, pathlib.Path] = {}
+        self.resource_parent_hashes: set[str] = set()
         self.parent_stats: dict[str, dict] = {}
         self.parent_cursor = 0
         self.selection_count = 0
@@ -460,6 +463,15 @@ class FeedbackCorpus:
         self.ext4_pc_coverage: set[int] = set()
         self.jbd2_pc_coverage: set[int] = set()
         self.target_pc_coverage: set[int] = set()
+        self.effect_pc_coverage: set[int] = set()
+        self.effect_edge_coverage: set[tuple[int, int]] = set()
+        self.effect_target_pc_coverage: set[int] = set()
+        self.effect_ext4_pc_coverage: set[int] = set()
+        self.effect_target_edge_coverage: set[tuple[int, int]] = set()
+        self.target_edge_coverage: set[tuple[int, int]] = set()
+        self.effect_call_counts: dict[str, int] = {}
+        self.effect_aware_admission = bool(effect_aware_admission)
+        self.require_target_success = bool(require_target_success)
         self.corpus_pc_coverage: set[int] = set()
         self.corpus_ext4_pc_coverage: set[int] = set()
         self.corpus_jbd2_pc_coverage: set[int] = set()
@@ -493,7 +505,7 @@ class FeedbackCorpus:
         return self.counts['saturated_samples']
 
     def summary(self):
-        return dict(schema=5, **self.counts, samples=self.samples,
+        return dict(schema=6, **self.counts, samples=self.samples,
                     total_coverage=len(self.coverage), corpus_size=len(self.parents),
                     total_ext4_coverage=len(self.ext4_coverage),
                     # ``total_ext4_coverage`` is a compatibility alias for
@@ -520,6 +532,15 @@ class FeedbackCorpus:
                         len(self.corpus_pc_coverage)
                         if self.corpus_pc_coverage else 0.0),
                     total_edges=len(self.edges),
+                    effect_aware_admission=self.effect_aware_admission,
+                    require_target_success=self.require_target_success,
+                    effect_pc_coverage=len(self.effect_pc_coverage),
+                    effect_edge_coverage=len(self.effect_edge_coverage),
+                    effect_target_edge_coverage=len(self.effect_target_edge_coverage),
+                    target_edge_coverage=len(self.target_edge_coverage),
+                    effect_target_pc_coverage=len(self.effect_target_pc_coverage),
+                    effect_ext4_pc_coverage=len(self.effect_ext4_pc_coverage),
+                    call_effect_counts=dict(sorted(self.effect_call_counts.items())),
                     total_semantic_features=len(self.semantic_features),
                     parent_selections=self.selection_count,
                     admission_parent_counts=dict(self.admission_parent_counts),
@@ -537,6 +558,7 @@ class FeedbackCorpus:
                     rarity_weights=dict(RARITY_WEIGHTS),
                     zero_yield_cooldown_streak=ZERO_YIELD_COOLDOWN_STREAK,
                     cooldown_yield_basis='new_pc_or_ext4_pc',
+                    resource_parent_cooldown=True,
                     zero_any_signal_streak_diagnostic=True,
                     yield_exploration_interval=YIELD_EXPLORATION_INTERVAL,
                     scheduler_policy=self.scheduler_policy,
@@ -546,10 +568,18 @@ class FeedbackCorpus:
                     feedback_complete=not self.gaps and self.counts['expected_samples'] > 0,
                     gaps=list(self.gaps))
 
-    def parent_candidate(self) -> dict | None:
-        if not self.parents:
+    def parent_candidate(self, resource_only=False) -> dict | None:
+        pool = ([index for index, path in enumerate(self.parents)
+                 if _sha(path) in self.resource_parent_hashes]
+                if resource_only else list(range(len(self.parents))))
+        if not pool:
             return None
-        index = self._choose_parent_index()
+        # Resource-valid slots have a smaller, changing parent pool than the
+        # ordinary mutation lane.  Apply the target-yield cooldown to this
+        # pool even when the campaign uses the fixed-cost uniform scheduler;
+        # otherwise a parent that repeatedly produces no target PC can be
+        # selected again and again as the pool grows.
+        index = self._choose_parent_index(pool, enforce_cooldown=resource_only)
         path = self.parents[index]
         key = _sha(path)
         stats = self._parent_stats(key, path)
@@ -572,7 +602,8 @@ class FeedbackCorpus:
                     zero_yield_streak=int(stats.get(
                         'zero_target_yield_streak', stats.get('zero_yield_streak', 0)) or 0),
                     yield_observations=int(stats.get('yield_observations', 0) or 0),
-                    admission_kind=self.parent_signal_kinds.get(key, 'unknown'))
+                    admission_kind=self.parent_signal_kinds.get(key, 'unknown'),
+                    resource_parent=key in self.resource_parent_hashes)
 
     def _parent_stats(self, parent_hash, path=None):
         """Return a complete, backward-compatible parent statistics record."""
@@ -673,8 +704,8 @@ class FeedbackCorpus:
                             1.0 + min(1.75, yield_score))
         return rarity_weight * yield_factor
 
-    def _eligible_parent_indices(self):
-        indices = list(range(len(self.parents)))
+    def _eligible_parent_indices(self, pool=None, enforce_cooldown=False):
+        indices = list(pool) if pool is not None else list(range(len(self.parents)))
         if not indices:
             return indices
         # The prospective selection is included in the denominator. This
@@ -697,7 +728,7 @@ class FeedbackCorpus:
         # The normal rarity pool excludes parents with a repeated zero-yield
         # streak. Every fixed interval reopens the complete eligible pool so
         # a parent can recover after global coverage changes.
-        if (self.scheduler_policy == 'rarity_fair' and
+        if ((self.scheduler_policy == 'rarity_fair' or enforce_cooldown) and
                 self.selection_count % YIELD_EXPLORATION_INTERVAL != 0):
             active = []
             for index in indices:
@@ -709,8 +740,8 @@ class FeedbackCorpus:
             indices = active or indices
         return indices
 
-    def _choose_parent_index(self):
-        eligible = self._eligible_parent_indices()
+    def _choose_parent_index(self, pool=None, enforce_cooldown=False):
+        eligible = self._eligible_parent_indices(pool, enforce_cooldown)
         if self.scheduler_policy == 'uniform_round_robin':
             return eligible[self.parent_cursor % len(eligible)]
         if self.scheduler_policy != 'rarity_fair':
@@ -874,6 +905,7 @@ class FeedbackCorpus:
             record = dict(self.parent_stats.get(key, {}))
             record.update(sha256=key, path=str(path.relative_to(self.run)))
             record['admission_kind'] = self.parent_signal_kinds.get(key, 'unknown')
+            record['resource_parent'] = key in self.resource_parent_hashes
             record['rarity_score'] = round(self.rarity_score(key), 6)
             components = {
                 name: round(value, 6)
@@ -905,12 +937,14 @@ class FeedbackCorpus:
                        semantic_only_parent_limit=self.semantic_only_parent_limit(),
                        edge_only_admissions_suppressed=self.edge_only_admissions_suppressed,
                        semantic_only_admissions_suppressed=self.semantic_only_admissions_suppressed,
+                       resource_parent_count=len(self.resource_parent_hashes),
                        yield_aware_scheduler=True,
                        yield_ext4_weight=YIELD_EXT4_WEIGHT,
                        yield_pc_weight=YIELD_PC_WEIGHT,
                        rarity_weights=dict(RARITY_WEIGHTS),
                        zero_yield_cooldown_streak=ZERO_YIELD_COOLDOWN_STREAK,
                        cooldown_yield_basis='new_pc_or_ext4_pc',
+                       resource_parent_cooldown=True,
                        zero_any_signal_streak_diagnostic=True,
                        yield_exploration_interval=YIELD_EXPLORATION_INTERVAL,
                        parents=parents)
@@ -925,6 +959,32 @@ class FeedbackCorpus:
                 shutil.copy2(source, target)
             self.parent_by_hash[program_hash] = target
             self.parents.append(target)
+        source_meta = source.parent / 'program.json'
+        if source_meta.is_file():
+            target_meta = target.with_suffix('.json')
+            try:
+                metadata = json.loads(source_meta.read_text())
+            except (OSError, json.JSONDecodeError):
+                metadata = {}
+            if metadata.get('input_mode') == 'resource-valid':
+                self.resource_parent_hashes.add(program_hash)
+                # A content-identical program may first enter the corpus via
+                # ordinary admission and later be observed as a typed
+                # resource-valid parent. Preserve the resource provenance so
+                # a future resource-only mutation can validate its template.
+                try:
+                    existing = (json.loads(target_meta.read_text())
+                                if target_meta.is_file() else {})
+                except (OSError, json.JSONDecodeError):
+                    existing = {}
+                merged = dict(existing)
+                merged.update(metadata)
+                temporary = target_meta.with_suffix('.json.tmp')
+                temporary.write_text(json.dumps(merged, sort_keys=True,
+                                                indent=2) + '\n')
+                temporary.replace(target_meta)
+            elif not target_meta.exists():
+                shutil.copy2(source_meta, target_meta)
         stats = self._parent_stats(program_hash, target)
         stats.setdefault('admission_signals', [])
         stats['own_new_pcs'] += features.get(
@@ -967,7 +1027,8 @@ class FeedbackCorpus:
         expected = set(expected)
         rows, errors, segment_new, segment_new_edges = [], [], set(), set()
         segment_new_target = set()
-        seen_pcs, seen_ext4, seen_target, seen_edges = set(), set(), set(), set()
+        seen_pcs, seen_ext4, seen_target, seen_edges, seen_target_edges = (
+            set(), set(), set(), set(), set())
         pending = []
         counts = dict.fromkeys(COUNTS, 0)
         counts.update(expected_samples=len(expected), received_samples=len(samples),
@@ -1001,8 +1062,11 @@ class FeedbackCorpus:
             target_set = set(target_info['target_pcs'])
             target_fresh = target_set - self.target_pc_coverage - seen_target
             edges = set()
+            target_edges = set()
             call_rows = []
-            program_seen_pcs, program_seen_edges = set(), set()
+            call_features = []
+            program_seen_pcs, program_seen_edges, program_seen_target = set(), set(), set()
+            program_seen_target_edges = set()
             call_inputs = (feature_payload['calls'] if feature_payload else None)
             for call_index, (start, length) in enumerate(ranges):
                 sequence = pcs[start:start + length]
@@ -1014,15 +1078,33 @@ class FeedbackCorpus:
                               else set(zip(sequence, sequence[1:])))
                 call_fresh_pcs = call_pcs - self.coverage - seen_pcs - program_seen_pcs
                 call_fresh_edges = call_edges - self.edges - seen_edges - program_seen_edges
+                call_target = set(classify_target_pcs(call_pcs, self.ext4_ranges)['target_pcs'])
+                call_target_edges = {edge for edge in call_edges
+                                     if edge[0] in call_target and edge[1] in call_target}
+                call_target_fresh = (call_target - self.target_pc_coverage - seen_target -
+                                     program_seen_target)
+                call_target_edge_fresh = (call_target_edges - self.target_edge_coverage -
+                                          seen_target_edges - program_seen_target_edges)
                 edges.update(call_edges)
+                target_edges.update(call_target_edges)
                 call_rows.append(dict(call_index=call_index, pc_count=len(sequence),
                                       unique_pcs=len(call_pcs), new_pcs=len(call_fresh_pcs),
-                                      edges=len(call_edges), new_edges=len(call_fresh_edges)))
+                                      edges=len(call_edges), new_edges=len(call_fresh_edges),
+                                      target_new_pcs=len(call_target_fresh),
+                                      target_new_edges=len(call_target_edge_fresh),
+                                      effect_new_target_pcs=0,
+                                      effect_new_target_edges=0))
+                call_features.append(dict(call_index=call_index, pcs=call_pcs,
+                                          edges=call_edges, target_pcs=call_target,
+                                          target_edges=call_target_edges))
                 program_seen_pcs.update(call_pcs)
                 program_seen_edges.update(call_edges)
+                program_seen_target.update(call_target)
+                program_seen_target_edges.update(call_target_edges)
             if feature_payload:
                 edges = set(feature_payload['edges'])
             fresh_edges = edges - self.edges - seen_edges
+            fresh_target_edges = target_edges - self.target_edge_coverage - seen_target_edges
             row.update(valid=True, count=sample_count(sample), unique=len(pcs_set), new=len(fresh),
                        ext4_pc_count=pc_info['ext4_pc_count'], ext4_unique=pc_info['ext4_unique'],
                        ext4_new=len(ext4_fresh), new_ext4_pcs=len(ext4_fresh),
@@ -1031,6 +1113,8 @@ class FeedbackCorpus:
                        target_unique=target_info['target_unique'],
                        target_new=len(target_fresh), new_target_pcs=len(target_fresh),
                        edge_count=len(edges), new_edges=len(fresh_edges),
+                       target_edge_count=len(target_edges),
+                       target_new_edges=len(fresh_target_edges),
                        calls=call_rows,
                        compact=bool(diagnostics.get('compact', False)),
                        feature_set=bool(diagnostics.get('feature_set', False)),
@@ -1050,6 +1134,7 @@ class FeedbackCorpus:
             seen_pcs.update(pcs_set)
             seen_ext4.update(ext4_set)
             seen_target.update(target_set)
+            seen_target_edges.update(target_edges)
             seen_edges.update(edges)
             segment_new.update(fresh)
             segment_new_target.update(target_fresh)
@@ -1060,7 +1145,10 @@ class FeedbackCorpus:
                                 target_ext4_pcs=set(target_info['ext4_pcs']),
                                 target_jbd2_pcs=set(target_info['jbd2_pcs']),
                                 target_pcs=target_set, target_fresh=target_fresh,
-                                edges=edges, fresh_edges=fresh_edges))
+                                target_edges=target_edges,
+                                target_fresh_edges=fresh_target_edges,
+                                edges=edges, fresh_edges=fresh_edges,
+                                call_features=call_features))
         if not expected:
             errors.append('no_expected_programs')
         self.pending_samples[folder.name] = pending
@@ -1086,7 +1174,8 @@ class FeedbackCorpus:
         return dict(segment, segment_summary=segment, campaign_summary=campaign)
 
     def augment(self, folder: pathlib.Path, report: dict, native_execution_verified=True,
-                timeline_path: pathlib.Path | None = None, mode='single') -> dict:
+                timeline_path: pathlib.Path | None = None, mode='single',
+                target_device=None) -> dict:
         pending = self.pending_samples.pop(pathlib.Path(folder).name, [])
         admitted = []
         admission_signals = {'pc': 0, 'edge': 0, 'semantic': 0}
@@ -1106,6 +1195,88 @@ class FeedbackCorpus:
             report.get('event_sources', {}).get(
                 'generated_syscall_attribution_complete',
                 report.get('event_sources', {}).get('source_attribution_complete')))
+        target_device = target_device if target_device is not None else report.get('target_device')
+        native_calls = {}
+        duplicate_native_calls = set()
+        for call in report.get('native_syscalls', []):
+            if call.get('program') is None or call.get('call_index') is None:
+                continue
+            try:
+                key = (call['program'], int(call['call_index']))
+            except (ValueError, TypeError):
+                continue
+            if key in native_calls:
+                duplicate_native_calls.add(key)
+            native_calls[key] = call
+        call_effects = {}
+        if self.effect_aware_admission:
+            for item in pending:
+                item_effects = {}
+                effect_pcs, effect_edges = set(), set()
+                eligible_indices = set()
+                for feature_row in item['call_features']:
+                    index = feature_row['call_index']
+                    key = (item['program'], index)
+                    call = native_calls.get(key)
+                    effect = ('unverified' if key in duplicate_native_calls else
+                              syscall_effect(call, target_device))
+                    if not native_execution_verified:
+                        effect = 'unverified'
+                    item_effects[index] = effect
+                    call_effects[key] = effect
+                    self.effect_call_counts[effect] = self.effect_call_counts.get(effect, 0) + 1
+                    feature_row['effect'] = effect
+                    if call:
+                        feature_row.update(target_device=canonical_device(target_device),
+                            object_device=canonical_device(call.get('object_dev')),
+                            verified=bool(call.get('verified')),
+                            raw_result=call.get('raw_result'), errno=call.get('errno'),
+                            repaired=bool(call.get('repaired')),
+                            adapted=bool(call.get('adapted')),
+                            original_fd=call.get('original_fd'),
+                            executed_fd=call.get('executed_fd'),
+                            original_length=call.get('original_length'),
+                            executed_length=call.get('executed_length'))
+                    report_call = next((row for row in item['row'].get('calls', [])
+                                        if row.get('call_index') == index), None)
+                    if report_call is not None:
+                        report_call.update(effect=effect,
+                            target_device=canonical_device(target_device),
+                            object_device=canonical_device(call.get('object_dev')) if call else None,
+                            syscall_verified=bool(call and call.get('verified')),
+                            raw_result=call.get('raw_result') if call else None,
+                            errno=call.get('errno') if call else None,
+                            repaired=bool(call and call.get('repaired')),
+                            adapted=bool(call and call.get('adapted')),
+                            original_fd=call.get('original_fd') if call else None,
+                            executed_fd=call.get('executed_fd') if call else None,
+                            original_length=call.get('original_length') if call else None,
+                            executed_length=call.get('executed_length') if call else None)
+                    if effect in ('target_success_unmodified', 'target_failure_unmodified'):
+                        eligible_indices.add(index)
+                        effect_pcs.update(feature_row['pcs'])
+                        effect_edges.update(feature_row['edges'])
+                item['call_effects'] = item_effects
+                item['eligible_call_indices'] = eligible_indices
+                item['effect_pcs'] = effect_pcs
+                item['effect_edges'] = effect_edges
+                effect_target = classify_target_pcs(effect_pcs, self.ext4_ranges)
+                item['effect_target_pcs'] = set(effect_target['target_pcs'])
+                item['effect_target_ext4_pcs'] = set(effect_target['ext4_pcs'])
+                item['effect_target_jbd2_pcs'] = set(effect_target['jbd2_pcs'])
+                item['target_success_calls'] = sum(
+                    effect == 'target_success_unmodified' for effect in item_effects.values())
+                item['target_unmodified_calls'] = sum(
+                    effect in ('target_success_unmodified', 'target_failure_unmodified')
+                    for effect in item_effects.values())
+                item['effect_eligible'] = bool(item['target_unmodified_calls']) and (
+                    not self.require_target_success or item['target_success_calls'] > 0)
+                item['row']['call_effects'] = [dict(call_index=index, effect=effect)
+                    for index, effect in sorted(item_effects.items())]
+                item['row'].update(target_device=canonical_device(target_device),
+                    target_success_calls=item['target_success_calls'],
+                    target_unmodified_calls=item['target_unmodified_calls'],
+                    effect_eligible=item['effect_eligible'])
         syscall_outcomes = {}
         for call in report.get('native_syscalls', []):
             if call.get('program') is None or call.get('call_index') is None:
@@ -1135,6 +1306,10 @@ class FeedbackCorpus:
                             row.get('attribution') != 'same_task_native_syscall' or
                             int(event.get('status', 3)) == 3):
                         continue
+                    if (self.effect_aware_admission and
+                            call_effects.get((program, int(call_index))) not in
+                            ('target_success_unmodified', 'target_failure_unmodified')):
+                        continue
                     status = int(event.get('status', 3))
                     if status not in (0, 1, 2):
                         continue
@@ -1157,18 +1332,22 @@ class FeedbackCorpus:
                 except (ValueError, TypeError, KeyError, json.JSONDecodeError):
                     continue
         if native_execution_verified:
+            effect_seen_pcs, effect_seen_edges, effect_seen_target = set(), set(), set()
+            effect_seen_target_edges = set()
             # Count observed feature frequency before calculating rarity. Each
             # program contributes at most one hit per feature per execution.
             for item in pending:
-                scored_pcs = (item.get('target_pcs', set())
+                scored_pcs = ((item.get('effect_target_pcs', set())
+                               if self.effect_aware_admission else item.get('target_pcs', set()))
                               if self.target_scope == 'ext4_jbd2'
-                              else item['pcs'])
-                scored_ext4 = (item.get('target_ext4_pcs', set())
-                               if self.target_scope == 'ext4_jbd2'
-                               else item['ext4_pcs'])
+                              else (item.get('effect_pcs', set())
+                                    if self.effect_aware_admission else item['pcs']))
+                scored_ext4 = (item.get('effect_target_ext4_pcs', set())
+                               if self.effect_aware_admission else item.get('target_ext4_pcs', set()))
                 ids = {f'pc:{pc:x}' for pc in scored_pcs}
                 ids.update(f'ext4:{pc:x}' for pc in scored_ext4)
-                ids.update(f'edge:{left:x}:{right:x}' for left, right in item['edges'])
+                scored_edges = item.get('effect_edges', set()) if self.effect_aware_admission else item['edges']
+                ids.update(f'edge:{left:x}:{right:x}' for left, right in scored_edges)
                 for feature in ids:
                     self.feature_frequency[feature] = self.feature_frequency.get(feature, 0) + 1
             for item in pending:
@@ -1178,10 +1357,59 @@ class FeedbackCorpus:
                 self.ext4_pc_coverage.update(item.get('target_ext4_pcs', set()))
                 self.jbd2_pc_coverage.update(item.get('target_jbd2_pcs', set()))
                 self.target_pc_coverage.update(target_pcs)
+                self.target_edge_coverage.update(item.get('target_edges', set()))
                 self.edges.update(item['edges'])
                 segment_new.update(item['fresh'])
                 row = item['row']
                 row['native_verified'] = True
+                effect_fresh_pcs = set()
+                effect_fresh_edges = set()
+                effect_fresh_target = set()
+                effect_fresh_target_edges = set()
+                effect_fresh_target_ext4 = set()
+                if self.effect_aware_admission:
+                    item_effect_target_edges = set()
+                    item_seen_target_pcs, item_seen_target_edges = set(), set()
+                    for feature_row in item['call_features']:
+                        if feature_row.get('effect') not in (
+                                'target_success_unmodified', 'target_failure_unmodified'):
+                            continue
+                        call_new_target_pcs = (feature_row['target_pcs'] -
+                            self.effect_target_pc_coverage - effect_seen_target -
+                            item_seen_target_pcs)
+                        call_new_target_edges = (feature_row['target_edges'] -
+                            self.effect_target_edge_coverage - effect_seen_target_edges -
+                            item_seen_target_edges)
+                        item_seen_target_pcs.update(feature_row['target_pcs'])
+                        item_seen_target_edges.update(feature_row['target_edges'])
+                        item_effect_target_edges.update(feature_row['target_edges'])
+                        report_call = next((call for call in item['row'].get('calls', [])
+                                            if call.get('call_index') == feature_row['call_index']), None)
+                        if report_call is not None:
+                            report_call.update(effect_new_target_pcs=len(call_new_target_pcs),
+                                               effect_new_target_edges=len(call_new_target_edges))
+                    item['effect_target_edges'] = item_effect_target_edges
+                    effect_fresh_pcs = item['effect_pcs'] - self.effect_pc_coverage - effect_seen_pcs
+                    effect_fresh_edges = item['effect_edges'] - self.effect_edge_coverage - effect_seen_edges
+                    effect_fresh_target = (item['effect_target_pcs'] -
+                        self.effect_target_pc_coverage - effect_seen_target)
+                    effect_fresh_target_edges = (item_effect_target_edges -
+                        self.effect_target_edge_coverage - effect_seen_target_edges)
+                    effect_fresh_target_ext4 = item['effect_target_ext4_pcs'] - self.effect_ext4_pc_coverage
+                    effect_seen_pcs.update(item['effect_pcs'])
+                    effect_seen_edges.update(item['effect_edges'])
+                    effect_seen_target.update(item['effect_target_pcs'])
+                    effect_seen_target_edges.update(item_effect_target_edges)
+                    self.effect_pc_coverage.update(item['effect_pcs'])
+                    self.effect_edge_coverage.update(item['effect_edges'])
+                    self.effect_target_pc_coverage.update(item['effect_target_pcs'])
+                    self.effect_target_edge_coverage.update(item_effect_target_edges)
+                    self.effect_ext4_pc_coverage.update(item['effect_target_ext4_pcs'])
+                item['effect_fresh_pcs'] = effect_fresh_pcs
+                item['effect_fresh_edges'] = effect_fresh_edges
+                item['effect_fresh_target'] = effect_fresh_target
+                item['effect_fresh_target_edges'] = effect_fresh_target_edges
+                item['effect_fresh_target_ext4'] = effect_fresh_target_ext4
                 per_program = program_feedback.setdefault(item['program'],
                     dict(features=set(), calls=set(), evidence=set()))
                 fresh_semantic = per_program['features'] - self.semantic_features
@@ -1200,33 +1428,69 @@ class FeedbackCorpus:
                     attributed_calls=len(per_program['calls']),
                     attribution_complete=timeline_complete,
                     exact_call_events_eligible=semantic_eligible)
+                if self.effect_aware_admission:
+                    feature_summary.update(
+                        raw_target_new=feature_summary['target_new'],
+                        raw_new_target_pcs=feature_summary['new_target_pcs'],
+                        raw_new_edges=feature_summary['new_edges'],
+                        target_new=len(effect_fresh_target),
+                        new_target_pcs=len(effect_fresh_target),
+                        ext4_new=len(effect_fresh_target_ext4),
+                        new_ext4_pcs=len(effect_fresh_target_ext4),
+                        new_edges=len(effect_fresh_edges),
+                        target_success_calls=item['target_success_calls'],
+                        target_unmodified_calls=item['target_unmodified_calls'],
+                        effect_new_pcs=len(effect_fresh_pcs),
+                        effect_new_target_pcs=len(effect_fresh_target),
+                        effect_new_edges=len(effect_fresh_edges),
+                        raw_target_new_edges=len(item.get('target_fresh_edges', set())),
+                        effect_new_target_edges=len(effect_fresh_target_edges),
+                        effect_eligible=item['effect_eligible'])
                 per_program['new_semantic_features'] = fresh_semantic
                 row.update(feature_summary)
                 source = pathlib.Path(folder) / 'syz-programs' / item['program'] / 'program.syz'
                 feedback_mode = self.feedback_mode
-                pc_novelty = (item.get('target_fresh', set())
-                              if self.target_scope == 'ext4_jbd2'
-                              else item['fresh'])
+                if self.effect_aware_admission:
+                    pc_novelty = (item['effect_fresh_target']
+                                  if self.target_scope == 'ext4_jbd2'
+                                  else item['effect_fresh_pcs'])
+                    edge_novelty = item['effect_fresh_edges']
+                    admission_allowed = item['effect_eligible']
+                else:
+                    pc_novelty = (item.get('target_fresh', set())
+                                  if self.target_scope == 'ext4_jbd2'
+                                  else item['fresh'])
+                    edge_novelty = item['fresh_edges']
+                    admission_allowed = True
                 new_pc = bool(pc_novelty) and feedback_mode != 'none'
-                new_edge = bool(item['fresh_edges']) and feedback_mode in ('pc_edge', 'pc_edge_semantic')
+                new_edge = bool(edge_novelty) and feedback_mode in ('pc_edge', 'pc_edge_semantic')
                 new_semantic = bool(fresh_semantic) and feedback_mode in ('pc_semantic', 'pc_edge_semantic')
                 feature_ids = []
                 if feedback_mode != 'none':
-                    scored_pcs = (item.get('target_pcs', set())
-                                  if self.target_scope == 'ext4_jbd2'
-                                  else item['pcs'])
-                    scored_ext4 = (item.get('target_ext4_pcs', set())
-                                   if self.target_scope == 'ext4_jbd2'
-                                   else item['ext4_pcs'])
+                    if self.effect_aware_admission:
+                        scored_pcs = (item['effect_target_pcs']
+                                      if self.target_scope == 'ext4_jbd2'
+                                      else item['effect_pcs'])
+                        scored_ext4 = item['effect_target_ext4_pcs']
+                    else:
+                        scored_pcs = (item.get('target_pcs', set())
+                                      if self.target_scope == 'ext4_jbd2'
+                                      else item['pcs'])
+                        scored_ext4 = (item.get('target_ext4_pcs', set())
+                                      if self.target_scope == 'ext4_jbd2'
+                                      else item['ext4_pcs'])
                     feature_ids.extend(f'pc:{pc:x}' for pc in scored_pcs)
                     # Ext4 IDs are a target view of PC coverage. Keeping them
                     # alongside general PC IDs lets the scheduler prioritize
                     # target novelty even in PC-only campaigns.
                     feature_ids.extend(f'ext4:{pc:x}' for pc in scored_ext4)
-                    feature_ids.extend(f'target:{pc:x}'
-                                       for pc in item.get('target_pcs', set()))
+                    target_ids = (item['effect_target_pcs'] if self.effect_aware_admission
+                                  else item.get('target_pcs', set()))
+                    feature_ids.extend(f'target:{pc:x}' for pc in target_ids)
                 if feedback_mode in ('pc_edge', 'pc_edge_semantic'):
-                    feature_ids.extend(f'edge:{left:x}:{right:x}' for left, right in item['edges'])
+                    edges_for_features = (item['effect_edges'] if self.effect_aware_admission
+                                          else item['edges'])
+                    feature_ids.extend(f'edge:{left:x}:{right:x}' for left, right in edges_for_features)
                 if feedback_mode in ('pc_semantic', 'pc_edge_semantic'):
                     feature_ids.extend('sem:' + feature for feature in per_program['features'])
                 for feature in per_program['features']:
@@ -1241,10 +1505,14 @@ class FeedbackCorpus:
                 if new_semantic:
                     signals.append('semantic')
                 feature_summary['admission_signals'] = signals
-                feature_summary['admission_eligible'] = bool(signals)
+                feature_summary['admission_eligible'] = bool(signals) and admission_allowed
+                feature_summary['effect_new_pcs'] = len(item['effect_fresh_pcs'])
+                feature_summary['effect_new_target_pcs'] = len(item['effect_fresh_target'])
+                feature_summary['effect_new_edges'] = len(item['effect_fresh_edges'])
+                feature_summary['effect_admission_eligible'] = admission_allowed
                 feature_summary['admitted'] = False
                 row.update(feature_summary)
-                if source.is_file() and signals:
+                if source.is_file() and signals and admission_allowed:
                     program_hash = _sha(source)
                     kind = self._admission_kind(signals)
                     if kind in ('edge_only', 'semantic_only') and not \
@@ -1265,10 +1533,16 @@ class FeedbackCorpus:
                         # decision is made per generated program, so this
                         # update must happen only after the program is
                         # accepted into the active corpus.
-                        self.corpus_pc_coverage.update(item['pcs'])
-                        self.corpus_ext4_pc_coverage.update(item['ext4_pcs'])
-                        self.corpus_jbd2_pc_coverage.update(item.get('target_jbd2_pcs', set()))
-                        self.corpus_target_pc_coverage.update(item.get('target_pcs', set()))
+                        if self.effect_aware_admission:
+                            self.corpus_pc_coverage.update(item['effect_pcs'])
+                            self.corpus_ext4_pc_coverage.update(item['effect_target_ext4_pcs'])
+                            self.corpus_jbd2_pc_coverage.update(item['effect_target_jbd2_pcs'])
+                            self.corpus_target_pc_coverage.update(item['effect_target_pcs'])
+                        else:
+                            self.corpus_pc_coverage.update(item['pcs'])
+                            self.corpus_ext4_pc_coverage.update(item['ext4_pcs'])
+                            self.corpus_jbd2_pc_coverage.update(item.get('target_jbd2_pcs', set()))
+                            self.corpus_target_pc_coverage.update(item.get('target_pcs', set()))
                         row.update(admitted=True, corpus=str(target.relative_to(self.run)))
                         admitted.append(row['corpus'])
                         feature_summary.update(admitted=True, corpus=row['corpus'])
@@ -1276,10 +1550,13 @@ class FeedbackCorpus:
                             admission_signals[signal] += 1
                         if signals == ['semantic']:
                             semantic_only_admitted.append(row['corpus'])
+                elif source.is_file() and signals and not admission_allowed:
+                    feature_summary['admission_suppressed'] = 'no_eligible_target_call'
+                    row['admission_suppressed'] = 'no_eligible_target_call'
                 meta_path = source.parent / 'program.json'
                 meta = json.loads(meta_path.read_text()) if meta_path.is_file() else {}
                 parent_hash = meta.get('parent_sha256')
-                if meta.get('method') == 'Mutate' and parent_hash:
+                if meta.get('method') in ('Mutate', 'ResourceMutate') and parent_hash:
                     self._record_child_yield(parent_hash, feature_summary,
                                              meta.get('mutation_input'))
                 self.semantic_features.update(per_program['features'])
@@ -1374,3 +1651,39 @@ def _signature(item):
     keys = ('stream', 'classification', 'peak_gap', 'recovery_point',
             'op', 'point', 'formula', 'ino', 'group', 'block', 'slot', 'confidence')
     return hashlib.sha256('|'.join(str(item.get(k, '')) for k in keys).encode()).hexdigest()
+
+
+def canonical_device(value):
+    """Normalize trace major/minor or stat(2) st_dev to ``major:minor``."""
+    if value is None:
+        return None
+    try:
+        if isinstance(value, str) and (':' in value or ',' in value):
+            separator = ':' if ':' in value else ','
+            major, minor = (int(part, 10) for part in value.split(separator, 1))
+        else:
+            device = int(value)
+            major, minor = os.major(device), os.minor(device)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if major < 0 or minor < 0:
+        return None
+    return f'{major}:{minor}'
+
+
+def syscall_effect(call, target_device):
+    """Classify one verified generated call against the mounted target device."""
+    if not call or not call.get('verified'):
+        return 'unverified'
+    target = canonical_device(target_device)
+    object_device = canonical_device(call.get('object_dev'))
+    if target is None or object_device is None:
+        return 'unverified'
+    if object_device != target:
+        return 'non_target'
+    successful = (isinstance(call.get('raw_result'), int) and
+                  call['raw_result'] >= 0 and call.get('errno', 0) == 0)
+    adapted = bool(call.get('repaired') or call.get('adapted'))
+    if successful:
+        return 'target_success_adapted' if adapted else 'target_success_unmodified'
+    return 'target_failure_adapted' if adapted else 'target_failure_unmodified'

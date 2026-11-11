@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-11-02",
-  "implementation_document": "COUNTER-TRACE-IMPLEMENTATION.md",
+  "updated_at": "2026-11-11",
+  "implementation_document": "../../COUNTER-TRACE-IMPLEMENTATION.md",
   "legacy_checker_migration_required": false,
   "main_project_snapshot": "baselines/20261009-130905+0800",
   "baseline": "baselines/20261009-130905+0800",
@@ -15,7 +15,7 @@
   "build_compiler": "gcc-14",
   "probe_protocol": "PROBE-API-SNAPSHOT.md",
   "patch_manifest": "patches/manifest.json",
-  "validation": "VALIDATION.md",
+  "validation": "IMPLEMENTATION-STATUS.md",
   "latest_smoke": null,
   "latest_special": "FAST-COMMIT-DIR-COUNT-FINDING.md",
   "latest_special_finding": "FAST-COMMIT-DIR-COUNT-FINDING.md",
@@ -27,11 +27,12 @@
   "special_passed": true,
   "trace_loss_detected": false,
   "pending_formulas": [
-    "BLOCK_UNINIT.disk_layout",
     "operation.cross_thread_parent",
     "special_domain.unified_timeline",
-    "fault_injection.eviction_orphan_xattr_error_exits",
-    "long_run.relation_coverage_and_throughput"
+    "long_run.relation_coverage_and_throughput",
+    "offline.META_BG.descriptor_placement",
+    "campaign.reset_carry_epoch_continuity",
+    "fault_findings.independent_persistence_and_error_contract"
   ],
   "implemented_runtime_formulas": [
     "R-IH",
@@ -49,7 +50,7 @@
     "R-LINK.disk",
     "P-DISK"
   ],
-  "next_phase": "Controlled long-run may be started by user after review; final manager feedback remains pending",
+  "next_phase": "Validate reset/carry epoch continuity, then run controlled repeated feedback comparisons; multi-VM corpus sharing remains unimplemented",
   "snapshot_archive": "baselines/20261009-130905+0800/main-project-snapshot.tar.gz",
   "latest_chain": null,
   "chain_passed": true,
@@ -153,7 +154,7 @@
     }
   },
   "long_run_gate_short_validation_passed": true,
-  "requested_12_hour_campaign_found": false,
+  "requested_12_hour_campaign_found": true,
   "long_run_partial_duration_seconds": null,
   "long_run_partial_stop_reason": null,
   "latest_campaign_complete_segments": null,
@@ -171,5 +172,44 @@
     "scp_transport_retries": 4,
     "point_report_lazy_next_segment_join": true
   },
-  "latest_campaign_requires_rerun_for_12h_evidence": true
+  "latest_campaign_requires_rerun_for_12h_evidence": true,
+  "documentation_audit": "../../DOCUMENTATION-AUDIT-20261111.md",
+  "current_coverage_audit": "research/2026-11-11-target-coverage/README.md",
+  "current_source_build_binding_verified": true,
+  "current_source_build_binding_checked_at": "2026-11-11",
+  "historical_validation_flags_scope": "Legacy top-level *_passed and trace_loss_detected flags, short-test counts and long_run_gates describe earlier bounded runs, often pruned; they do not validate the current retained twelve-hour campaigns",
+  "offline_bigalloc_feature_field": "s_feature_ro_compat (superblock offset 100), bit 0x0200",
+  "offline_bigalloc_regression_combinations": 4,
+  "retained_12_hour_campaigns": {
+    "pc_only": {
+      "path": "results/campaign-9chz7m3j",
+      "passed": false,
+      "kcov_feedback_complete": true,
+      "coverage_complete": false,
+      "raw_coverage_complete": true,
+      "counter_validation_passed": false,
+      "source_attribution_complete": false,
+      "analysis_failed_segments": 7,
+      "status": "candidate_review_required"
+    },
+    "full_feedback": {
+      "path": "results/campaign-fyubc_lv",
+      "passed": false,
+      "kcov_feedback_complete": true,
+      "coverage_complete": false,
+      "raw_coverage_complete": true,
+      "counter_validation_passed": false,
+      "source_attribution_complete": false,
+      "analysis_failed_segments": 3,
+      "status": "candidate_review_required"
+    }
+  },
+  "pruned_campaigns": [
+    "results/campaign-lhze43mu",
+    "results/campaign-k3gxmeex",
+    "results/campaign-k3gxmeex-postreport",
+    "results/campaign-fmxs5w3e"
+  ],
+  "current_retained_12_hour_validation_passed": false,
+  "current_retained_12_hour_status": "candidate_review_required"
 }

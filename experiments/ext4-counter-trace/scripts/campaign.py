@@ -16,6 +16,127 @@ FAULT_OUTCOME_ISSUES = {'lifecycle_validation_failed', 'analysis_failed',
                         'segment_guest_error'}
 
 
+def finding_category(item):
+    """Return the stable root-cause category used for candidate counting.
+
+    Evidence rows remain untouched; this intentionally only normalizes the
+    labels used by the report.  The text search covers both lifecycle formula
+    names and fsck/object-finding payloads emitted by older campaigns.
+    """
+    try:
+        text = json.dumps(item, sort_keys=True, default=str).casefold()
+    except (TypeError, ValueError):
+        text = str(item).casefold()
+    if any(token in text for token in
+           ('free-inode descriptor', 'free_inode_descriptor',
+            'descriptor_postcondition', 'new_free_inode')):
+        return 'new_free_inode_descriptor_postcondition'
+    if any(token in text for token in
+           ('r-ievict', 'r-idelta-evict', 'inode bitmap', 'inode_bitmap',
+            'inode eviction', 'inode_evict')):
+        return 'known_inode_bitmap_leak'
+    if any(token in text for token in
+           ('orphan slot', 'orphan_slot', 'o-life', 'orphan')):
+        return 'known_orphan_slot'
+    if any(token in text for token in
+           ('r-link', 'r_link', 'rmdir', 'unlink', 'rename',
+            'r-ug', 'r_usum', 'inode.alloc.lifetime',
+            'inode.free.lifetime', 'namespace/link', 'namespace_link')):
+        return 'known_namespace_r_link'
+    return 'unclassified'
+
+
+def _fault_attribution_admitted(fault):
+    """Require an exact hook -> verified native syscall envelope."""
+    if not isinstance(fault, dict) or fault.get('errno_choice_verified') is not True:
+        return False
+    attribution = fault.get('attribution')
+    if not isinstance(attribution, dict) or attribution.get('status') != 'verified':
+        return False
+    return (attribution.get('native_envelope_count') == 1 and
+            attribution.get('native_envelope_verified') is True and
+            attribution.get('userspace_return_verified') is True)
+
+
+def _observation_admitted(fault, observation):
+    if not _fault_attribution_admitted(fault) or not isinstance(observation, dict):
+        return False
+    if observation.get('status') != 'candidate':
+        return False
+    if observation.get('namespace_valid') is not True:
+        return False
+    if observation.get('relations_valid') is not True:
+        return False
+    reason = ' '.join(str(observation.get(key) or '') for key in
+                      ('reason', 'namespace_reason', 'relations_reason')).casefold()
+    for key in ('observation_stable', 'quiescent'):
+        if observation.get(key) is False:
+            return False
+    return not any(token in reason for token in
+                   ('concurrent_or_unhealthy', 'read_failed', 'unsupported',
+                    'interrupted', 'timeout', 'missing', 'busy', 'unstable'))
+
+
+def _lifecycle_admitted(fault, lifecycle):
+    if not _fault_attribution_admitted(fault) or not isinstance(lifecycle, dict):
+        return False
+    findings = lifecycle.get('object_findings') or []
+    if findings and any(not isinstance(item, dict) or
+                        item.get('capture_complete') is not True
+                        for item in findings):
+        return False
+    evidence = json.dumps(lifecycle, sort_keys=True, default=str).casefold()
+    return not any(token in evidence for token in
+                   ('concurrent_or_unhealthy', 'read_failed', 'unsupported',
+                    'invalid_trace', 'trajectory_snapshot_discontinuity',
+                    'no_valid_stable_confirmation'))
+
+
+def _candidate_identity(record):
+    category = record.get('category') or finding_category(record)
+    # Known categories are one finding even when several fault hits produce
+    # the same consequence.  Other categories remain distinct per episode.
+    if category.startswith(('known_', 'new_')):
+        return ('category', category)
+    segment = record.get('segment_id')
+    if segment is None:
+        segment = tuple(record.get('segment_ids') or ())
+    return ('episode', record.get('kind'), segment, category)
+
+
+def _merge_candidates(raw_candidates):
+    merged = {}
+    for item in raw_candidates:
+        row = dict(item)
+        row['category'] = finding_category(row)
+        key = _candidate_identity(row)
+        current = merged.get(key)
+        if current is None:
+            row['phases'] = [row.get('phase')] if row.get('phase') else []
+            row['sources'] = [row.get('source')] if row.get('source') else []
+            row['occurrence_count'] = 1
+            merged[key] = row
+            continue
+        current['occurrence_count'] += 1
+        phase = row.get('phase')
+        if phase and phase not in current.setdefault('phases', []):
+            current['phases'].append(phase)
+        source = row.get('source')
+        if source and source not in current.setdefault('sources', []):
+            current['sources'].append(source)
+        for field in ('segment_ids', 'evidence'):
+            if field not in row:
+                continue
+            values = row[field] if isinstance(row[field], list) else [row[field]]
+            existing = current.setdefault(field, [])
+            if not isinstance(existing, list):
+                existing = current[field] = [existing]
+            for value in values:
+                if value not in existing:
+                    existing.append(value)
+    return list(merged.values())
+
+
 def atomic_json(path, value):
     path = pathlib.Path(path)
     tmp = path.with_name(path.name + '.tmp')
@@ -89,6 +210,7 @@ def fault_injection_summary(manifests, meta):
     isolated_count = 0
     hit_kinds = collections.Counter()
     hit_operations = collections.Counter()
+    raw_candidates = []
     for manifest in manifests:
         fault = manifest.get('fault_injection') or {}
         if not fault.get('hit'):
@@ -127,7 +249,7 @@ def fault_injection_summary(manifests, meta):
                                    evidence=f'segments/segment-{segment_id:06d}/trace.txt'))
 
         attribution = fault.get('attribution')
-        if not isinstance(attribution, dict) or attribution.get('status') == 'unverified':
+        if not _fault_attribution_admitted(fault):
             unverified.append(dict(source='attribution', segment_id=segment_id,
                                    kind=kind, phase='hook_to_syscall', status='unverified',
                                    evidence=f'segments/segment-{segment_id:06d}/fault-attribution.json'))
@@ -136,37 +258,106 @@ def fault_injection_summary(manifests, meta):
             evidence = f'segments/segment-{segment_id:06d}/{observation.get("path", "")}'.rstrip('/')
             record = dict(source='stable_snapshot', segment_id=segment_id, kind=kind,
                           phase=phase, status=observation.get('status'), evidence=evidence)
-            if observation.get('status') == 'candidate':
+            if _observation_admitted(fault, observation):
                 record['observation'] = observation
-                candidates.append(record)
+                raw_candidates.append(record)
+            elif observation.get('status') == 'candidate':
+                record['status'] = 'unverified'
+                record['admission'] = 'incomplete_fault_or_snapshot_envelope'
+                unverified.append(record)
             elif observation.get('status') != 'clear':
                 unverified.append(record)
 
         lifecycle = fault.get('lifecycle_candidate')
         if lifecycle:
-            candidates.append(dict(source='lifecycle', segment_id=segment_id, kind=kind,
-                                   evidence=f'segments/segment-{segment_id:06d}/'
-                                            f'{manifest.get("lifecycle_report", "analysis/lifecycle/report.json.gz")}',
-                                   details=lifecycle))
+            record = dict(source='lifecycle', segment_id=segment_id, kind=kind,
+                          evidence=f'segments/segment-{segment_id:06d}/'
+                                   f'{manifest.get("lifecycle_report", "analysis/lifecycle/report.json.gz")}',
+                          details=lifecycle)
+            if _lifecycle_admitted(fault, lifecycle):
+                raw_candidates.append(record)
+            else:
+                unverified.append(dict(record, status='unverified',
+                                       admission='incomplete_fault_or_snapshot_envelope'))
         offline = fault.get('offline_fsck_candidate')
         if offline:
-            candidates.append(dict(offline, segment_id=segment_id, kind=kind))
+            record = dict(offline, segment_id=segment_id, kind=kind)
+            if _fault_attribution_admitted(fault):
+                raw_candidates.append(record)
+            else:
+                unverified.append(dict(record, status='unverified',
+                                       admission='incomplete_fault_or_snapshot_envelope'))
         if fault.get('offline_check_unverified'):
             unverified.append(dict(source='fault_offline_fsck', segment_id=segment_id,
                                    kind=kind, phase='offline', status='unverified',
                                    evidence=f'segments/segment-{segment_id:06d}/fault-offline-status.txt'))
         if manifest.get('fault_expected_workload_exit'):
-            candidates.append(dict(source='workload_exit', segment_id=segment_id,
-                                   kind=kind, status='candidate',
-                                   workload_exit=manifest.get('guest_exit'),
-                                   evidence=f'segments/segment-{segment_id:06d}/workload.txt'))
+            record = dict(source='workload_exit', segment_id=segment_id,
+                          kind=kind, status='candidate',
+                          workload_exit=manifest.get('guest_exit'),
+                          evidence=f'segments/segment-{segment_id:06d}/workload.txt')
+            if _fault_attribution_admitted(fault):
+                raw_candidates.append(record)
+            else:
+                unverified.append(dict(record, status='unverified',
+                                       admission='incomplete_fault_or_snapshot_envelope'))
 
-    candidates.extend(dict(item) for item in meta.get('fault_injection_candidates', []))
+    # Offline disk checks are emitted after all segments.  They already carry
+    # the affected segment set and are deduplicated with per-segment evidence
+    # below, rather than counted as another finding.
+    admitted_hits = []
+    for manifest in manifests:
+        fault = manifest.get('fault_injection') or {}
+        status = fault.get('status') or {}
+        if (fault.get('hit') and status.get('enabled') is not False and
+                status.get('operation') != 'off' and
+                _fault_attribution_admitted(fault)):
+            admitted_hits.append(manifest)
+    for item in meta.get('fault_injection_candidates', []):
+        item = dict(item)
+        related = item.get('segment_ids') or []
+        if related:
+            eligible = any(m.get('segment_id') in related for m in admitted_hits)
+        else:
+            eligible = bool(admitted_hits)
+        if eligible:
+            raw_candidates.append(item)
+        else:
+            unverified.append(dict(item, status='unverified',
+                                   admission='incomplete_fault_or_snapshot_envelope'))
+
+    raw_count = len(raw_candidates)
+    candidates = _merge_candidates(raw_candidates)
+    categories = collections.defaultdict(lambda: dict(raw_occurrences=0,
+                                                       candidate_count=0,
+                                                       sources=[], segment_ids=[]))
+    for item in raw_candidates:
+        category = finding_category(item)
+        row = categories[category]
+        row['raw_occurrences'] += 1
+        if item.get('source') and item['source'] not in row['sources']:
+            row['sources'].append(item['source'])
+        for field in ('segment_id', 'segment_ids'):
+            value = item.get(field)
+            values = value if isinstance(value, list) else [value]
+            for segment in values:
+                if segment is not None and segment not in row['segment_ids']:
+                    row['segment_ids'].append(segment)
+    for item in candidates:
+        categories[item['category']]['candidate_count'] += 1
+    category_rows = dict(sorted(categories.items()))
+    known_categories = tuple(name for name in category_rows if name.startswith('known_'))
+    new_categories = tuple(name for name in category_rows if name.startswith('new_'))
     return dict(enabled=bool(meta.get('limits', {}).get('random_fault_injection')),
                 hit_count=len(hits), hit_segments=hits,
                 hit_counts_by_kind=dict(sorted(hit_kinds.items())),
                 hit_counts_by_operation=dict(sorted(hit_operations.items())),
                 candidates=candidates, candidate_count=len(candidates),
+                raw_candidate_count=raw_count,
+                finding_categories=category_rows,
+                unique_finding_category_count=len(category_rows),
+                known_finding_categories=list(known_categories),
+                new_finding_categories=list(new_categories),
                 unverified=unverified, unverified_count=len(unverified),
                 review_required=bool(candidates or unverified),
                 isolated_hit_count=isolated_count,
@@ -436,12 +627,22 @@ def aggregate(run, output=None, reanalyzed=None):
         issues.append('missing_duplicate_or_noncontinuous_segment_ids')
     if set(meta.get('devices', {})) != set(KINDS):
         issues.append('missing_campaign_device_identity')
+    scheduled_kinds = {summary.get('kind') for summary in summaries}
     for kind, dev in meta.get('devices', {}).items():
         domain = (meta.get('boot_id'), dev)
         initial = meta.get('initial_states', {}).get(kind)
         final = meta.get('final_states', {}).get(kind)
         first, end = identities.get(domain), last.get(domain)
-        if not initial or not final or not first or not end:
+        if (kind not in scheduled_kinds and initial and final and not first and not end and
+                initial.get('epoch') == final.get('epoch') and
+                initial.get('seq') == final.get('seq')):
+            # A target-kind campaign still mounts, snapshots, fscks, and
+            # validates every disk, but it intentionally schedules workload
+            # only on the selected filesystem. An untouched device has no
+            # trace domain; identical stable endpoints prove no activity was
+            # lost from its counter stream.
+            pass
+        elif not initial or not final or not first or not end:
             issues.append(kind + ':missing_campaign_endpoints')
         elif tainted_filesystems:
             # The trace event enable is global. Once one isolated fault is

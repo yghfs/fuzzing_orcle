@@ -4,6 +4,7 @@ import importlib.util
 import gzip
 import json
 import pathlib
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -12,7 +13,9 @@ from types import SimpleNamespace
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / 'scripts'))
 from campaign import aggregate, atomic_json, digest, KINDS, LOSS_KEYS
 from campaign_runner import (Collector, CampaignError, Runner, carry_start_line,
-                             directory_bytes, program_input_plan, random_fault_policy,
+                             directory_bytes, program_input_plan, select_program_input,
+                             split_ordinary_slot_is_fresh,
+                             random_fault_policy,
                              RANDOM_FAULT_OPERATIONS,
                              fault_status_matches_arm,
                              random_fault_trace_event,
@@ -189,17 +192,44 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(r['classification_counts']['transient_mismatch'], 4)
         self.assertEqual(r['by_kind_mode']['regular/single']['transient_mismatch'], 4)
 
+    def test_regular_only_schedule_accepts_untouched_validated_devices(self):
+        self.meta['limits']['target_kind'] = 'regular'
+        for kind in ('bigalloc', 'inline'):
+            self.meta['initial_states'][kind] = dict(epoch=42, seq=0, active=0)
+            self.meta['final_states'][kind] = dict(epoch=42, seq=0, active=0)
+        for index in range(2):
+            folder = self.run / 'segments' / f'segment-{index:06d}'
+            manifest_path = folder / 'manifest.json'
+            manifest = json.loads(manifest_path.read_text())
+            manifest['raw_domains'] = [domain for domain in manifest['raw_domains']
+                                       if domain['dev'] == '253,16']
+            trace = folder / 'trace.txt'
+            trace.write_text(''.join(
+                line for line in trace.read_text().splitlines(keepends=True)
+                if 'dev=253,16 ' in line))
+            manifest['evidence_sha256']['trace.txt'] = digest(trace)
+            atomic_json(manifest_path, manifest)
+        report = self.report()
+        self.assertTrue(report['passed'], report['issues'])
+        self.assertTrue(report['raw_coverage_complete'])
+        self.assertNotIn('bigalloc:missing_campaign_endpoints', report['issues'])
+        self.assertNotIn('inline:missing_campaign_endpoints', report['issues'])
+
     def test_fault_hits_are_separate_from_stability_candidates(self):
         self.meta['limits']['random_fault_injection'] = True
         clear = dict(path='regular-before.json', status='clear', valid=True,
                      namespace_valid=True, relations_valid=True)
         candidate = dict(path='regular-after.json', status='candidate', valid=False,
-                         observed_mismatches=1, namespace_valid=False,
+                         observed_mismatches=1, namespace_valid=True,
                          namespace_mismatched=1, relations_valid=True, relations_mismatches=0)
         for index in range(2):
             self.change(index, fault_injection=dict(
                 hit=True, seed=100+index, probability_ppm=1000000,
+                errno_choice_verified=True,
                 status=dict(injected=1, operation='random'),
+                attribution=dict(status='verified', native_envelope_count=1,
+                                  native_envelope_verified=True,
+                                  userspace_return_verified=True),
                 event=dict(operation='inode_evict_final_dirty', pid=400+index),
                 stable_observation=dict(before=clear, after=candidate if index == 0 else clear)))
         report = self.report()
@@ -249,12 +279,66 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(fault['candidate_count'], 0)
         self.assertFalse(fault['review_required'])
 
-    def test_stable_snapshot_validation_failure_is_a_candidate(self):
+    def test_fault_candidates_merge_known_root_cause_across_phases_and_sources(self):
+        self.meta['limits']['random_fault_injection'] = True
+        clear = dict(status='clear', valid=True, namespace_valid=True,
+                     relations_valid=True)
+        candidate = dict(status='candidate', valid=False,
+                         namespace_valid=True, relations_valid=True,
+                         formula='R-IEVICT', point='INODE.EVICT.TARGET.EXIT',
+                         observed_mismatches=1)
+        verified = dict(status='verified', native_envelope_count=1,
+                        native_envelope_verified=True,
+                        userspace_return_verified=True)
+        for index in range(2):
+            self.change(index, fault_injection=dict(
+                hit=True, errno_choice_verified=True,
+                status=dict(enabled=True, operation='random', injected=1),
+                attribution=verified,
+                event=dict(operation='inode_evict_final_dirty', errno=-5),
+                stable_observation=dict(before=clear, after=candidate),
+                lifecycle_candidate=dict(object_findings=[
+                    {'formula': 'R-IEVICT', 'capture_complete': True}]),
+                offline_fsck_candidate=dict(source='fault_offline_fsck',
+                                            status='candidate', formula='R-IEVICT')))
+        self.meta['fault_injection_candidates'] = [dict(
+            source='offline_disk', kind='regular', segment_ids=[0, 1],
+            reasons=['fsck_not_clean'], formula='R-IEVICT')]
+        report = self.report()['fault_injection']
+        self.assertGreater(report['raw_candidate_count'], report['candidate_count'])
+        self.assertEqual(report['candidate_count'], 1)
+        self.assertEqual(report['unique_finding_category_count'], 1)
+        finding = report['candidates'][0]
+        self.assertEqual(finding['category'], 'known_inode_bitmap_leak')
+        self.assertIn('stable_snapshot', finding['sources'])
+        self.assertIn('lifecycle', finding['sources'])
+        self.assertIn('fault_offline_fsck', finding['sources'])
+        self.assertIn('offline_disk', finding['sources'])
+
+    def test_incomplete_lifecycle_object_finding_is_unverified(self):
+        self.meta['limits']['random_fault_injection'] = True
+        verified = dict(status='verified', native_envelope_count=1,
+                        native_envelope_verified=True,
+                        userspace_return_verified=True)
+        for index in range(2):
+            self.change(index, fault_injection=dict(
+                hit=True, errno_choice_verified=True,
+                status=dict(enabled=True, operation='random', injected=1),
+                attribution=verified,
+                event=dict(operation='inode_evict_final_dirty', errno=-5),
+                lifecycle_candidate=dict(object_findings=[
+                    {'formula': 'R-IEVICT', 'capture_complete': False}])))
+        report = self.report()['fault_injection']
+        self.assertEqual(report['candidate_count'], 0)
+        self.assertEqual(report['raw_candidate_count'], 0)
+        self.assertEqual(report['unverified_count'], 2)
+
+    def test_stable_snapshot_validation_failure_is_unverified(self):
         path = self.run / 'stable.json'
         atomic_json(path, dict(valid=False, namespace_valid=False, relations_valid=True,
                                observed_mismatches=0, namespace_mismatched=0,
                                relations_mismatches=0, reason='namespace_scan_invalid'))
-        self.assertEqual(stable_snapshot_health(path)['status'], 'candidate')
+        self.assertEqual(stable_snapshot_health(path)['status'], 'unverified')
         atomic_json(path, dict(valid=False, namespace_valid=False, relations_valid=False,
                                observed_mismatches=0, namespace_mismatched=0,
                                relations_mismatches=0,
@@ -421,6 +505,36 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(program_input_plan('private',0,2),('resource-valid','namespace'))
         self.assertEqual(program_input_plan('private',2,2),('resource-valid','file-state'))
         self.assertEqual(program_input_plan('private',3,2),('ordinary','auto'))
+
+    def test_fresh_lane_can_override_resource_cadence_for_private_workloads(self):
+        # The runner applies this precedence in collect_segment: a fresh slot
+        # must remain available even when every ordinal is resource-valid.
+        self.assertEqual(select_program_input('private', 0, 1, 4),
+                         ('ordinary', 'auto', True))
+        self.assertEqual(select_program_input('private', 1, 1, 4),
+                         ('resource-valid', 'file-state', False))
+        self.assertEqual(select_program_input('shared', 0, 1, 4),
+                         ('resource-valid', 'shared-contention', False))
+
+    def test_split_arms_alternate_typed_and_fresh_generate_slots(self):
+        slots = [select_program_input('private', ordinal, 2, 0)
+                 for ordinal in range(6)]
+        self.assertEqual([item[0] for item in slots], [
+            'resource-valid', 'ordinary', 'resource-valid', 'ordinary',
+            'resource-valid', 'ordinary'])
+        self.assertTrue(split_ordinary_slot_is_fresh('ordinary', False, 'seed_only'))
+        self.assertTrue(split_ordinary_slot_is_fresh('ordinary', False, 'parent_only'))
+        self.assertFalse(split_ordinary_slot_is_fresh(
+            'resource-valid', False, 'parent_only'))
+        self.assertTrue(split_ordinary_slot_is_fresh(
+            'ordinary', True, 'combined'))
+
+    def test_resource_mutation_modes_are_recorded_and_validated_by_cli(self):
+        result = subprocess.run([
+            sys.executable, str(pathlib.Path(__file__).resolve().parents[1] /
+                               'scripts/campaign_runner.py'), '--help'],
+            check=True, capture_output=True, text=True)
+        self.assertIn('--resource-mutation-mode', result.stdout)
 
     def test_measurement_start_preserves_prepared_setup_anchors(self):
         runner = object.__new__(Runner)

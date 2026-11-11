@@ -47,9 +47,9 @@ else
 
 源码位置：
 
-- [upstream inode.c](</home/ikun/fuzzing-orcle/kernel/linux-mainline/fs/ext4/inode.c:372>)
-- [faultable inode.c](<dev/linux-6.12.1/fs/ext4/inode.c:296>)
-- [ext4_free_inode()](<dev/linux-6.12.1/fs/ext4/ialloc.c:225>)
+- [upstream inode.c](../../../../../kernel/linux-mainline/fs/ext4/inode.c#L372)
+- [faultable inode.c](../../../dev/linux-6.12.1/fs/ext4/inode.c#L296)
+- [ext4_free_inode()](../../../dev/linux-6.12.1/fs/ext4/ialloc.c#L225)
 
 ## 2. fault injector 到底模拟了什么
 

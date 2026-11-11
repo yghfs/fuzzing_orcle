@@ -1,6 +1,8 @@
 # ext4 Bug Inventory
 
-状态截至 2026-11-02。此清单记录已观察问题、源码定位和证据结论。重复或过时的历史运行目录
+历史复核主体截至 2026-11-02，extent v2 补充截至 2026-11-10；文档边界核对于 2026-11-11。
+本次未重跑下列内核实验，也未重新查询上游最新 HEAD；“主线状态”仅指各条明确列出的历史版本。
+当前证据可用性见 [文档审计](DOCUMENTATION-AUDIT-20261111.md)。此清单记录已观察问题、源码定位和证据结论。重复或过时的历史运行目录
 按本轮清理要求移除；规范的当前块层 EIO 记录、必要的源码语义注入材料、修复对照和可重跑
 脚本保留。历史数值与证据边界保留在这里。核心公式范围见 [`公式.md`](公式.md)。下文的
 “证明错误”说明可观察结果违反的关系或操作后置条件，
@@ -38,7 +40,7 @@ ordered 模式 20 秒、60 秒和 `data=journal` 30 秒的普通 syscall workloa
 - **核心公式已审计路径**：group extend 容量/bitmap 一致性、普通 mkdir/rmdir/unlink/rename 的目录计数及 `R-LINK`。group add 失败后 resize inode 指向未发布容量之外的块，是同一审计范围发现的持久化 resize metadata defect；本轮并未证明旧声称的 `R-BSUM`/`R-ISUM` mismatch。inode eviction 仍保留作生命周期审计材料，但按本轮最终报告降级为保守恢复语义。自然 inode/block quota `EDQUOT` 的失败回滚验证通过；新增 fast-commit replay 目录计数漏洞单列如下。
 - **新增已复现公式漏洞**：fast-commit replay 新目录后 `bg_used_dirs_count` 少计一个，违反 `R-UG`。使用普通 `mkdir`、文件 `fsync` 和 host hard-stop 自然触发；稳定运行时扫描、离线 bitmap/inode 扫描及 `e2fsck` 三方确认。复现报告见 [`FAST-COMMIT-DIR-COUNT-FINDING.md`](experiments/ext4-counter-trace/FAST-COMMIT-DIR-COUNT-FINDING.md)。
 - **历史 forced-shutdown 样本**：早期 `EXT4_IOC_SHUTDOWN` 竞态没有作为当前持久化 finding 证据；其无效和重复运行目录已于 2026-11-02 清理。当前结论使用正常卸载后的源码语义复核与块层 `EIO` 记录。
-- **本轮主线核对**：torvalds/linux 当前 HEAD 为 `32c52ec87d6245ee2d12ed5dd509e40062939b50`。已从该 HEAD 核对 `fs/ext4/namei.c`：下列 unlink、rename 和 mkdir 错误出口更新顺序均仍存在，未发现相应回滚修复。
+- **历史主线核对**：当次记录的 torvalds/linux HEAD 为 `32c52ec87d6245ee2d12ed5dd509e40062939b50`。已从该 HEAD 核对 `fs/ext4/namei.c`：下列 unlink、rename 和 mkdir 错误出口更新顺序均仍存在，未发现相应回滚修复。
 - **此前 syscall-only 扩展不变量**：extent `i_blocks`、EA inode 引用、共享 xattr block COW 引用，以及 orphan-file slot；它们分别由 extent 可达性、EA 容器引用、xattr 条目引用和 orphan 生命周期约束。
 - **2026-11-01 源码语义注入复核**：除 fast-commit 外，5 项违反核心容量/命名空间计数后置条件的条件性缺陷得到正常卸载后的磁盘证据：group extend、mkdir、rmdir、unlink、普通 rename；group add 另有失败 resize 后非法 resize-inode 引用的持久化缺陷，但没有证明 active-group `R-BSUM`/`R-ISUM` totals mismatch。`rename_setent_dirty` 的 `-ENOSPC` 合法返回值替代是同一 rename 链接计数缺陷的另一条 caller-error-path 复现；该 hook 跳过 `jbd2_journal_dirty_metadata()`，因此没有实际执行 credit exhaustion 分支，也不构成第七个独立根因。eviction 属源码规定的保守恢复行为；orphan-file/xattr 本轮没有取得可归因于该单项且完成 journal recovery 的持久化证据，不计入。逐项边界和证据见下方复核表及 [`FINAL-AUDIT-20261031.md`](experiments/ext4-source-fault-study/FINAL-AUDIT-20261031.md)。
 - **2026-11-02 真实块层 EIO 复核**：通过 QEMU `blkdebug` 让 guest 的实际块请求返回 `EIO`，并在正常卸载后离线检查。group extend、rmdir、unlink、普通 rename 均命中清单所述错误位置并留下对应磁盘不一致；mkdir 的块层 EIO 命中 `add_dirent_to_buf()` 较早的错误出口并留下悬空目录项，但在父 `nlink` 已递增后的精确 dirty 分支暂停/清缓存复核中没有命中 EIO，mkdir 成功。group add 的真实写 EIO 触发 JBD2 abort；该 finding 依赖 `ext4_mb_add_groupinfo()` 的分配失败 `-ENOMEM`，块 I/O 错误不验证这一条件。故 5 项核心计数 finding 中 4 项有精确块层 EIO 复核，mkdir 有相邻错误分支的真实 EIO 持久化复核，精确分支仍只有源码语义注入证据；细节和证据链接见 [`PHYSICAL-IO-CORE-20261102.md`](experiments/ext4-source-fault-study/PHYSICAL-IO-CORE-20261102.md)。这里的“真实块层 EIO”指 QEMU 向 guest 返回 I/O 错误，不是宿主物理介质故障。
@@ -58,10 +60,10 @@ ordered 模式 20 秒、60 秒和 `data=journal` 30 秒的普通 syscall workloa
 ### inode eviction 失败后 bitmap 未释放（降级：保守恢复语义）
 
 - 公式归属：`R-IEVICT`，属于 inode 生命周期后置条件。该错误出口同时跳过 bitmap 和 free-inode counter 更新，因此 `R-IG` 仍可能成立；`R-IDELTA-EVICT` 只适用于 inode slot 实际释放后的计数增量。
-- 源码位置：[`inode.c:304`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/inode.c#L304) 在最终 inode dirty 失败时只清理内存 inode，不调用 `ext4_free_inode()`；mode 30 注入定义在 [`fault-inject.c:247`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/fault-inject.c#L247)。inode 真正释放和 bitmap/global 更新在 [`ialloc.c:347`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/ialloc.c#L347)。
+- 源码位置：[`inode.c:304`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/inode.c#L304) 在最终 inode dirty 失败时只清理内存 inode，不调用 `ext4_free_inode()`；mode 30 注入定义在 [`fault-inject.c:223`](kernel/linux-6.12.1/fs/ext4/fault-inject.c#L223)。inode 真正释放和 bitmap/global 更新在 [`ialloc.c:347`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/ialloc.c#L347)。
 - 问题描述：eviction 的 inode 元数据无法写入时，磁盘 inode bit 可能继续占用，导致 inode 空间泄漏。
 - 旧的 forced-shutdown/close 运行不是当前缺陷证据，原始临时目录已清理。无错误注入的测试没有命中 eviction 错误出口；当前分类依据是 `ext4_evict_inode()` 的保守恢复语义。
-- 错误判据：最后一次 eviction 已完成且不存在活跃 inode 引用后，目标 inode bitmap bit 仍为 1，即违反 `R-IEVICT`。如果 bitmap 与 descriptor/global free-inode 数一起保持未释放状态，不能仅凭这一点称为 `R-IG` 违例。目录 inode 未释放还会使离线 `e2fsck` 将 `bg_used_dirs_count` 判为高于有效目录重算值。
+- 观测判据：最后一次 eviction 结束后 bit 仍为 1 可被 checker 记录，但只有最终 inode 更新成功、正常释放应当完成时才适用 `R-IEVICT` 正常释放保证。final-dirty 错误保留 bit 的分支不满足该前提。如果 bitmap 与 descriptor/global free-inode 数一起保持未释放状态，不能仅凭这一点称为 `R-IG` 违例。目录 inode 未释放还会使离线 `e2fsck` 将 `bg_used_dirs_count` 判为高于有效目录重算值。
 - 本轮最终分类：`ext4_evict_inode()` 源码明确要求 mark-dirty 失败时不能调用 `ext4_free_inode()`，以避免 inode-table 未安全写回时复用 inode number；因此 bitmap 未释放是保守恢复代价，暂不作为独立 patch finding。
 - checker 覆盖：eviction 错误出口现在直接读取目标 inode bitmap bit，检查后置条件 `allocated(t1)=0`；本轮无 fault、无断电运行报告 `model=inode_bitmap source=inode_eviction_error ... expected=0 actual=1`。
 - 证据边界：旧 mode 30/forced-shutdown 运行只作过故障窗口探索，不计为持久化 finding；对应临时输出已清理。
@@ -134,7 +136,7 @@ ordered 模式 20 秒、60 秒和 `data=journal` 30 秒的普通 syscall workloa
 ### mkdir 失败后的目录 inode/free-inode/link 计数不一致（条件性源码语义 finding）
 
 - 公式归属：`R-UG`、`R-UDELTA`、`R-LINK`，属于核心公式。
-- 源码位置：创建和错误清理从 [`namei.c:3173`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/namei.c#L3173) 开始；父目录 link count 在 [`namei.c:3219`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/namei.c#L3219) 增加，父 inode dirty 失败回到 inode 清理出口。mode 34 注入点为 [`namei.c:3222`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/namei.c#L3222)，定义在 [`fault-inject.c:280`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/fault-inject.c#L280)；失败路径检查器在 [`checker.c:990`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/checker.c#L990) 对比调用前父 nlink 并检查父目录是否仍含新 dirent。
+- 源码位置：创建和错误清理从 [`namei.c:3173`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/namei.c#L3173) 开始；父目录 link count 在 [`namei.c:3219`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/namei.c#L3219) 增加，父 inode dirty 失败回到 inode 清理出口。mode 34 注入点为 [`namei.c:3222`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/namei.c#L3222)，定义在 [`fault-inject.c:256`](kernel/linux-6.12.1/fs/ext4/fault-inject.c#L256)；失败路径检查器在 [`checker.c:1082`](kernel/linux-6.12.1/fs/ext4/checker.c#L1082) 对比调用前父 nlink 并检查父目录是否仍含新 dirent。
 - 问题描述：mkdir 在 child dirent 已插入、父目录 link count 已增加后，如果父 inode dirty 失败并进入 `out_clear_inode`，该清理会回收新目录 inode，却没有移除已发布 dirent 或撤回 parent nlink 增量。
 - 源码语义主证据：在父 inode `ext4_mark_inode_dirty()` 结果边界替代返回 `-EIO`。`mkdir()` 返回 `EIO`，正常卸载后 `e2fsck -fn` 报 parent inode 13 link count 为 3、应为 2，且 `child` 指向已删除/未分配 inode 14；这仍是本条所指 `parent nlink` 已递增后显式 dirty 失败分支的精确复核。见 [`mkdir-parent-EIO.log`](experiments/ext4-source-fault-study/results/qemu-source-replay-20261101/mkdir-parent-EIO.log) 和 [`.e2fsck.log`](experiments/ext4-source-fault-study/results/qemu-source-replay-20261101/mkdir-parent-EIO.e2fsck.log)。
 - 真实块层 EIO 补充（2026-11-02）：sector 344 READ 错误命中更早的 `add_dirent_to_buf()` parent dirty 出口；`mkdir()` 返回 `EIO`，正常卸载后 `e2fsck -fn` 报 `newdir` 指向已删除/未分配 inode。它证明相邻错误出口也能留下持久化目录项/分配不一致，但没有命中本条特指的 parent `nlink` 已递增后、显式 parent inode dirty 失败分支；精确暂停点复核没有收到 EIO、mkdir 成功。详见 [`PHYSICAL-IO-CORE-20261102.md`](experiments/ext4-source-fault-study/PHYSICAL-IO-CORE-20261102.md#结果)。
@@ -183,30 +185,27 @@ group add 的写 EIO 触发 JBD2 abort，不能替代其 `-ENOMEM` 分配失败�
 
 ### extent tree 增深后 `i_blocks` 多计不可达元数据块
 
+- 审阅修订 v2（2026-11-10）：按 Jan Kara 的意见，统一回收 `sb_getblk_gfp()`、`ext4_journal_get_create_access()`、`ext4_handle_dirty_metadata()` 三处失败时尚未接入树的新块；接入树后的 inode dirty 错误不释放该块。三个独立 caller 边界注入的修复前后对照均通过：未修复版各泄漏 7 块，修复版均无泄漏、正常卸载后 fsck=0，且重试、正常增深与截断通过。这不模拟真实 journal abort。正式 `[PATCH v2]`、验证证据和提交命令见 [v2 报告](experiments/ext4-invariant-checker/EXTENT-GROW-ERRORS-V2-20261110.md)。
+
+- 本地修复与验证（2026-11-10）：`sb_getblk_gfp()` 返回 NULL 时通过 `ext4_free_blocks(..., EXT4_FREE_BLOCKS_METADATA)` 回收尚未接入树的新块并撤销记账。原版 Linux 6.12.1 在无 checker 的精确 caller 错误路径注入下复现 7 个 `40 != 32` inode 和 7 个 bitmap 孤块；相同输入的修复版仍返回 `ENOMEM`，但 inode 均为 32，正常卸载后的 `e2fsck -fn` 返回 0，失败后重试、正常增深和截断也通过。注入验证不代表 helper 内部真实发生内存耗尽。独立补丁、复现入口和证据见 [`EXTENT-GROW-ENOMEM-FIX-20261110.md`](experiments/ext4-invariant-checker/EXTENT-GROW-ENOMEM-FIX-20261110.md)。
 - 公式归属：旧模型 `extent_blocks`，不属于核心公式。
-- 源码位置：[`extents.c:1311`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/extents.c#L1311) 分配新的 extent tree metadata block；若随后 [`extents.c:1334`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/extents.c#L1334) 取 buffer 失败，代码记录错误并返回，root 尚未发布新指针。独立遍历可达 extent 并比较 `i_blocks` 的 checker 在 [`checker.c:875`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/checker.c#L875)。mode 25 dirty 失败点在 [`extents.c:1372`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/extents.c#L1372)。
-- 问题描述：metadata block 分配已计入 inode block accounting，但新 extent root/index 未发布，出错返回后计费块不可从 extent tree 到达，造成 `i_blocks` 高于实际可达块数。
-- 复现方式与结果：历史 syscall-only 测试用普通写入/`fallocate()` 在自然内存压力下触发 `ENOMEM`。记录的旧 checker 统计为 7 次检查、3 次违例；典型观测为预期 32 sectors、实际 40 sectors。另有 2 次 extent-map error exit 验证，其中 2 次可验证且为 `ENOMEM`。mode 25 或块设备错误仅为额外 fault 验证。
-- 错误判据：稳定 inode extent tree 遍历得到的 data+metadata+xattr blocks 换算成 sectors 后必须等于 `i_blocks`；观测到 `40 != 32`，差值正好是一个 4 KiB metadata block 的 8 sectors。该独立结构重算和持久化检查记录构成错误证据。
-- 证据边界：历史数字在清理前从 checker 输出记录；原运行目录与逐次报告已删除。此问题属于附加计数模型，不是核心公式 finding。
+- 源码位置：[`extents.c:1334`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/extents.c#L1334) 的 `sb_getblk_gfp()` 调用失败时；`ext4_new_meta_blocks()` 已在 [`extents.c:1329`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/extents.c#L1329) 分配并计费了块，但错误返回后块不会被释放。独立遍历可达 extent 并比较 `i_blocks` 的 checker 在 [`checker.c:956`](kernel/linux-6.12.1/fs/ext4/checker.c#L956)。
+- 问题描述：`ext4_ext_grow_indepth()` 中 metadata block 分配已计入 inode block accounting（dquot），但 `sb_getblk_gfp()` 返回 NULL 时，函数直接返回 `-ENOMEM` 不释放已分配的块。新 extent root/index 未发布，出错返回后计费块不可从 extent tree 到达，造成 `i_blocks` 高于实际可达块数。
+- 复现方式与结果：历史 syscall-only 测试用普通写入/`fallocate()` 在自然内存压力下触发 `ENOMEM`。记录的旧 checker 统计为 7 次检查、3 次违例；典型观测为预期 32 sectors、实际 40 sectors。另有 2 次 extent-map error exit 验证，其中 2 次可验证且为 `ENOMEM`。mode 25 或块设备错误仅为额外 fault 验证。2026-11-10 精准自然内存压力复现：后台持续 malloc/touch/free 高压力线程、20 个 fallocate 尝试各 20 轮增深循环，关键是**保留 inode 不删除**让 i_blocks 错误持久化。e2fsck 报告 7 个 inode（12-18）的 i_blocks 都为 40，应为 32；块位图泄漏 7 个块；checker 统计 35 次违例。见 [`experiments/ext4-invariant-checker/results/ext4-extent-grow-persistent-iblocks-20261110-113028/`](experiments/ext4-invariant-checker/results/ext4-extent-grow-persistent-iblocks-20261110-113028/)。2026-11-10 源码语义注入复现：在 `ext4_ext_grow_indepth()` 的 `sb_getblk_gfp()` 调用后强制返回 NULL（前 7 次调用），触发错误出口。workload 执行 7 个 `fallocate()` 让 extent 树增深，每次都命中注入点。checker 统计 `model_extent_blocks_violations=28`（7 个 inode × 4 次检查点），`error_exit_extent_map_verified=14`（14 次命中错误出口）。
+- 错误判据：稳定 inode extent tree 遍历得到的 data+metadata+xattr blocks 换算成 sectors 后必须等于 `i_blocks`；观测到 40 vs 32，差值正好是一个 4 KiB metadata block 的 8 sectors。该独立结构重算和持久化检查记录构成错误证据。
+- 离线证据：自然压力版：7 个 inode（12-18）的 `i_blocks` 都为 40，应为 32（同注入版）；块位图 7 个泄漏块（32833、33285、33290、33795、33800、33805、33810）；fsck 返回码 4。见 [`ext4-extent-grow-persistent-iblocks-20261110-113028/fsck.txt`](experiments/ext4-invariant-checker/results/ext4-extent-grow-persistent-iblocks-20261110-113028/fsck.txt)。注入版：同样 7 个 inode i_blocks=40；块位图 6 个泄漏块；见 [`extent-grow-iblocks-injected-20261110-111034/fsck.txt`](experiments/ext4-invariant-checker/results/extent-grow-iblocks-injected-20261110-111034/fsck.txt)。
+- 修改代码（注入版）：在 checker 内核的 `fs/ext4/extents.c` 中，在 `sb_getblk_gfp()` 后加入计数器注入，前 7 次调用时强制 `bh = NULL`，触发既有的错误处理路径。
+- 源码版本边界：上述链接固定为 v6.12.1，不能作为“当前 torvalds/linux HEAD 未修复”的证据。已有 extent v2 材料记录主线应用/编译核对，但运行对照来自 Linux 6.12.1；本次未重新核验上游最新状态。
+- 证据边界：此问题属于附加计数模型，不是核心公式 finding。**自然压力已稳定复现**（精准保留 inode），源码语义注入也能稳定复现，两种方式结果一致。
 
 ### EA inode 引用在容器释放失败路径中未递减
 
 - 公式归属：旧模型 `ea_references` 局部引用转换，不属于核心公式。
-- 源码位置：EA inode 读取在 [`xattr.c:499`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/xattr.c#L499)；容器释放逐条读取并递减引用在 [`xattr.c:1262`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/xattr.c#L1262)。`iget`/数组扩容/日志 credit 等错误会记录后继续，调用方仍可能释放该 xattr 容器。旧 checker 的局部引用错误记录在 [`checker.c:1271`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/checker.c#L1271)，mode 13 定义在 [`fault-inject.c:111`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/fault-inject.c#L111)。
+- 源码位置：EA inode 读取在 [`xattr.c:499`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/xattr.c#L499)；容器释放逐条读取并递减引用在 [`xattr.c:1262`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/xattr.c#L1262)。`iget`/数组扩容/日志 credit 等错误会记录后继续，调用方仍可能释放该 xattr 容器。当前 checker 的稳定 EA inode 引用扫描在 [`checker.c:2450`](kernel/linux-6.12.1/fs/ext4/checker.c#L2450)，mode 13 定义在 [`fault-inject.c:111`](kernel/linux-6.12.1/fs/ext4/fault-inject.c#L111)。
 - 问题描述：容器中每个 EA inode 编号代表一个持有引用。容器销毁时若因 `ENOMEM` 等原因无法 iget EA inode，却继续丢弃容器，引用没有减一，EA inode 会残留引用/空间。
 - 复现方式与结果：历史 syscall-only 测试通过 `fsetxattr()`/`unlink()` 和自然内存压力触发 `ENOMEM`。旧模型记录 1,410 次检查、150 次违例；典型记录为 `source=xattr_container_release_iget`、预期引用变化 `-1`、实际 `0`、错误 `-ENOMEM`。mode 13 是额外 fault 验证。
 - 错误判据：容器删除使其持有引用数减一；因此同一事务/完成操作中 EA inode reference count 若没有相应减一，等式 `expected_ref_delta=-1, actual_ref_delta=0` 直接显示引用泄漏。
 - 证据边界：历史专用运行材料已清理，保留数字来自清理前 checker 汇总。该旧 checker finding 不应误报成核心公式覆盖。
-
-### 共享 xattr block COW 替换后 EA inode 引用多计（新确认）
-
-- 公式归属：EA 引用守恒扩展式 `ref(E) ==` 所有可达 inode-body 与外部 xattr block 条目中 `e_value_inum == E` 的次数。
-- 源码位置：[`xattr.c:1196-1242`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/xattr.c#L1196) 的 `ext4_xattr_inode_inc_ref_all()` 在创建 COW block 时为复制出的全部 EA 条目增加引用；[`xattr.c:2115-2135`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/xattr.c#L2115) 随后把被替换条目的 `e_value_inum` 清零；[`xattr.c:2261-2264`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/xattr.c#L2261) 调用该增加函数。旧共享 block 仍有另一个 inode 引用时，[`xattr.c:1397-1435`](https://github.com/torvalds/linux/blob/v6.12.1/fs/ext4/xattr.c#L1397) 只递减 block `h_refcount`，不会为 COW 中被移除的 EA 条目补递减。
-- 问题描述：两个 inode 共享同一外部 xattr block 时，替换其中一个 inode 的一个大 EA 值会复制并先增加旧条目引用，再从新 block 删除该条目。旧 block 仍被第二个 inode 使用，因此释放旧 block 不会触发 EA inode 条目清理，导致对应 EA inode 的持久化 ref 多一。
-- syscall 复现：普通 `openat()` 创建两个文件；对每个文件设置 64 个 5000 字节 `user.large_XX` xattr；`fsync()`、`syncfs()` 后仅对第一个文件替换一个 xattr，再 `fsync()`、`syncfs()`、`close()`。无 fault injection、无内存压力、无 `EXT4_IOC_SHUTDOWN`、无断电；独立负载与脚本见 [`ext4-ea-ref-conservation.c`](tests/ext4-ea-ref-conservation.c) 和 [`run-ext4-ea-ref-conservation.sh`](tests/run-ext4-ea-ref-conservation.sh)。
-- 证据：`work/candidate-probes/ea-ref-conservation/run-new-08/` 中 `workload_rc=0`；checker 稳定记录 `model=ea_inode_references source=stable_snapshot ino=15 expected_ref=64 actual_ref=65`，汇总 `model_ea_inode_references_violations=11`（同一稳定状态的重复快照）；正常 guest `systemctl poweroff` 后离线 `e2fsck -fn` 再报 `Extended attribute inode 15 ref count is 65, should be 64`。基线镜像离线检查无错误。
-- 主线状态：通过 GitHub API 获取的 `torvalds/linux` HEAD 为 `c03c1a14507dfaf8b856c2608f9ac216021fc222`（Linux 7.3）；该 HEAD 的 `fs/ext4/xattr.c` blob `5c310747b965002e46b44467a2128138337f5187` 仍保留同一 `inc_ref_all`、COW 清零旧条目和共享 block 仅减 `h_refcount` 的路径，未见对应修复。
 
 ## 非计数后置条件问题
 

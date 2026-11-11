@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/ext4.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +14,14 @@
 #include <sys/types.h>
 #include <sys/xattr.h>
 #include <unistd.h>
+
+static volatile sig_atomic_t continue_close;
+
+static void continue_close_handler(int signo)
+{
+	(void)signo;
+	continue_close = 1;
+}
 #ifndef RENAME_EXCHANGE
 #define RENAME_EXCHANGE (1 << 1)
 #endif
@@ -153,6 +162,56 @@ int main(int argc, char **argv)
 	}
 	if (!strcmp(argv[1], "rename-plain") && argc == 4)
 		return report("rename", rename(argv[2], argv[3]));
+	if (!strcmp(argv[1], "allocate") && argc == 3) {
+		int fd = open(argv[2], O_RDWR | O_CLOEXEC);
+		if (fd < 0)
+			return report("allocate_open", -1);
+		rc = fallocate(fd, 0, 0, 4096);
+		saved_errno = rc < 0 ? errno : 0;
+		if (rc == 0 && fsync(fd) < 0) {
+			rc = -1;
+			saved_errno = errno;
+		}
+		close(fd);
+		if (rc < 0)
+			errno = saved_errno;
+		return report("fallocate", rc);
+	}
+	if (!strcmp(argv[1], "evict-pause") && argc == 3) {
+		char token;
+		struct sigaction action = { .sa_handler = continue_close };
+		int fd;
+
+		sigemptyset(&action.sa_mask);
+		if (sigaction(SIGUSR1, &action, NULL) < 0)
+			return report("evict_signal_setup", -1);
+		fd = open(argv[2], O_RDONLY | O_CLOEXEC);
+		if (fd < 0)
+			return report("evict_open", -1);
+		if (unlink(argv[2]) < 0) {
+			saved_errno = errno;
+			close(fd);
+			errno = saved_errno;
+			return report("evict_unlink", -1);
+		}
+		puts("EVICT_CLOSE_READY");
+		fflush(stdout);
+		while (!continue_close)
+			pause();
+		if (syncfs(fd) < 0)
+			printf("EVICT_SYNCFS_RESULT rc=-1 errno=%d\n", errno);
+		else
+			puts("EVICT_SYNCFS_RESULT rc=0 errno=0");
+		{
+			int drop = open("/proc/sys/vm/drop_caches", O_WRONLY | O_CLOEXEC);
+			if (drop >= 0) {
+				(void)write(drop, "3\n", 2);
+				close(drop);
+			}
+		}
+		rc = close(fd);
+		return report("close_last_unlinked", rc);
+	}
 	if (!strcmp(argv[1], "exchange") && argc == 4)
 		return report("renameat2_exchange",
 			syscall(SYS_renameat2, AT_FDCWD, argv[2], AT_FDCWD,

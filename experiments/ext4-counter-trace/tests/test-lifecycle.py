@@ -382,11 +382,11 @@ class LifecycleTests(unittest.TestCase):
     def test_native_syscall_result_and_same_nr_helper_writes_not_confused(self):
         def line(n,body): return dict(line=n,pid=100,cpu=0,comm='w',timestamp_ns=n*1000,body=body)
         lines=[line(1,'sys_enter: NR 1 (0,0)'),
-               line(2,'tracing_mark_write: CT_SYSCALL phase=BEGIN id=100-1 nr=1 name=write executed_fd=3 object_ino=88 object_dev=253 object_is_dir=0'),
+               line(2,'tracing_mark_write: CT_SYSCALL phase=BEGIN id=100-1 nr=1 name=write executed_fd=3 object_ino=88 object_dev=253 object_is_dir=0 repaired=1 adapted=1 original_fd=900 executed_fd=3 original_length=8192 executed_length=4096'),
                line(3,'sys_exit: NR 1 = 80'), # begin marker write to fd 0
                line(4,'sys_enter: NR 1 (3,0)'),line(5,'sys_exit: NR 1 = -28'),
                line(6,'sys_enter: NR 1 (0,0)'),
-               line(7,'tracing_mark_write: CT_SYSCALL phase=END id=100-1 nr=1 name=write ret=-1 errno=28 executed_fd=3 object_ino=88 object_dev=253 object_is_dir=0'),
+               line(7,'tracing_mark_write: CT_SYSCALL phase=END id=100-1 nr=1 name=write ret=-1 errno=28 executed_fd=3 object_ino=88 object_dev=253 object_is_dir=0 repaired=1 adapted=1 original_fd=900 original_length=8192 executed_length=4096'),
                line(8,'sys_exit: NR 1 = 80')]
         calls,issues=correlate_syscalls(lines)
         self.assertFalse(issues);self.assertTrue(calls[0]['verified'])
@@ -394,6 +394,9 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(calls[0]['errno'],28)
         self.assertEqual((calls[0]['object_ino'],calls[0]['object_dev'],calls[0]['object_is_dir']),
                          (88,253,0))
+        self.assertEqual((calls[0]['repaired'], calls[0]['adapted']), (1, 1))
+        self.assertEqual((calls[0]['original_fd'], calls[0]['executed_fd']), ('900', '3'))
+        self.assertEqual((calls[0]['original_length'], calls[0]['executed_length']), (8192, 4096))
         calls,_=correlate_syscalls([l for l in lines if l['line']!=5])
         self.assertFalse(calls[0]['verified'])
 
