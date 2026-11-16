@@ -105,6 +105,8 @@ fault_reset_kind()
     esac
     mountpoint="/mnt/ct-$kind"
     printf 'CT_PROGRESS phase=FAULT_RESET_START kind=%s dev=%s\n' "$kind" "$dev"
+    state "$dev" "$base/fault-reset-$kind-before.json"
+    reset_counter_dev=$(tr ':' ',' < "/sys/class/block/$dev/dev")
     # Formatting creates a fresh counter epoch and a large amount of helper
     # activity.  Keep that maintenance transaction out of the workload trace
     # by disabling the workload events while leaving tracing_on set.  Turning
@@ -147,8 +149,11 @@ fault_reset_kind()
         done
     fi
     sync
-    printf '{"schema":1,"kind":"%s","dev":"%s","scenario":"%s","reset":true}\n' \
-        "$kind" "$dev" "$scenario" > "$base/fault-reset-$kind.json"
+    state "$dev" "$base/fault-reset-$kind-after.json"
+    printf '{"schema":2,"kind":"%s","dev":"%s","counter_dev":"%s","scenario":"%s","reset":true,"before":%s,"after":%s}\n' \
+        "$kind" "$dev" "$reset_counter_dev" "$scenario" \
+        "$(cat "$base/fault-reset-$kind-before.json")" \
+        "$(cat "$base/fault-reset-$kind-after.json")" > "$base/fault-reset-$kind.json"
     for event in $reset_events; do echo 1 > "$event"; done
     printf 'CT_PROGRESS phase=FAULT_RESET_END kind=%s dev=%s\n' "$kind" "$dev"
     return 0

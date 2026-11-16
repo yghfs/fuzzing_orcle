@@ -1,0 +1,812 @@
+{
+  "date": "2026-11-12",
+  "tests": {
+    "test-campaign.py": 81,
+    "test-kcov-feedback.py": 56,
+    "test-lifecycle.py": 31,
+    "test-target-coverage-comparison.py": 8,
+    "test-syzkaller.py": 22
+  },
+  "runs": {
+    "normal": {
+      "passed": true,
+      "status": "passed",
+      "segments": 12,
+      "coverage_complete": true,
+      "kcov_feedback_complete": true,
+      "raw_coverage_complete": true,
+      "counter_validation_passed": true,
+      "generated_syscalls": 192,
+      "native_verified": 192,
+      "issues": [],
+      "run_dir": "experiments/ext4-counter-trace/results/campaign-4q4qfrjm",
+      "settings": {
+        "segments": 12,
+        "mode": "single",
+        "duration_seconds": 900,
+        "target_syscalls": 0,
+        "segment_seconds": 1,
+        "max_batches": 1,
+        "batch_timeout": 30,
+        "boot_timeout": 180,
+        "analysis_timeout": 180,
+        "workers": 1,
+        "memory_mb": 0,
+        "guest_memory_mb": 1024,
+        "cpus": 1,
+        "qemu_cpu": "qemu64",
+        "buffer_kb": 65536,
+        "max_trace_mb": 64,
+        "max_run_mb": 40960,
+        "min_free_mb": 1024,
+        "port": 11973,
+        "seed": 20261112,
+        "random_fault_injection": false,
+        "random_fault_probability_ppm": 1000,
+        "random_fault_operations": "mballoc_mark,unlink_inode_dirty,inode_evict_final_dirty",
+        "random_fault_errnos": "native",
+        "fault_isolation": true,
+        "syz_calls": 16,
+        "resource_valid_every": 1,
+        "fresh_generate_every": 0,
+        "resource_seed_refresh_every": 4,
+        "resource_mutation_mode": "combined",
+        "scheduler_policy": "rarity_fair",
+        "feedback_mode": "pc_edge_semantic",
+        "target_scope": "ext4_jbd2",
+        "effect_aware_admission": true,
+        "require_target_success": false,
+        "strict_kcov_feedback": true,
+        "mutation_budget_policy": "fixed",
+        "max_mutation_calls": 256,
+        "scenario": "baseline",
+        "predecessor": null,
+        "rootfs_backing": null,
+        "target_kind": "regular",
+        "comparison_seed_image": null
+      },
+      "kernel_sha256": "59fae3a9259a8c3ed081fc2c096a96c1faecdc90e98a17f6022fbfae1463df86",
+      "segments_detail": [
+        {
+          "segment_id": 0,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "namespace",
+              "task": "resource_valid_seed",
+              "planned_template": "namespace",
+              "template_slot": 0,
+              "reason": "periodic_template_seed"
+            }
+          ]
+        },
+        {
+          "segment_id": 1,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "file-state",
+              "task": "resource_valid_seed",
+              "planned_template": "file-state",
+              "template_slot": 0,
+              "reason": "periodic_template_seed"
+            }
+          ]
+        },
+        {
+          "segment_id": 2,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "namespace",
+              "task": "resource_mutate",
+              "planned_template": "namespace",
+              "template_slot": 1,
+              "reason": "active_template_parent"
+            }
+          ]
+        },
+        {
+          "segment_id": 3,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "file-state",
+              "task": "resource_mutate",
+              "planned_template": "file-state",
+              "template_slot": 1,
+              "reason": "active_template_parent"
+            }
+          ]
+        },
+        {
+          "segment_id": 4,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "namespace",
+              "task": "resource_mutate",
+              "planned_template": "namespace",
+              "template_slot": 2,
+              "reason": "active_template_parent"
+            }
+          ]
+        },
+        {
+          "segment_id": 5,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "file-state",
+              "task": "resource_mutate",
+              "planned_template": "file-state",
+              "template_slot": 2,
+              "reason": "active_template_parent"
+            }
+          ]
+        },
+        {
+          "segment_id": 6,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "namespace",
+              "task": "resource_mutate",
+              "planned_template": "namespace",
+              "template_slot": 3,
+              "reason": "active_template_parent"
+            }
+          ]
+        },
+        {
+          "segment_id": 7,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "file-state",
+              "task": "resource_mutate",
+              "planned_template": "file-state",
+              "template_slot": 3,
+              "reason": "active_template_parent"
+            }
+          ]
+        },
+        {
+          "segment_id": 8,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "namespace",
+              "task": "resource_valid_seed",
+              "planned_template": "namespace",
+              "template_slot": 4,
+              "reason": "periodic_template_seed"
+            }
+          ]
+        },
+        {
+          "segment_id": 9,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "file-state",
+              "task": "resource_valid_seed",
+              "planned_template": "file-state",
+              "template_slot": 4,
+              "reason": "periodic_template_seed"
+            }
+          ]
+        },
+        {
+          "segment_id": 10,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "namespace",
+              "task": "resource_mutate",
+              "planned_template": "namespace",
+              "template_slot": 5,
+              "reason": "active_template_parent"
+            }
+          ]
+        },
+        {
+          "segment_id": 11,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "file-state",
+              "task": "resource_mutate",
+              "planned_template": "file-state",
+              "template_slot": 5,
+              "reason": "active_template_parent"
+            }
+          ]
+        }
+      ],
+      "target_edge_feature_scope_verified": true
+    },
+    "fault_reset": {
+      "passed": true,
+      "status": "candidate_review_required",
+      "segments": 4,
+      "coverage_complete": true,
+      "kcov_feedback_complete": true,
+      "raw_coverage_complete": true,
+      "counter_validation_passed": true,
+      "generated_syscalls": 64,
+      "native_verified": 53,
+      "issues": [],
+      "run_dir": "experiments/ext4-counter-trace/results/campaign-6bdpspyj",
+      "settings": {
+        "segments": 4,
+        "mode": "single",
+        "duration_seconds": 600,
+        "target_syscalls": 0,
+        "segment_seconds": 1,
+        "max_batches": 1,
+        "batch_timeout": 30,
+        "boot_timeout": 180,
+        "analysis_timeout": 180,
+        "workers": 1,
+        "memory_mb": 0,
+        "guest_memory_mb": 1024,
+        "cpus": 1,
+        "qemu_cpu": "qemu64",
+        "buffer_kb": 65536,
+        "max_trace_mb": 64,
+        "max_run_mb": 40960,
+        "min_free_mb": 1024,
+        "port": 11974,
+        "seed": 20261113,
+        "random_fault_injection": true,
+        "random_fault_probability_ppm": 1000000,
+        "random_fault_operations": "unlink_inode_dirty",
+        "random_fault_errnos": "ENOSPC",
+        "fault_isolation": true,
+        "syz_calls": 16,
+        "resource_valid_every": 1,
+        "fresh_generate_every": 0,
+        "resource_seed_refresh_every": 4,
+        "resource_mutation_mode": "seed_only",
+        "scheduler_policy": "uniform_round_robin",
+        "feedback_mode": "pc_edge_semantic",
+        "target_scope": "ext4_jbd2",
+        "effect_aware_admission": true,
+        "require_target_success": false,
+        "strict_kcov_feedback": true,
+        "mutation_budget_policy": "fixed",
+        "max_mutation_calls": 256,
+        "scenario": "baseline",
+        "predecessor": null,
+        "rootfs_backing": null,
+        "target_kind": "regular",
+        "comparison_seed_image": null
+      },
+      "kernel_sha256": "59fae3a9259a8c3ed081fc2c096a96c1faecdc90e98a17f6022fbfae1463df86",
+      "segments_detail": [
+        {
+          "segment_id": 0,
+          "analysis_passed": false,
+          "issues": [
+            "analysis_failed"
+          ],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [
+            "regular-single:single_writer_unverified_episode"
+          ],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "namespace",
+              "task": "resource_valid_seed",
+              "planned_template": "namespace",
+              "template_slot": 0,
+              "reason": "seed_only"
+            }
+          ]
+        },
+        {
+          "segment_id": 1,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [
+            {
+              "kind": "regular",
+              "dev": "253,16",
+              "previous_epoch": 76453394556,
+              "epoch": 125525580159,
+              "evidence": "fault-reset.json",
+              "evidence_schema": 2,
+              "verification": "guest_counter_states"
+            }
+          ],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "file-state",
+              "task": "resource_valid_seed",
+              "planned_template": "file-state",
+              "template_slot": 0,
+              "reason": "seed_only"
+            }
+          ]
+        },
+        {
+          "segment_id": 2,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "namespace",
+              "task": "resource_valid_seed",
+              "planned_template": "namespace",
+              "template_slot": 1,
+              "reason": "seed_only"
+            }
+          ]
+        },
+        {
+          "segment_id": 3,
+          "analysis_passed": true,
+          "issues": [],
+          "reset_boundaries": [],
+          "lifecycle_blockers": [],
+          "trajectory_integrity": {
+            "regular-single": true,
+            "bigalloc-single": true,
+            "inline-single": true
+          },
+          "programs": [
+            {
+              "template": "file-state",
+              "task": "resource_valid_seed",
+              "planned_template": "file-state",
+              "template_slot": 1,
+              "reason": "seed_only"
+            }
+          ]
+        }
+      ],
+      "fault_injection": {
+        "enabled": true,
+        "hit_count": 1,
+        "hit_segments": [
+          {
+            "segment_id": 0,
+            "kind": "regular",
+            "operation": "unlink_inode_dirty",
+            "errno": -28,
+            "errno_choice_index": 0,
+            "errno_choice_draw": 479617,
+            "errno_choice_allowed": [
+              -28
+            ],
+            "admission": "reviewed",
+            "attribution": {
+              "schema": 1,
+              "hook": "unlink_inode_dirty",
+              "hook_errno": -28,
+              "hook_trace_line": 14655,
+              "hook_timestamp_ns": 109687796000,
+              "hook_pid": 440,
+              "target_pid": 440,
+              "native_envelope_count": 1,
+              "native_envelope": {
+                "id": "segment-000000-b1-440-5",
+                "name": "unlinkat",
+                "program": "b1-w0",
+                "call_index": 4,
+                "enter_line": 14650,
+                "exit_line": 14659,
+                "raw_result": -28,
+                "errno": 28,
+                "user_result": -1,
+                "user_errno": 28,
+                "verified": true
+              },
+              "hook_trace_verified": true,
+              "native_envelope_verified": true,
+              "userspace_return_verified": true,
+              "status": "verified"
+            },
+            "isolated_after_call": true,
+            "stop_marker": "segments/segment-000000/fault-stop-after-call",
+            "offline_check": {
+              "unmount_exit": "0",
+              "fsck_exit": "0",
+              "remount_exit": "0"
+            },
+            "filesystem_tainted": true,
+            "manifest": "segments/segment-000000/manifest.json"
+          }
+        ],
+        "hit_counts_by_kind": {
+          "regular": 1
+        },
+        "hit_counts_by_operation": {
+          "unlink_inode_dirty": 1
+        },
+        "candidates": [],
+        "candidate_count": 0,
+        "raw_candidate_count": 0,
+        "finding_categories": {},
+        "unique_finding_category_count": 0,
+        "known_finding_categories": [],
+        "new_finding_categories": [],
+        "unverified": [
+          {
+            "source": "stable_snapshot",
+            "segment_id": 0,
+            "kind": "regular",
+            "phase": "after",
+            "status": "unverified",
+            "evidence": "segments/segment-000000/regular-after.json"
+          }
+        ],
+        "unverified_count": 1,
+        "review_required": true,
+        "isolated_hit_count": 1,
+        "admitted_operations": [
+          "unlink_inode_dirty"
+        ],
+        "experimental_operations": []
+      },
+      "reset_evidence": {
+        "schema": 2,
+        "kind": "regular",
+        "dev": "vdb",
+        "counter_dev": "253,16",
+        "scenario": "baseline",
+        "reset": true,
+        "before": {
+          "epoch": 117695861878,
+          "seq": 8,
+          "version": 0,
+          "active": 0
+        },
+        "after": {
+          "epoch": 125525580159,
+          "seq": 279,
+          "version": 82,
+          "active": 0
+        }
+      },
+      "target_edge_feature_scope_verified": true
+    }
+  },
+  "historical_reset_reanalysis": [
+    {
+      "campaign": "campaign-9chz7m3j",
+      "segment": 97,
+      "passed": true,
+      "blockers": [],
+      "reset_boundaries": [
+        {
+          "kind": "regular",
+          "dev": "253,16",
+          "previous_epoch": 72835648435,
+          "epoch": 2860266443573,
+          "evidence": "fault-reset.json",
+          "evidence_schema": 1,
+          "verification": "legacy_evidence_and_segment_endpoints"
+        }
+      ],
+      "trajectory_integrity": {
+        "regular-single": true,
+        "bigalloc-single": true,
+        "inline-single": true
+      }
+    },
+    {
+      "campaign": "campaign-9chz7m3j",
+      "segment": 693,
+      "passed": true,
+      "blockers": [],
+      "reset_boundaries": [
+        {
+          "kind": "regular",
+          "dev": "253,16",
+          "previous_epoch": 2860266443573,
+          "epoch": 20516545877240,
+          "evidence": "fault-reset.json",
+          "evidence_schema": 1,
+          "verification": "legacy_evidence_and_segment_endpoints"
+        }
+      ],
+      "trajectory_integrity": {
+        "regular-single": true,
+        "bigalloc-single": true,
+        "inline-single": true
+      }
+    },
+    {
+      "campaign": "campaign-9chz7m3j",
+      "segment": 954,
+      "passed": true,
+      "blockers": [],
+      "reset_boundaries": [
+        {
+          "kind": "regular",
+          "dev": "253,16",
+          "previous_epoch": 20516545877240,
+          "epoch": 27701173243991,
+          "evidence": "fault-reset.json",
+          "evidence_schema": 1,
+          "verification": "legacy_evidence_and_segment_endpoints"
+        }
+      ],
+      "trajectory_integrity": {
+        "regular-single": true,
+        "bigalloc-single": true,
+        "inline-single": true
+      }
+    },
+    {
+      "campaign": "campaign-9chz7m3j",
+      "segment": 1089,
+      "passed": true,
+      "blockers": [],
+      "reset_boundaries": [
+        {
+          "kind": "regular",
+          "dev": "253,16",
+          "previous_epoch": 27701173243991,
+          "epoch": 31429724476093,
+          "evidence": "fault-reset.json",
+          "evidence_schema": 1,
+          "verification": "legacy_evidence_and_segment_endpoints"
+        }
+      ],
+      "trajectory_integrity": {
+        "regular-single": true,
+        "bigalloc-single": true,
+        "inline-single": true
+      }
+    },
+    {
+      "campaign": "campaign-9chz7m3j",
+      "segment": 1278,
+      "passed": true,
+      "blockers": [],
+      "reset_boundaries": [
+        {
+          "kind": "regular",
+          "dev": "253,16",
+          "previous_epoch": 31429724476093,
+          "epoch": 36641529705820,
+          "evidence": "fault-reset.json",
+          "evidence_schema": 1,
+          "verification": "legacy_evidence_and_segment_endpoints"
+        }
+      ],
+      "trajectory_integrity": {
+        "regular-single": true,
+        "bigalloc-single": true,
+        "inline-single": true
+      }
+    },
+    {
+      "campaign": "campaign-9chz7m3j",
+      "segment": 1298,
+      "passed": true,
+      "blockers": [],
+      "reset_boundaries": [
+        {
+          "kind": "regular",
+          "dev": "253,16",
+          "previous_epoch": 36641529705820,
+          "epoch": 37223247874734,
+          "evidence": "fault-reset.json",
+          "evidence_schema": 1,
+          "verification": "legacy_evidence_and_segment_endpoints"
+        }
+      ],
+      "trajectory_integrity": {
+        "regular-single": true,
+        "bigalloc-single": true,
+        "inline-single": true
+      }
+    },
+    {
+      "campaign": "campaign-9chz7m3j",
+      "segment": 1465,
+      "passed": true,
+      "blockers": [],
+      "reset_boundaries": [
+        {
+          "kind": "regular",
+          "dev": "253,16",
+          "previous_epoch": 37223247874734,
+          "epoch": 41969308630974,
+          "evidence": "fault-reset.json",
+          "evidence_schema": 1,
+          "verification": "legacy_evidence_and_segment_endpoints"
+        }
+      ],
+      "trajectory_integrity": {
+        "regular-single": true,
+        "bigalloc-single": true,
+        "inline-single": true
+      }
+    },
+    {
+      "campaign": "campaign-fyubc_lv",
+      "segment": 326,
+      "passed": true,
+      "blockers": [],
+      "reset_boundaries": [
+        {
+          "kind": "regular",
+          "dev": "253,16",
+          "previous_epoch": 72967721654,
+          "epoch": 10270952760495,
+          "evidence": "fault-reset.json",
+          "evidence_schema": 1,
+          "verification": "legacy_evidence_and_segment_endpoints"
+        }
+      ],
+      "trajectory_integrity": {
+        "regular-single": true,
+        "bigalloc-single": true,
+        "inline-single": true
+      }
+    },
+    {
+      "campaign": "campaign-fyubc_lv",
+      "segment": 1089,
+      "passed": true,
+      "blockers": [],
+      "reset_boundaries": [
+        {
+          "kind": "regular",
+          "dev": "253,16",
+          "previous_epoch": 10270952760495,
+          "epoch": 33966117614755,
+          "evidence": "fault-reset.json",
+          "evidence_schema": 1,
+          "verification": "legacy_evidence_and_segment_endpoints"
+        }
+      ],
+      "trajectory_integrity": {
+        "regular-single": true,
+        "bigalloc-single": true,
+        "inline-single": true
+      }
+    },
+    {
+      "campaign": "campaign-fyubc_lv",
+      "segment": 1298,
+      "passed": true,
+      "blockers": [],
+      "reset_boundaries": [
+        {
+          "kind": "regular",
+          "dev": "253,16",
+          "previous_epoch": 33966117614755,
+          "epoch": 40273037911135,
+          "evidence": "fault-reset.json",
+          "evidence_schema": 1,
+          "verification": "legacy_evidence_and_segment_endpoints"
+        }
+      ],
+      "trajectory_integrity": {
+        "regular-single": true,
+        "bigalloc-single": true,
+        "inline-single": true
+      }
+    }
+  ]
+}

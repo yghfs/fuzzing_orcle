@@ -56,6 +56,16 @@ resource-valid 输入使用 syzkaller typed `Prog.Mutate` 保留并演化资源�
 和 resource parent mutation 的来源必须分开记录。均匀轮转是可审计基线，`rarity_fair` 是独立
 策略；动态预算也必须单独开实验，不能和反馈信号同时改变。
 
+2026-11-12 修正：typed 父程序按 `resource_template` 分池，不再由父程序覆盖计划模板。
+combined 模式默认每个模板的第 0、4、8……个实际 typed 槽位从 seed 刷新；
+`--resource-seed-refresh-every N` 可调整，0 关闭周期刷新。模板没有可用父程序或全部冷却时
+也从该模板重新播种。seed_only / parent_only 保持各自实验含义，后者仅在无活跃父程序时
+产生明确标记的 bootstrap。每次选择记录计划模板、实际模板、模板槽位和选择原因。
+
+`target_scope=ext4_jbd2` 同时约束 PC 和 edge 的准入、edge rarity/频率与子代 edge 收益；
+全内核 raw/effect edge 仍保留为诊断字段。新结果含 `feedback_edge_scope`，不能将旧结果的
+全内核 edge 奖励与新结果当作同一种处理条件。
+
 ## 每次运行必须保留的字段
 
 - ext4、JBD2 的 raw/effect PC 和 edge 累计集合及分段时间曲线；

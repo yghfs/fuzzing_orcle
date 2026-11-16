@@ -34,8 +34,9 @@ if [[ ! -r "${kernel}" || ! -r "${root_base}" ]]; then
 fi
 mkdir -p "${run_dir}"
 program="${run_dir}/ext4-ea-ref-array-memory-pressure"
+workload_source="${EXT4_EA_ARRAY_WORKLOAD_SOURCE:-${root_dir}/tests/ext4-ea-ref-array-memory-pressure.c}"
 gcc -O2 -Wall -Wextra -Werror -static -DEA_COUNT="${ea_per_file}" -o "${program}" \
-	"${root_dir}/tests/ext4-ea-ref-array-memory-pressure.c"
+	"${workload_source}"
 if [[ ! -e "${test_base}" ]]; then
 	qemu-img create -q -f raw "${test_base}" 1G
 	mke2fs -q -F -t ext4 -O ea_inode,^orphan_file -b 4096 -N 32768 \
@@ -80,7 +81,7 @@ ssh "${ssh_opts[@]}" root@127.0.0.1 'test ! -e /sys/module/ext4/parameters/ext4_
 scp -q -i "${ssh_key}" -P "${port}" -o StrictHostKeyChecking=no \
 	-o UserKnownHostsFile=/dev/null "${program}" root@127.0.0.1:/tmp/
 ssh "${ssh_opts[@]}" root@127.0.0.1 \
-	'printf 1 > /sys/kernel/debug/ext4/vdb/invariant_reset'
+	'printf 1 > /sys/kernel/debug/ext4/vdb/invariant_reset; sysctl -w vm.overcommit_memory=1 >/dev/null'
 set +e
 ssh "${ssh_opts[@]}" root@127.0.0.1 \
 	"EXT4_EA_ARRAY_MEMCG_MAX=${memcg_max} EXT4_EA_ARRAY_MEMCG_FILL_KIB=${memcg_fill_kib} EXT4_EA_ARRAY_DROP_CACHES=${drop_caches} timeout --foreground ${timeout_sec}s /tmp/ext4-ea-ref-array-memory-pressure /mnt/ext4-ea-array/workload ${files} ${locked_mib} ${min_free_kib}; rc=\$?; echo workload_rc=\${rc}; exit \${rc}" \

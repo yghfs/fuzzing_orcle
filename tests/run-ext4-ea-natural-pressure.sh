@@ -3,8 +3,9 @@ set -euo pipefail
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work_dir="$root_dir/work"
 kernel="${EXT4_EA_PRESSURE_KERNEL:-$work_dir/kernels/ext4-count-normal-new/bzImage}"
-base="$work_dir/debian-clean-smalljournal.img"
+base="${EXT4_EA_PRESSURE_ROOT_IMAGE:-$work_dir/debian-clean-smalljournal.img}"
 port="${EXT4_EA_PRESSURE_PORT:-12281}"
+qemu_mem="${EXT4_EA_PRESSURE_QEMU_MEM:-512}"
 run="${EXT4_EA_PRESSURE_RUN_DIR:-$work_dir/ext4-ea-natural-pressure-$(date +%Y%m%d%H%M%S)-$$}"
 mkdir -p "$run"
 gcc -O2 -Wall -Wextra -Werror -static -o "$run/workload" "$root_dir/tests/ext4-ea-natural-pressure.c"
@@ -13,7 +14,7 @@ mke2fs -q -F -t ext4 -O 'ea_inode,^orphan_file,^64bit' -b 4096 -N 32768 -m 0 -J 
 e2fsck -fn "$run/test.raw" >"$run/baseline-fsck.txt" 2>&1 || true
 qemu-img create -q -f qcow2 -F raw -b "$base" "$run/root.qcow2"
 qemu-img create -q -f qcow2 -F raw -b "$run/test.raw" "$run/test.qcow2"
-qemu-system-x86_64 -machine q35,accel=tcg -cpu max -m 512M -smp 2 -kernel "$kernel" \
+qemu-system-x86_64 -machine q35,accel=tcg -cpu max -m "${qemu_mem}M" -smp 2 -kernel "$kernel" \
   -drive "file=$run/root.qcow2,format=qcow2,if=virtio" -drive "file=$run/test.qcow2,format=qcow2,if=virtio" \
   -netdev "user,id=n0,hostfwd=tcp:127.0.0.1:$port-:22" -device virtio-net-pci,netdev=n0 \
   -append 'root=/dev/vda rw console=ttyS0 net.ifnames=0 ext4.ext4_checker_panic=0 ext4.ext4_checker_event_cap=65536' \

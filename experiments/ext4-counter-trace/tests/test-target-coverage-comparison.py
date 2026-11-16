@@ -313,6 +313,15 @@ class TargetCoverageComparisonTests(unittest.TestCase):
             self.assertFalse(mismatched_report['measurement_complete'])
             self.assertFalse(mismatched_report['fairness'][
                 'custom_feedback_arm_settings_aligned_except_feedback_mode'])
+            full_campaign['limits']['fresh_generate_every'] = 7
+            for control, value in (('resource_seed_refresh_every', 4),
+                                   ('resource_mutation_mode', 'seed_only')):
+                changed = json.loads(json.dumps(full_campaign))
+                changed['limits'][control] = value
+                (full / 'campaign.json').write_text(json.dumps(changed))
+                result = MODULE.build_three_arm_report(native, pc, full, 'ext4_jbd2',
+                                                       operations_pc, operations_full, 'pc_edge')
+                self.assertFalse(result['fairness']['feedback_ablation_settings_aligned'])
 
     def test_three_arm_zero_native_target_pc_is_inconclusive(self):
         with tempfile.TemporaryDirectory() as tmp:

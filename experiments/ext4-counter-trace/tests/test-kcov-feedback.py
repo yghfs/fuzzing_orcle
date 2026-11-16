@@ -240,6 +240,59 @@ class KcovFeedbackTests(unittest.TestCase):
             self.assertEqual(corpus.parent_candidate(resource_only=True)['path'],
                              corpus.corpus / (hashlib.sha256(resource.read_bytes()).hexdigest() + '.syz'))
 
+    def test_resource_templates_keep_separate_parent_pools_and_scheduler_commits(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run = pathlib.Path(temp)
+            corpus = FeedbackCorpus(run)
+            parents = {}
+            for template in ('file-state', 'namespace'):
+                directory = run / template
+                directory.mkdir()
+                source = directory / 'program.syz'
+                source.write_text(template)
+                (directory / 'program.json').write_text(json.dumps(dict(
+                    input_mode='resource-valid', resource_template=template)))
+                parents[template] = corpus._admit_parent(source, dict(admission_signals=['pc']))
+            for template in ('namespace', 'file-state', 'namespace'):
+                candidate = corpus.parent_candidate(
+                    resource_only=True, resource_template=template)
+                self.assertEqual(candidate['path'], parents[template])
+                self.assertEqual(corpus.selection_count, candidate['selection_index'])
+                corpus.commit_parent(candidate)
+            self.assertEqual(corpus.selection_count, 3)
+            self.assertEqual(corpus.selection_parent_counts['pc'], 3)
+            self.assertIsNone(corpus.parent_candidate(
+                resource_only=True, resource_template='shared-contention'))
+            self.assertEqual(corpus.selection_count, 3)
+
+    def test_exhausted_resource_template_returns_none_even_on_exploration_turn(self):
+        for policy in ('uniform_round_robin', 'rarity_fair'):
+            with self.subTest(policy=policy), tempfile.TemporaryDirectory() as temp:
+                run = pathlib.Path(temp)
+                corpus = FeedbackCorpus(run, scheduler_policy=policy)
+                for template in ('file-state', 'namespace'):
+                    directory = run / template
+                    directory.mkdir()
+                    source = directory / 'program.syz'
+                    source.write_text(template)
+                    (directory / 'program.json').write_text(json.dumps(dict(
+                        input_mode='resource-valid', resource_template=template)))
+                    target = corpus._admit_parent(source, dict(admission_signals=['pc']))
+                    if template == 'file-state':
+                        key = hashlib.sha256(target.read_bytes()).hexdigest()
+                        for _ in range(3):
+                            corpus._record_child_yield(key, dict(new_pcs=0, ext4_new=0))
+                for selections in (0, 1, 16):
+                    corpus.selection_count = selections
+                    self.assertIsNone(corpus.parent_candidate(
+                        resource_only=True, resource_template='file-state'))
+                    active = corpus.parent_candidate(
+                        resource_only=True, resource_template='namespace')
+                    self.assertEqual(json.loads(active['path'].with_suffix('.json').read_text())[
+                        'resource_template'], 'namespace')
+                # The ordinary pool still retains its periodic exploration.
+                self.assertEqual(len(corpus._eligible_parent_indices()), 2)
+
     def test_resource_admission_upgrades_existing_corpus_sidecar(self):
         with tempfile.TemporaryDirectory() as temp:
             run = pathlib.Path(temp)
@@ -852,6 +905,66 @@ class KcovFeedbackTests(unittest.TestCase):
                 self.assertEqual(bool(corpus.parents), expected)
                 row = json.loads((folder / 'coverage.json').read_text())['programs'][0]
                 self.assertEqual(row['target_new'], int(expected))
+
+    def test_edge_admission_rarity_and_child_yield_follow_target_scope(self):
+        for effect_aware in (False, True):
+            for scope in ('all', 'ext4_jbd2'):
+                for target_edge in (False, True):
+                    with self.subTest(effect=effect_aware, scope=scope, target=target_edge), \
+                            tempfile.TemporaryDirectory() as temp:
+                        run = pathlib.Path(temp)
+                        folder = run / 'segment-000000'
+                        directory = folder / 'syz-programs/b1-w0'
+                        directory.mkdir(parents=True)
+                        (folder / 'coverage').mkdir()
+                        source = directory / 'program.syz'
+                        source.write_text('child')
+                        seed = run / 'seed.syz'
+                        seed.write_text('seed')
+                        parent_hash = hashlib.sha256(seed.read_bytes()).hexdigest()
+                        (directory / 'program.json').write_text(json.dumps(dict(
+                            method='Mutate', parent_sha256=parent_hash)))
+                        features = [(pc, 0) for pc in (10, 20, 110, 120)]
+                        # Neither a generic edge nor a target-to-generic
+                        # transition belongs to the ext4/JBD2 target edge set.
+                        features += [(10, 20), (110, 10)]
+                        if target_edge:
+                            features.append((110, 120))
+                        self.sample_v5(folder / 'coverage/b1-w0.bin', features,
+                                       [(0, len(features))])
+                        corpus = FeedbackCorpus(run, feedback_mode='pc_edge',
+                            target_scope=scope, effect_aware_admission=effect_aware)
+                        corpus.ext4_ranges = [(100, 130, 'ext4_file_operation')]
+                        corpus._admit_parent(seed, dict(admission_signals=['pc']))
+                        for field in ('coverage', 'effect_pc_coverage'):
+                            getattr(corpus, field).update((10, 20, 110, 120))
+                        for field in ('target_pc_coverage', 'ext4_coverage',
+                                      'effect_target_pc_coverage', 'effect_ext4_pc_coverage'):
+                            getattr(corpus, field).update((110, 120))
+                        corpus.collect(folder, dict(segment_id=0, expected_programs=['b1-w0']))
+                        # A genuine unmodified target failure remains eligible.
+                        report = dict(native_syscalls=[dict(program='b1-w0', call_index=0,
+                            verified=True, object_dev=os.makedev(253, 16),
+                            raw_result=-1, errno=28, repaired=0, adapted=0)])
+                        result = corpus.augment(folder, report, target_device='253,16')
+                        row = json.loads((folder / 'coverage.json').read_text())['programs'][0]
+                        expected = 2 + int(target_edge) if scope == 'all' else int(target_edge)
+                        self.assertEqual(row['admitted'], bool(expected))
+                        self.assertEqual(row['admission_signals'], ['edge'] if expected else [])
+                        self.assertEqual(row['new_edges'], expected)
+                        self.assertEqual(row['raw_new_edges'], 2 + int(target_edge))
+                        self.assertEqual(len(corpus.edges), 2 + int(target_edge))
+                        self.assertEqual(result['campaign_summary']['feedback_edge_scope'], scope)
+                        edges = {feature for feature in row['feature_ids']
+                                 if feature.startswith('edge:')}
+                        self.assertEqual(len(edges), expected)
+                        if scope == 'ext4_jbd2':
+                            self.assertNotIn('edge:a:14', corpus.feature_frequency)
+                            self.assertNotIn('edge:6e:a', corpus.feature_frequency)
+                            self.assertEqual(edges, {'edge:6e:78'} if target_edge else set())
+                        self.assertEqual(corpus.parent_stats[parent_hash]['child_new_edges'], expected)
+                        self.assertEqual(corpus.parent_stats[parent_hash]['zero_any_signal_streak'],
+                                         int(not expected))
 
     def test_kcov_call_ranges_never_create_edges_across_syscalls(self):
         with tempfile.TemporaryDirectory() as temp:

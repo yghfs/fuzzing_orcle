@@ -1,6 +1,6 @@
 # ext4 Bug Inventory
 
-历史复核主体截至 2026-11-02，extent v2 补充截至 2026-11-10；文档边界核对于 2026-11-11。
+历史复核主体截至 2026-11-02，extent v2 补充截至 2026-11-10，独立 ext4 三候选补充截至 2026-11-16；文档边界核对于 2026-11-11。
 本次未重跑下列内核实验，也未重新查询上游最新 HEAD；“主线状态”仅指各条明确列出的历史版本。
 当前证据可用性见 [文档审计](DOCUMENTATION-AUDIT-20261111.md)。此清单记录已观察问题、源码定位和证据结论。重复或过时的历史运行目录
 按本轮清理要求移除；规范的当前块层 EIO 记录、必要的源码语义注入材料、修复对照和可重跑
@@ -37,13 +37,14 @@ ordered 模式 20 秒、60 秒和 `data=journal` 30 秒的普通 syscall workloa
 
 ## 分类速览
 
-- **核心公式已审计路径**：group extend 容量/bitmap 一致性、普通 mkdir/rmdir/unlink/rename 的目录计数及 `R-LINK`。group add 失败后 resize inode 指向未发布容量之外的块，是同一审计范围发现的持久化 resize metadata defect；本轮并未证明旧声称的 `R-BSUM`/`R-ISUM` mismatch。inode eviction 仍保留作生命周期审计材料，但按本轮最终报告降级为保守恢复语义。自然 inode/block quota `EDQUOT` 的失败回滚验证通过；新增 fast-commit replay 目录计数漏洞单列如下。
+- **核心公式已审计路径**：group extend 容量/bitmap 一致性、普通 mkdir/rmdir/unlink/rename/linkat 的目录计数及 `R-LINK`。group add 失败后 resize inode 指向未发布容量之外的块，是同一审计范围发现的持久化 resize metadata defect；本轮并未证明旧声称的 `R-BSUM`/`R-ISUM` mismatch。inode eviction 仍保留作生命周期审计材料，但按本轮最终报告降级为保守恢复语义。自然 inode/block quota `EDQUOT` 的失败回滚验证通过；新增 fast-commit replay 目录计数漏洞单列如下。
 - **新增已复现公式漏洞**：fast-commit replay 新目录后 `bg_used_dirs_count` 少计一个，违反 `R-UG`。使用普通 `mkdir`、文件 `fsync` 和 host hard-stop 自然触发；稳定运行时扫描、离线 bitmap/inode 扫描及 `e2fsck` 三方确认。复现报告见 [`FAST-COMMIT-DIR-COUNT-FINDING.md`](experiments/ext4-counter-trace/FAST-COMMIT-DIR-COUNT-FINDING.md)。
 - **历史 forced-shutdown 样本**：早期 `EXT4_IOC_SHUTDOWN` 竞态没有作为当前持久化 finding 证据；其无效和重复运行目录已于 2026-11-02 清理。当前结论使用正常卸载后的源码语义复核与块层 `EIO` 记录。
 - **历史主线核对**：当次记录的 torvalds/linux HEAD 为 `32c52ec87d6245ee2d12ed5dd509e40062939b50`。已从该 HEAD 核对 `fs/ext4/namei.c`：下列 unlink、rename 和 mkdir 错误出口更新顺序均仍存在，未发现相应回滚修复。
 - **此前 syscall-only 扩展不变量**：extent `i_blocks`、EA inode 引用、共享 xattr block COW 引用，以及 orphan-file slot；它们分别由 extent 可达性、EA 容器引用、xattr 条目引用和 orphan 生命周期约束。
 - **2026-11-01 源码语义注入复核**：除 fast-commit 外，5 项违反核心容量/命名空间计数后置条件的条件性缺陷得到正常卸载后的磁盘证据：group extend、mkdir、rmdir、unlink、普通 rename；group add 另有失败 resize 后非法 resize-inode 引用的持久化缺陷，但没有证明 active-group `R-BSUM`/`R-ISUM` totals mismatch。`rename_setent_dirty` 的 `-ENOSPC` 合法返回值替代是同一 rename 链接计数缺陷的另一条 caller-error-path 复现；该 hook 跳过 `jbd2_journal_dirty_metadata()`，因此没有实际执行 credit exhaustion 分支，也不构成第七个独立根因。eviction 属源码规定的保守恢复行为；orphan-file/xattr 本轮没有取得可归因于该单项且完成 journal recovery 的持久化证据，不计入。逐项边界和证据见下方复核表及 [`FINAL-AUDIT-20261031.md`](experiments/ext4-source-fault-study/FINAL-AUDIT-20261031.md)。
 - **2026-11-02 真实块层 EIO 复核**：通过 QEMU `blkdebug` 让 guest 的实际块请求返回 `EIO`，并在正常卸载后离线检查。group extend、rmdir、unlink、普通 rename 均命中清单所述错误位置并留下对应磁盘不一致；mkdir 的块层 EIO 命中 `add_dirent_to_buf()` 较早的错误出口并留下悬空目录项，但在父 `nlink` 已递增后的精确 dirty 分支暂停/清缓存复核中没有命中 EIO，mkdir 成功。group add 的真实写 EIO 触发 JBD2 abort；该 finding 依赖 `ext4_mb_add_groupinfo()` 的分配失败 `-ENOMEM`，块 I/O 错误不验证这一条件。故 5 项核心计数 finding 中 4 项有精确块层 EIO 复核，mkdir 有相邻错误分支的真实 EIO 持久化复核，精确分支仍只有源码语义注入证据；细节和证据链接见 [`PHYSICAL-IO-CORE-20261102.md`](experiments/ext4-source-fault-study/PHYSICAL-IO-CORE-20261102.md)。这里的“真实块层 EIO”指 QEMU 向 guest 返回 I/O 错误，不是宿主物理介质故障。
+- **2026-11-16 独立 ext4 三候选复核**：在独立 Linux 快照上使用 QEMU `blkdebug`，只对目标 syscall 窗口返回真实 guest-visible `EIO`。`linkat`、`FALLOC_FL_PUNCH_HOLE` 和碎片化 `FALLOC_FL_COLLAPSE_RANGE` 均在正常卸载后留下持久化不一致；对应故障组 `e2fsck -fn` 返回 4，控制组返回 0。三项分别违反 `R-LINK`、extent ownership/bitmap 和 extent `i_blocks` 后置条件；`RENAME_EXCHANGE` 父目录计数候选因真实 EIO 先命中既有 cross-rename 路径、ENOMEM 复核 clean，未计入独立 finding。完整报告见 [`INDEPENDENT-THREE-CANDIDATES-20261116.md`](experiments/ext4-source-fault-study/INDEPENDENT-THREE-CANDIDATES-20261116.md)，只读校验器见 [`verify-independent-ext4-audit.py`](experiments/ext4-source-fault-study/scripts/verify-independent-ext4-audit.py)。
 - **历史修复**：inline data 长度溢出 Oops 已由上游修复，本清单只保留修复记录。
 
 ## 核心计数公式
@@ -123,7 +124,10 @@ ordered 模式 20 秒、60 秒和 `data=journal` 30 秒的普通 syscall workloa
 - JBD2 运行时跟踪补证：在同一 sector 2312 READ EIO 路径中，从 unlink 前到正常卸载持续启用 `jbd2_journal_abort()` kprobe；命中数为 0。unlink handle 在 `jbd2_journal_stop()` 入口属于 TID 7、状态为 `T_RUNNING`，`h_err=0`、`h_aborted=0`、journal `JBD2_ABORT` 位未置位且 `j_errno=0`，该 stop 返回 0。之后 tracepoint 明确记录 transaction 7 的 start/end commit；正常 `sync` 后事务统计增加。原因是 inode-table read 在进入 journal write-access 前失败，且本次挂载为 `errors=continue`；这个块层错误没有触发全局 journal abort，但事务仍提交并持久化了 unlink 后的不一致。注意，旧 `unlink_parent_global_abort` 源码语义注入曾专门触发 writeback-error abort，日志中的 `Aborting journal` 属于另一条路径；不能当成本次物理 READ EIO 的调用记录。逐事件记录与采集脚本见 [`unlink-jbd2-serial.log`](experiments/ext4-source-fault-study/results/unlink-jbd2-state-20261102/unlink-jbd2-serial.log)、[`unlink-jbd2-qmp-transcript.jsonl`](experiments/ext4-source-fault-study/results/unlink-jbd2-state-20261102/unlink-jbd2-qmp-transcript.jsonl)、[`run-unlink-jbd2-trace.py`](experiments/ext4-source-fault-study/scripts/run-unlink-jbd2-trace.py) 和 [`PHYSICAL-IO-CORE-20261102.md`](experiments/ext4-source-fault-study/PHYSICAL-IO-CORE-20261102.md)。
 - 证据边界：此前 inode-table read-result hook 命中 uptodate cache，只验证 helper 错误清理；2026-11-02 的 `blkdebug` 实验让 guest 实际走块层读请求失败并收到 virtio 磁盘 `EIO`。错误由 QEMU 注入，不是宿主物理介质或控制器故障。
 - 主线状态：torvalds/linux HEAD `d135ab453a7400a34930bdda1ef4bdc8acfac80e` 的 [`namei.c`](kernel/linux-mainline/fs/ext4/namei.c) 仍先删除目录项、再 dirty 父 inode，并只在其成功后执行 `drop_nlink(inode)`；该错误顺序仍存在。
-- 修复草案：主线版本补丁为 [`mainline-d135ab-ext4-unlink-reserve-inode-write-access.patch`](experiments/ext4-source-fault-study/patches/mainline-d135ab-ext4-unlink-reserve-inode-write-access.patch)，已应用在 `kernel/linux-mainline` 的 `ext4-unlink-reserve-inode-write-access` 分支。历史核对确认，父 inode dirty 失败后提前退出的行为由 `4209ae12b122`（`ext4: handle ext4_mark_inode_dirty errors`）引入：此前该处忽略 dirty 错误并继续递减目标 `nlink`。补丁据此标注 `Fixes: 4209ae12b122`，并列入 stable。它在删除目录项前预留父 inode 与目标 inode 的 inode-table buffer/journal write access；`fs/ext4/namei.o` 在该主线 HEAD 上 `W=1` 编译通过。修复后的四组 parent/target read-result 与 journal write-access 回归来自 Linux 6.12.1 实验树：四次均为 `unlink -> EIO`、正常卸载、`e2fsck -fn` 无诊断，且磁盘仍保留 `file` 和 inode 13 `Links: 1`；无故障对照为正常删除、`Links: 0`、目录无 `file`、`e2fsck -fn` 通过。原始输出见 [`qemu-fix-validation`](experiments/ext4-source-fault-study/results/qemu-fix-validation/)。当前主线 checkout 只完成 `fs/ext4/namei.o` 的 `W=1` 编译；完整主线 QEMU fault-injection 尚未运行。inode-read 注入命中 uptodate cache 后走原生 read-error cleanup，不代表物理块设备 read 失败。补丁草案尚未发送上游。
+- 修复补丁：主线版本补丁为 [`mainline-d135ab-ext4-unlink-reserve-inode-write-access.patch`](experiments/ext4-source-fault-study/patches/mainline-d135ab-ext4-unlink-reserve-inode-write-access.patch)，历史验证记录使用 `kernel/linux-mainline` 的 `ext4-unlink-reserve-inode-write-access` 分支。历史核对确认，父 inode dirty 失败后提前退出的行为由 `4209ae12b122`（`ext4: handle ext4_mark_inode_dirty errors`）引入：此前该处忽略 dirty 错误并继续递减目标 `nlink`。补丁据此标注 `Fixes: 4209ae12b122`，并列入 stable。它在删除目录项前预留父 inode 与目标 inode 的 inode-table buffer/journal write access；`fs/ext4/namei.o` 在该主线 HEAD 上 `W=1` 编译通过。修复后的四组 parent/target read-result 与 journal write-access 回归来自 Linux 6.12.1 实验树：四次均为 `unlink -> EIO`、正常卸载、`e2fsck -fn` 无诊断，且磁盘仍保留 `file` 和 inode 13 `Links: 1`；无故障对照为正常删除、`Links: 0`、目录无 `file`、`e2fsck -fn` 通过。原始输出见 [`qemu-fix-validation`](experiments/ext4-source-fault-study/results/qemu-fix-validation/)。该主线版本只完成 `fs/ext4/namei.o` 的 `W=1` 编译；完整主线 QEMU fault-injection 尚未运行。inode-read 注入命中 uptodate cache 后走原生 read-error cleanup，不代表物理块设备 read 失败。
+- 上游投稿与审阅状态（2026-11-16 核对）：已于 **2026-10-27 18:53:51 +0800** 发给 Theodore Ts'o 并抄送 linux-ext4/stable；[lore 原邮件](https://lore.kernel.org/linux-ext4/tencent_D60E766CE07D3A1847B81DE9BC37B4466908@qq.com/) 的 Message-ID 为 `<tencent_D60E766CE07D3A1847B81DE9BC37B4466908@qq.com>`，[Spinics 原邮件镜像](https://www.spinics.net/lists/linux-ext4/msg113195.html) 已实查。**当天 19:05:02 +0800 已有 [Sashiko AI 机器人回复](https://www.spinics.net/lists/linux-ext4/msg113196.html)**，原文为 “Sashiko has reviewed this patch and found no issues.”；这不是维护者的人工审阅或接收通知。本次检索 Spinics 最新及后续 5 页日期索引，只找到原邮件与该机器人回复，尚未查到人工回复；lore 实时线程返回 Anubis 验证页，故不把镜像检索当成对所有回复的完整证明。距投稿约 20 天，可在原线程礼貌跟进，并补充 11 月 2 日块层 READ EIO、JBD2 未 abort 且 TID 7 已提交、正常卸载后 fsck 异常及修复对照证据。维护者未回复的具体原因没有公开证据，不能据此认定 finding 被否定或补丁被拒绝。
+
+- 跟进投递（2026-11-16）：已保存带原线程 `In-Reply-To`/`References` 的[跟进邮件](experiments/ext4-source-fault-study/submissions/unlink-followup-20261116.eml)，补充真实块层 READ EIO、JBD2 状态与修复对照；对比 extent 补丁后重新核对当前主线 `MAINTAINERS` 和 `get_maintainer.pl`，保留 Theodore Ts'o 为 To，补齐 Jan Kara 等 ext4 reviewers、Fixes 原作者 Harshad Shirwadkar，以及 linux-ext4/linux-kernel/stable 列表。用户提供的正式发送输出记录邮件 Date 为 **2026-11-16 15:35:19 +0800**，QQ SMTP 返回 **`Result: 250`**，说明发送服务器已接受邮件；本地生成的 Message-ID 为 `<20261116073519.21804-1-3164729207@qq.com>`。该 ID 不同于前一次 dry-run 的 ID，且 QQ 可能改写它；**归档中的实际 Message-ID、最终收件状态及人工回复待确认**。收件人依据、投递记录、已执行命令及证据索引见[跟进说明](experiments/ext4-source-fault-study/UNLINK-FOLLOWUP-20261116.md)。
 
 ### rename 错误出口源/目标目录项与 inode nlink 不一致（条件性源码语义 finding）
 
@@ -142,6 +146,15 @@ ordered 模式 20 秒、60 秒和 `data=journal` 30 秒的普通 syscall workloa
 - 真实块层 EIO 补充（2026-11-02）：sector 344 READ 错误命中更早的 `add_dirent_to_buf()` parent dirty 出口；`mkdir()` 返回 `EIO`，正常卸载后 `e2fsck -fn` 报 `newdir` 指向已删除/未分配 inode。它证明相邻错误出口也能留下持久化目录项/分配不一致，但没有命中本条特指的 parent `nlink` 已递增后、显式 parent inode dirty 失败分支；精确暂停点复核没有收到 EIO、mkdir 成功。详见 [`PHYSICAL-IO-CORE-20261102.md`](experiments/ext4-source-fault-study/PHYSICAL-IO-CORE-20261102.md#结果)。
 - 错误判据：失败 mkdir 不应留下已发布的 child dirent，也不应让父目录 nlink 相对调用前增加；`R_U` 与 group directory count/已分配目录 inode 仍须一致。该条件用于判断源码语义注入与块层 EIO 后的持久化状态。
 - 主线状态：torvalds/linux HEAD `32c52ec87d6245ee2d12ed5dd509e40062939b50` 的 `fs/ext4/namei.c` 仍在 `ext4_inc_count(dir)` 后 dirty 父 inode；失败仍跳到清理 child 的 `out_clear_inode`，没有递减父目录 nlink。
+
+### linkat 目录项插入后 inode nlink 未同步（条件性块层 EIO finding）
+
+- 公式归属：`R-LINK`。稳定状态下，普通 inode 的 raw `i_nlink` 必须等于指向它的目录项引用数。
+- 源码位置：`fs/ext4/namei.c:3476-3479` 的 `__ext4_link()` 先成功调用 `__ext4_add_entry()` 插入目录项，再调用 `ext4_mark_inode_dirty(handle, inode)` 写回目标 inode；该 dirty 失败时没有删除已经插入的目录项或恢复 inode link count。
+- 问题描述：`linkat()` 返回错误时，目录命名空间已经增加一个引用，但目标 inode 的持久化 `nlink` 仍为旧值，形成目录项引用数与 inode link count 不一致。
+- 当前证据（2026-11-16）：QEMU `blkdebug` 在 guest 已挂载并进入 syscall 窗口后，对目标 inode-table sector 368 返回真实 `EIO`。`linkat()` 返回 `EIO`，在线 checker 报 `refs_live=2`、raw `actual=1`；正常卸载后的 `e2fsck -fn` 报 inode 93 `ref count is 1, should be 2`，返回码 4。无故障控制组 `expected=2 actual=2`，`e2fsck -fn` 返回码 0。证据目录为 [`linkat-eio-precise`](work/ext4-independent-audit/runs/linkat-eio-precise/)、[`linkat-control`](work/ext4-independent-audit/runs/linkat-control/)。
+- 去重边界：该路径是“新硬链接目录项已插入、目标 inode dirty 失败”，与已有 unlink/普通 rename 的目录项顺序不同；不把同一 `R-LINK` 公式按多个错误点重复计数。
+- 可重复核验：运行 [`verify-independent-ext4-audit.py`](experiments/ext4-source-fault-study/scripts/verify-independent-ext4-audit.py)，会同时验证本条及另外两项独立候选。
 
 ## 2026-11-01 源码语义错误注入复核
 
@@ -182,6 +195,22 @@ group add 的写 EIO 触发 JBD2 abort，不能替代其 `-ENOMEM` 分配失败�
 
 以下计数类问题使用旧 checker 的专用模型，不属于当前 [`公式.md`](公式.md) 核心公式集。
 这些模型、条目及现存材料均保留；各项历史材料的可用性由对应的证据边界说明。
+
+### punch hole 后释放块仍被 extent tree 认领（条件性块层 EIO finding）
+
+- 公式归属：extent ownership 与 `i_blocks`/bitmap 守恒，属于附加计数模型；不是已有 extent-grow 增深 finding 的同一源码边界。
+- 源码位置：`fs/ext4/inode.c:5324-5328` 调用 `ext4_ext_remove_space()` 释放 hole 区间，随后 `inode.c:5343-5345` 调用 `ext4_mark_inode_dirty()` 持久化 inode；该 dirty 失败后没有回滚已经完成的 extent/block 释放状态。
+- 问题描述：释放区间的块位图已经被清除，但 inode 的持久化 extent tree 仍可达这些数据块，形成 bitmap 与 extent ownership 不一致。
+- 当前证据（2026-11-16）：真实块层 sector 368 `EIO` 命中 inode dirty 错误路径；`fallocate(FALLOC_FL_PUNCH_HOLE)` 返回 `EIO`，checker 报 `expected_free_reachable=0 actual=128`，正常卸载后 `e2fsck -fn` 报 `Block bitmap differences: +(2306--2433)`，返回码 4。无故障控制组 `actual=0`，返回码 0。证据目录为 [`punch-eio-verified3`](work/ext4-independent-audit/runs/punch-eio-verified3/)、[`punch-control-seeded`](work/ext4-independent-audit/runs/punch-control-seeded/)。
+- 证据边界：EIO 由 QEMU `blkdebug` 返回给 guest，故证明的是 ext4 在真实块层读错误下的持久化错误路径；不把它表述为宿主物理介质故障。
+
+### 碎片化 collapse range 后 extent 与 i_blocks 不一致（条件性块层 EIO finding）
+
+- 公式归属：extent ownership/`i_blocks`，属于附加计数模型；与已有 `ext4_ext_grow_indepth()` 未发布元数据块问题分开计数。
+- 源码位置：`fs/ext4/extents.c:5482-5484` 的 `ext4_ext_shift_path_extents()` 在修改 extent 后调用 `ext4_ext_dirty()`；错误返回直接退出。`ext4_collapse_range()` 的释放、移动和 inode accounting 因此可能在同一事务中分裂，缺少对已完成修改的回滚。
+- 问题描述：碎片化 extent 树执行 `FALLOC_FL_COLLAPSE_RANGE` 时，区间移除/块释放已发生，后续 extent dirty 返回错误，磁盘 inode `i_blocks` 仍保留旧值，导致 raw accounting 高于 extent 可达块数。
+- 当前证据（2026-11-16）：sector 368 真实 `EIO` 命中 `__ext4_ext_dirty`；`COLLAPSE_RANGE` 返回 `EIO`，checker 报 `expected_sectors=776 actual_sectors=1032`，正常卸载后的 `e2fsck -fn` 报 `Inode 94, i_blocks is 1032, should be 776`，返回码 4。无故障控制组为 `776/776`，返回码 0。证据目录为 [`collapse-fragmented-eio`](work/ext4-independent-audit/runs/collapse-fragmented-eio/)、[`collapse-fragmented-control`](work/ext4-independent-audit/runs/collapse-fragmented-control/)。
+- 主线状态边界：本轮完成了本地源码快照和 guest 复现，没有据此声明最新上游已修复或未修复；源码与运行版本信息见 [`INDEPENDENT-THREE-CANDIDATES-20261116.md`](experiments/ext4-source-fault-study/INDEPENDENT-THREE-CANDIDATES-20261116.md)。
 
 ### extent tree 增深后 `i_blocks` 多计不可达元数据块
 

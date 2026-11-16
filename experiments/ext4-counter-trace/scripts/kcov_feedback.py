@@ -451,6 +451,7 @@ class FeedbackCorpus:
         self.parents: list[pathlib.Path] = []
         self.parent_by_hash: dict[str, pathlib.Path] = {}
         self.resource_parent_hashes: set[str] = set()
+        self.resource_parent_templates: dict[str, str] = {}
         self.parent_stats: dict[str, dict] = {}
         self.parent_cursor = 0
         self.selection_count = 0
@@ -515,6 +516,7 @@ class FeedbackCorpus:
                     jbd2_pc_coverage=len(self.jbd2_pc_coverage),
                     target_pc_coverage=len(self.target_pc_coverage),
                     target_scope=self.target_scope,
+                    feedback_edge_scope=self.target_scope,
                     target_fraction=(len(self.target_pc_coverage) /
                                      len(self.coverage) if self.coverage else 0.0),
                     # The primary custom view includes every complete,
@@ -568,10 +570,15 @@ class FeedbackCorpus:
                     feedback_complete=not self.gaps and self.counts['expected_samples'] > 0,
                     gaps=list(self.gaps))
 
-    def parent_candidate(self, resource_only=False) -> dict | None:
+    def parent_candidate(self, resource_only=False, resource_template=None) -> dict | None:
+        if resource_template is not None and not resource_only:
+            raise ValueError('resource_template_requires_resource_only')
         pool = ([index for index, path in enumerate(self.parents)
                  if _sha(path) in self.resource_parent_hashes]
                 if resource_only else list(range(len(self.parents))))
+        if resource_template is not None:
+            pool = [index for index in pool
+                    if self._resource_template(self.parents[index]) == resource_template]
         if not pool:
             return None
         # Resource-valid slots have a smaller, changing parent pool than the
@@ -580,6 +587,8 @@ class FeedbackCorpus:
         # otherwise a parent that repeatedly produces no target PC can be
         # selected again and again as the pool grows.
         index = self._choose_parent_index(pool, enforce_cooldown=resource_only)
+        if index is None:
+            return None
         path = self.parents[index]
         key = _sha(path)
         stats = self._parent_stats(key, path)
@@ -604,6 +613,17 @@ class FeedbackCorpus:
                     yield_observations=int(stats.get('yield_observations', 0) or 0),
                     admission_kind=self.parent_signal_kinds.get(key, 'unknown'),
                     resource_parent=key in self.resource_parent_hashes)
+
+    def _resource_template(self, path):
+        key = _sha(path)
+        if key not in self.resource_parent_templates:
+            try:
+                metadata = json.loads(path.with_suffix('.json').read_text())
+            except (OSError, ValueError):
+                return None
+            if metadata.get('input_mode') == 'resource-valid':
+                self.resource_parent_templates[key] = metadata.get('resource_template')
+        return self.resource_parent_templates.get(key)
 
     def _parent_stats(self, parent_hash, path=None):
         """Return a complete, backward-compatible parent statistics record."""
@@ -728,8 +748,8 @@ class FeedbackCorpus:
         # The normal rarity pool excludes parents with a repeated zero-yield
         # streak. Every fixed interval reopens the complete eligible pool so
         # a parent can recover after global coverage changes.
-        if ((self.scheduler_policy == 'rarity_fair' or enforce_cooldown) and
-                self.selection_count % YIELD_EXPLORATION_INTERVAL != 0):
+        if (enforce_cooldown or (self.scheduler_policy == 'rarity_fair' and
+                self.selection_count % YIELD_EXPLORATION_INTERVAL != 0)):
             active = []
             for index in indices:
                 stats = self._parent_stats(_sha(self.parents[index]))
@@ -737,11 +757,16 @@ class FeedbackCorpus:
                                    stats.get('zero_yield_streak', 0))
                 if int(streak or 0) < ZERO_YIELD_COOLDOWN_STREAK:
                     active.append(index)
-            indices = active or indices
+            # A typed slot can refresh its seed when its own template pool
+            # is exhausted. Do not reopen that exhausted pool at an ordinary
+            # scheduler exploration turn or fall back to another template.
+            indices = active if enforce_cooldown else (active or indices)
         return indices
 
     def _choose_parent_index(self, pool=None, enforce_cooldown=False):
         eligible = self._eligible_parent_indices(pool, enforce_cooldown)
+        if not eligible:
+            return None
         if self.scheduler_policy == 'uniform_round_robin':
             return eligible[self.parent_cursor % len(eligible)]
         if self.scheduler_policy != 'rarity_fair':
@@ -926,6 +951,7 @@ class FeedbackCorpus:
             parents.append(record)
         payload = dict(schema=2, policy=self.scheduler_policy,
                        feedback_mode=self.feedback_mode,
+                       feedback_edge_scope=self.target_scope,
                        parent_cursor=self.parent_cursor,
                        selection_count=self.selection_count,
                        admission_parent_counts=dict(self.admission_parent_counts),
@@ -968,6 +994,7 @@ class FeedbackCorpus:
                 metadata = {}
             if metadata.get('input_mode') == 'resource-valid':
                 self.resource_parent_hashes.add(program_hash)
+                self.resource_parent_templates[program_hash] = metadata.get('resource_template')
                 # A content-identical program may first enter the corpus via
                 # ordinary admission and later be observed as a typed
                 # resource-valid parent. Preserve the resource provenance so
@@ -1173,6 +1200,18 @@ class FeedbackCorpus:
         # summaries prevent segment and campaign completeness being confused.
         return dict(segment, segment_summary=segment, campaign_summary=campaign)
 
+    def _feedback_edges(self, item, fresh=False):
+        """Use one edge scope for admission, rarity, frequency, and child yield."""
+        if self.effect_aware_admission:
+            field = ('effect_fresh_target_edges' if fresh else 'effect_target_edges') \
+                if self.target_scope == 'ext4_jbd2' else \
+                ('effect_fresh_edges' if fresh else 'effect_edges')
+        else:
+            field = ('target_fresh_edges' if fresh else 'target_edges') \
+                if self.target_scope == 'ext4_jbd2' else \
+                ('fresh_edges' if fresh else 'edges')
+        return item.get(field, set())
+
     def augment(self, folder: pathlib.Path, report: dict, native_execution_verified=True,
                 timeline_path: pathlib.Path | None = None, mode='single',
                 target_device=None) -> dict:
@@ -1213,6 +1252,7 @@ class FeedbackCorpus:
             for item in pending:
                 item_effects = {}
                 effect_pcs, effect_edges = set(), set()
+                effect_target_edges = set()
                 eligible_indices = set()
                 for feature_row in item['call_features']:
                     index = feature_row['call_index']
@@ -1256,10 +1296,12 @@ class FeedbackCorpus:
                         eligible_indices.add(index)
                         effect_pcs.update(feature_row['pcs'])
                         effect_edges.update(feature_row['edges'])
+                        effect_target_edges.update(feature_row['target_edges'])
                 item['call_effects'] = item_effects
                 item['eligible_call_indices'] = eligible_indices
                 item['effect_pcs'] = effect_pcs
                 item['effect_edges'] = effect_edges
+                item['effect_target_edges'] = effect_target_edges
                 effect_target = classify_target_pcs(effect_pcs, self.ext4_ranges)
                 item['effect_target_pcs'] = set(effect_target['target_pcs'])
                 item['effect_target_ext4_pcs'] = set(effect_target['ext4_pcs'])
@@ -1346,7 +1388,7 @@ class FeedbackCorpus:
                                if self.effect_aware_admission else item.get('target_ext4_pcs', set()))
                 ids = {f'pc:{pc:x}' for pc in scored_pcs}
                 ids.update(f'ext4:{pc:x}' for pc in scored_ext4)
-                scored_edges = item.get('effect_edges', set()) if self.effect_aware_admission else item['edges']
+                scored_edges = self._feedback_edges(item)
                 ids.update(f'edge:{left:x}:{right:x}' for left, right in scored_edges)
                 for feature in ids:
                     self.feature_frequency[feature] = self.feature_frequency.get(feature, 0) + 1
@@ -1446,6 +1488,11 @@ class FeedbackCorpus:
                         raw_target_new_edges=len(item.get('target_fresh_edges', set())),
                         effect_new_target_edges=len(effect_fresh_target_edges),
                         effect_eligible=item['effect_eligible'])
+                # Preserve the full-kernel edge diagnostics while using the
+                # configured target consistently for scheduling and yield.
+                feature_summary.setdefault('raw_new_edges', len(item['fresh_edges']))
+                feature_summary['feedback_edge_scope'] = self.target_scope
+                feature_summary['new_edges'] = len(self._feedback_edges(item, fresh=True))
                 per_program['new_semantic_features'] = fresh_semantic
                 row.update(feature_summary)
                 source = pathlib.Path(folder) / 'syz-programs' / item['program'] / 'program.syz'
@@ -1454,13 +1501,13 @@ class FeedbackCorpus:
                     pc_novelty = (item['effect_fresh_target']
                                   if self.target_scope == 'ext4_jbd2'
                                   else item['effect_fresh_pcs'])
-                    edge_novelty = item['effect_fresh_edges']
+                    edge_novelty = self._feedback_edges(item, fresh=True)
                     admission_allowed = item['effect_eligible']
                 else:
                     pc_novelty = (item.get('target_fresh', set())
                                   if self.target_scope == 'ext4_jbd2'
                                   else item['fresh'])
-                    edge_novelty = item['fresh_edges']
+                    edge_novelty = self._feedback_edges(item, fresh=True)
                     admission_allowed = True
                 new_pc = bool(pc_novelty) and feedback_mode != 'none'
                 new_edge = bool(edge_novelty) and feedback_mode in ('pc_edge', 'pc_edge_semantic')
@@ -1488,8 +1535,7 @@ class FeedbackCorpus:
                                   else item.get('target_pcs', set()))
                     feature_ids.extend(f'target:{pc:x}' for pc in target_ids)
                 if feedback_mode in ('pc_edge', 'pc_edge_semantic'):
-                    edges_for_features = (item['effect_edges'] if self.effect_aware_admission
-                                          else item['edges'])
+                    edges_for_features = self._feedback_edges(item)
                     feature_ids.extend(f'edge:{left:x}:{right:x}' for left, right in edges_for_features)
                 if feedback_mode in ('pc_semantic', 'pc_edge_semantic'):
                     feature_ids.extend('sem:' + feature for feature in per_program['features'])

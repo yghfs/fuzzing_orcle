@@ -4,6 +4,7 @@ import importlib.util
 import gzip
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,10 +12,12 @@ import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / 'scripts'))
-from campaign import aggregate, atomic_json, digest, KINDS, LOSS_KEYS
+from campaign import aggregate, atomic_json, digest, read_json, KINDS, LOSS_KEYS
 from campaign_runner import (Collector, CampaignError, Runner, carry_start_line,
                              directory_bytes, program_input_plan, select_program_input,
                              split_ordinary_slot_is_fresh,
+                             resource_input_candidate, lifecycle_intervals,
+                             reset_boundary_evidence,
                              random_fault_policy,
                              RANDOM_FAULT_OPERATIONS,
                              fault_status_matches_arm,
@@ -535,6 +538,77 @@ class CampaignTests(unittest.TestCase):
                                'scripts/campaign_runner.py'), '--help'],
             check=True, capture_output=True, text=True)
         self.assertIn('--resource-mutation-mode', result.stdout)
+        self.assertIn('--resource-seed-refresh-every', result.stdout)
+
+    def test_collect_segment_keeps_template_rotation_and_independent_seed_refresh(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from kcov_feedback import FeedbackCorpus
+        runner = object.__new__(Runner)
+        runner.run = self.run
+        runner.args = SimpleNamespace(max_batches=1, resource_valid_every=1,
+            fresh_generate_every=0, resource_mutation_mode='combined',
+            resource_seed_refresh_every=4, mutation_budget_policy='fixed',
+            syz_calls=16, max_mutation_calls=256, scheduler_policy='uniform_round_robin',
+            feedback_mode='pc_edge_semantic')
+        runner.feedback = FeedbackCorpus(self.run)
+        runner.generated_syscalls = 0
+        runner.progress = lambda *a, **k: None
+        runner.command = lambda *a, **k: None
+        runner.push = lambda *a, **k: (_ for _ in ()).throw(RuntimeError('generation_complete'))
+        observed = []
+
+        def generate(command, generator, directory, seed, count, **kwargs):
+            directory.mkdir(parents=True)
+            source = directory / 'program.syz'
+            source.write_text(str(seed))
+            template = kwargs['resource_template']
+            parent = kwargs['mutate']
+            if parent:
+                parent_meta = json.loads(parent.with_suffix('.json').read_text())
+                self.assertEqual(parent_meta['resource_template'], template)
+            metadata = dict(input_mode='resource-valid', resource_template=template,
+                method='ResourceMutate' if parent else 'ResourceSeed',
+                calls=[dict(index=i) for i in range(count)], decision=kwargs['decision'])
+            atomic_json(directory / 'program.json', metadata)
+            # Seed candidates become eligible before the following slot.
+            runner.feedback._admit_parent(source, dict(admission_signals=['pc']))
+            observed.append((template, bool(parent), kwargs['decision']))
+            return metadata
+
+        with patch('campaign_runner.generate_program', side_effect=generate):
+            for index in range(20):
+                folder = self.run / 'segments' / f'typed-{index}'
+                folder.mkdir()
+                atomic_json(folder / 'manifest.json', dict(segment_id=index, workers=1,
+                    object_sharing='private', seed=index+1, generated_syscalls=0))
+                with self.assertRaisesRegex(RuntimeError, 'generation_complete'):
+                    runner.collect_segment(folder)
+        for template in ('namespace', 'file-state'):
+            slots = [(parent, decision) for actual, parent, decision in observed if actual == template]
+            self.assertEqual(len(slots), 10)
+            self.assertEqual([i for i, (parent, _) in enumerate(slots) if not parent], [0, 4, 8])
+            for index, (_, decision) in enumerate(slots):
+                self.assertEqual(decision['resource_template_slot'], index)
+                self.assertEqual(decision['planned_resource_template'], template)
+        self.assertEqual(runner.feedback.selection_count, 14)
+
+    def test_resource_split_modes_and_exhausted_templates_reseed(self):
+        from kcov_feedback import FeedbackCorpus
+        feedback = FeedbackCorpus(self.run)
+        for mode in ('combined', 'seed_only', 'parent_only'):
+            candidate, task, _ = resource_input_candidate(feedback, 'namespace', 1, mode, 4)
+            self.assertIsNone(candidate)
+            self.assertEqual(task, 'resource_parent_bootstrap' if mode == 'parent_only'
+                             else 'resource_valid_seed')
+        with patch.object(feedback, 'parent_candidate', return_value={'path': 'parent'}) as choose:
+            candidate, task, _ = resource_input_candidate(feedback, 'namespace', 0, 'parent_only', 4)
+            self.assertEqual(task, 'resource_mutate')
+            self.assertIsNotNone(candidate)
+            choose.assert_called_once_with(resource_only=True, resource_template='namespace')
+            choose.reset_mock()
+            resource_input_candidate(feedback, 'namespace', 0, 'seed_only', 4)
+            choose.assert_not_called()
 
     def test_measurement_start_preserves_prepared_setup_anchors(self):
         runner = object.__new__(Runner)
@@ -1239,6 +1313,126 @@ class CampaignTests(unittest.TestCase):
         # Legacy evidence has no persisted epoch identity; latest is the
         # current boundary in the carried trace.
         self.assertEqual(select_snapshot_event(events, snapshot, '253,32')['line'], 20)
+
+    def reset_chain_fixture(self):
+        import gzip
+        folder = self.run / 'reset-segment'; folder.mkdir()
+        carry = self.run / 'previous-segment'; carry.mkdir()
+        (carry / 'analysis').mkdir()
+        with gzip.open(carry / 'analysis/carry-out.txt.gz', 'wt') as stream:
+            stream.write('retained old trace\n')
+        manifest = dict(mode='single', kind='regular', issues=[], filesystem_reset_before=True,
+                        filesystem_reset_completed=True, filesystem_reset_evidence='fault-reset.json')
+        atomic_json(folder / 'manifest.json', manifest)
+        atomic_json(folder / 'fault-reset.json', dict(schema=2, kind='regular', dev='vdb',
+            counter_dev='253,16', reset=True, before=dict(epoch=42, seq=16, active=0),
+            after=dict(epoch=99, seq=0, active=0)))
+        events = []
+        identities = {}
+        for kind, dev in self.meta['devices'].items():
+            old = fixtures.Fixture(); old.snapshot(1); old.snapshot(2)
+            old_seq = len(old.events)
+            atomic_json(carry / f'{kind}-after.json', old.snapshots[-1][1])
+            atomic_json(carry / f'{kind}-end.json', dict(epoch=42, seq=old_seq, active=0))
+            for event in old.events:
+                event['dev'] = dev
+            if kind == 'regular':
+                current = fixtures.Fixture(); current.snapshot(1); current.snapshot(2)
+                for event in current.events:
+                    event.update(epoch=99, dev=dev)
+                start = dict(epoch=99, seq=0, active=0)
+            else:
+                current = old
+                current.snapshot(3); current.snapshot(4)
+                for event in current.events:
+                    event['dev'] = dev
+                start = dict(epoch=42, seq=old_seq, active=0)
+            atomic_json(folder / f'{kind}-start.json', start)
+            atomic_json(folder / f'{kind}-end.json', dict(
+                epoch=start['epoch'], seq=current.events[-1]['seq'], active=0))
+            atomic_json(folder / f'{kind}-before.json', current.snapshots[-2][1])
+            atomic_json(folder / f'{kind}-after.json', current.snapshots[-1][1])
+            begin = next(e for e in old.events if e['formula'] == 'BEGIN' and e['op'] == 2)
+            identities[f'{kind}-after'] = {k: begin[k] for k in ('epoch', 'seq')}
+            events.extend(old.events if kind == 'regular' else [])
+            events.extend(current.events)
+        for line, event in enumerate(events, 1):
+            event.update(line=line, timestamp_ns=line*1000)
+        atomic_json(carry / 'manifest.json', dict(snapshot_events=identities))
+        return folder, carry, manifest, events
+
+    def analyze_reset_chain(self, folder, carry, manifest, events):
+        intervals, snapshots, boundaries = lifecycle_intervals(
+            folder, manifest, events, self.meta['devices'], carry)
+        analysis = folder / 'analysis'
+        lines = []
+        for e in events:
+            fields = ' '.join(f'{k}={v}' for k, v in e.items() if k not in
+                              {'line', 'timestamp_ns', 'cpu', 'pid', 'comm'})
+            lines.append(f"worker-{e['pid']} [000] ..... {e['timestamp_ns']/1e9:.9f}: "
+                         f'ext4_counter_event: {fields}\n')
+        (analysis / 'trace.txt').write_text(''.join(lines))
+        (analysis / 'cpu0-stats.txt').write_text('overrun: 0\ncommit overrun: 0\ndropped events: 0\n')
+        atomic_json(analysis / 'chain-manifest.json', dict(intervals=intervals,
+                                                         reset_boundaries=boundaries))
+        return fixtures.analyze(analysis), intervals, snapshots, boundaries
+
+    def test_reset_restarts_only_target_chain_and_reused_snapshot_ids_are_unambiguous(self):
+        folder, carry, manifest, events = self.reset_chain_fixture()
+        report, intervals, snapshots, boundaries = self.analyze_reset_chain(folder, carry, manifest, events)
+        self.assertTrue(report['passed'], report['blockers'])
+        self.assertEqual(len(boundaries), 1)
+        self.assertEqual(boundaries[0]['epoch'], 99)
+        self.assertNotIn('regular-carry.json', intervals[0]['snapshots'])
+        for interval in intervals[1:]:
+            self.assertIn(interval['name'].split('-')[0]+'-carry.json', interval['snapshots'])
+        self.assertEqual(snapshots['regular-after']['epoch'], 99)
+        # The following segment must use the new epoch as its carried anchor.
+        atomic_json(folder / 'manifest.json', dict(snapshot_events=snapshots))
+        (folder / 'analysis/carry-out.txt.gz').write_bytes(b'bounded carry')
+        next_folder = self.run / 'next-segment'; next_folder.mkdir()
+        for path in folder.glob('*.json'):
+            if any(path.name.startswith(k+'-') for k in KINDS):
+                shutil.copy2(path, next_folder / path.name)
+        next_manifest = dict(mode='single', kind='regular', issues=[])
+        next_intervals, _, next_boundaries = lifecycle_intervals(
+            next_folder, next_manifest, events, self.meta['devices'], folder)
+        self.assertFalse(next_boundaries)
+        self.assertIn('regular-carry.json', next_intervals[0]['snapshots'])
+        self.assertEqual(read_json(next_folder/'analysis/regular-start.json')['epoch'], 99)
+
+    def test_reset_does_not_hide_missing_or_duplicate_events_on_any_device(self):
+        folder, carry, manifest, events = self.reset_chain_fixture()
+        for dev, epoch in (('253,16', 99), ('253,32', 42)):
+            victim = next(e for e in events if e['dev'] == dev and e['epoch'] == epoch
+                          and e['point'] == 'SNAPSHOT.MEMORY.STABLE' and e['formula'] == 'R-BSUM'
+                          and e['op'] == (1 if epoch == 99 else 3))
+            for altered in ([e for e in events if e is not victim], events+[victim]):
+                report, _, _, _ = self.analyze_reset_chain(folder, carry, manifest, altered)
+                self.assertFalse(report['passed'])
+                self.assertTrue(any('sequence_missing_duplicate_or_wrong_epoch' in r['integrity_issues']
+                                    for r in report['runs']))
+
+    def test_reset_requires_matching_evidence_and_changed_epoch(self):
+        folder, carry, manifest, events = self.reset_chain_fixture()
+        path = folder / 'fault-reset.json'
+        evidence = read_json(path)
+        start, end = read_json(folder/'regular-start.json'), read_json(folder/'regular-end.json')
+        for change in (dict(dev='vdc'), dict(counter_dev='253,32'), dict(reset=False),
+                       dict(after=dict(epoch=42, seq=0, active=0))):
+            atomic_json(path, dict(evidence, **change))
+            with self.assertRaises(CampaignError):
+                lifecycle_intervals(folder, manifest, events, self.meta['devices'], carry)
+        atomic_json(path, evidence)
+        with self.assertRaisesRegex(CampaignError, 'epoch_unchanged'):
+            reset_boundary_evidence(folder, manifest, 'regular', '253,16', start, end, 99)
+        for flag in ('filesystem_reset_before', 'filesystem_reset_completed'):
+            with self.assertRaisesRegex(CampaignError, 'incomplete_reset'):
+                lifecycle_intervals(folder, dict(manifest, **{flag: False}), events,
+                                    self.meta['devices'], carry)
+        path.unlink()
+        with self.assertRaisesRegex(CampaignError, 'unreadable_reset'):
+            lifecycle_intervals(folder, manifest, events, self.meta['devices'], carry)
 
 
 if __name__ == '__main__':

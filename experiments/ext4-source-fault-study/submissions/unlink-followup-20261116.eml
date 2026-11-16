@@ -1,0 +1,62 @@
+From: Alan <3164729207@qq.com>
+To: Theodore Ts'o <tytso@mit.edu>
+Cc: Andreas Dilger <adilger.kernel@dilger.ca>,
+    Baokun Li <libaokun@linux.alibaba.com>,
+    Jan Kara <jack@suse.cz>,
+    Ojaswin Mujoo <ojaswin@linux.ibm.com>,
+    "Ritesh Harjani (IBM)" <ritesh.list@gmail.com>,
+    Zhang Yi <yi.zhang@huawei.com>,
+    Harshad Shirwadkar <harshadshirwadkar@gmail.com>,
+    linux-ext4@vger.kernel.org,
+    linux-kernel@vger.kernel.org,
+    stable@vger.kernel.org
+Subject: Re: [PATCH] ext4: reserve inode write access before unlinking entry
+In-Reply-To: <tencent_D60E766CE07D3A1847B81DE9BC37B4466908@qq.com>
+References: <tencent_D60E766CE07D3A1847B81DE9BC37B4466908@qq.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Hi Ted, Jan and ext4 reviewers,
+
+A gentle ping on this patch from October 27. Are there any comments on the
+approach?
+
+I have additional validation from November 2 using QEMU blkdebug to fail an
+actual guest block READ. These results supplement the source-derived fault
+injection described in the original mail.
+
+On the unpatched Linux 6.12.1 test kernel, with errors=continue, the failed
+read was at sector 2312, in the parent inode-table block (block 289, parent
+inode 13). The kernel reported:
+
+  I/O error, dev vda, sector 2312 op 0x0:(READ)
+  ext4_get_inode_loc:4554: inode #13: block 289: unable to read itable block
+  __ext4_unlink:3469: inode #13: mark_inode_dirty error
+
+unlink returned EIO. After normal unmount, /p/file was absent, but raw
+inode 2064 still had Links: 1. e2fsck -fn reported:
+
+  Unattached inode 2064
+
+In this case the inode-table read fails in ext4_get_inode_loc(), before the
+journal write-access call. A separate run of the same block-read failure
+traced JBD2 through unlink, sync and normal unmount:
+
+  jbd2_journal_abort() probe hits: 0
+  unlink handle at jbd2_journal_stop(): TID 7, T_RUNNING
+  h_err=0, h_aborted=0, j_errno=0, journal JBD2_ABORT flag clear
+  jbd2_journal_stop() return value: 0
+  jbd2_start_commit: transaction 7
+  jbd2_end_commit: transaction 7
+
+The offline filesystem check still reported the unattached inode. This
+demonstrates that this read-error path can commit the directory change
+without a journal abort when mounted with errors=continue.
+
+With the fix, the same clean input and block-read error failed before the
+directory entry was removed. After normal unmount, /p/file remained present,
+inode 2064 still had Links: 1, and e2fsck -fn completed without diagnostics.
+
+Thanks,
+Alan

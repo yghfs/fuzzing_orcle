@@ -88,6 +88,19 @@ def split_ordinary_slot_is_fresh(input_mode, force_fresh, resource_mutation_mode
         resource_mutation_mode in ('seed_only', 'parent_only')))
 
 
+def resource_input_candidate(feedback, template, template_slot, mode, refresh_every):
+    """Keep template exploration independent of the first admitted parent."""
+    if mode == 'seed_only':
+        return None, 'resource_valid_seed', 'seed_only'
+    if mode == 'combined' and refresh_every and template_slot % refresh_every == 0:
+        return None, 'resource_valid_seed', 'periodic_template_seed'
+    candidate = feedback.parent_candidate(resource_only=True, resource_template=template)
+    if candidate:
+        return candidate, 'resource_mutate', 'active_template_parent'
+    task = 'resource_parent_bootstrap' if mode == 'parent_only' else 'resource_valid_seed'
+    return None, task, 'no_active_template_parent'
+
+
 def validate_guest_trace_cpus(requested, cpu_stats):
     """Require every requested vCPU to be online and represented in tracefs."""
     actual = len(cpu_stats)
@@ -371,6 +384,139 @@ def select_snapshot_event(events, snapshot, dev, identity=None):
     return max(candidates, key=lambda event: event.get('line', -1))
 
 
+def reset_boundary_evidence(folder, manifest, kind, dev, start, end, previous_epoch=None):
+    """Authorize a new counter epoch using the completed guest reset evidence.
+
+    A reset applies only to its selected device.  Other devices retain their
+    old anchors and sequence checks.  Legacy reset records did not capture
+    counter states, so their epoch change is checked against the carried
+    anchor and the immutable segment endpoints instead.
+    """
+    if manifest.get('kind') != kind:
+        return None
+    requested = bool(manifest.get('filesystem_reset_before'))
+    completed = bool(manifest.get('filesystem_reset_completed'))
+    if requested != completed:
+        raise CampaignError('incomplete_reset_boundary')
+    if not requested:
+        return None
+    evidence_name = manifest.get('filesystem_reset_evidence')
+    if evidence_name != 'fault-reset.json':
+        raise CampaignError('missing_reset_boundary_evidence')
+    try:
+        evidence = read_json(pathlib.Path(folder) / evidence_name)
+    except (OSError, ValueError, EOFError) as error:
+        raise CampaignError('unreadable_reset_boundary_evidence') from error
+    expected_block = dict(regular='vdb', bigalloc='vdc', inline='vdd')[kind]
+    if (evidence.get('reset') is not True or evidence.get('kind') != kind or
+            evidence.get('dev') != expected_block):
+        raise CampaignError('reset_boundary_device_mismatch')
+    if (not all(type(state.get(key)) is int for state in (start, end)
+                for key in ('epoch', 'seq', 'active')) or
+            start.get('epoch') != end.get('epoch') or
+            start.get('active') != 0 or end.get('active') != 0 or
+            start.get('seq', -1) < 0 or end.get('seq', -1) < start.get('seq', 0)):
+        raise CampaignError('invalid_reset_boundary_endpoints')
+    new_epoch = start['epoch']
+    if previous_epoch is not None and previous_epoch == new_epoch:
+        raise CampaignError('reset_boundary_epoch_unchanged')
+    schema = evidence.get('schema')
+    if schema == 2:
+        before, after = evidence.get('before', {}), evidence.get('after', {})
+        if (not isinstance(before, dict) or not isinstance(after, dict) or
+                evidence.get('counter_dev') != dev or
+                type(before.get('epoch')) is not int or
+                after.get('epoch') != new_epoch or before['epoch'] == new_epoch or
+                after.get('active') != 0 or
+                type(after.get('seq')) is not int or
+                not 0 <= after['seq'] <= start['seq']):
+            raise CampaignError('reset_boundary_state_mismatch')
+    elif schema != 1 or previous_epoch is None:
+        raise CampaignError('unverified_reset_boundary_epoch')
+    return dict(kind=kind, dev=dev, previous_epoch=previous_epoch,
+                epoch=new_epoch, evidence=evidence_name, evidence_schema=schema,
+                verification=('guest_counter_states' if schema == 2 else
+                              'legacy_evidence_and_segment_endpoints'))
+
+
+def lifecycle_intervals(folder, manifest, events, devices, carry_folder=None, checkpoint_folder=None):
+    """Build per-device intervals; verified resets start a new target chain only."""
+    analysis = folder / 'analysis'
+    analysis.mkdir(exist_ok=True)
+    carry_available = bool(carry_folder and
+                           (carry_folder / 'analysis/carry-out.txt.gz').is_file())
+    # Record the current segment's stable snapshot identities before
+    # adding it to the carry chain.  The operation id alone is not
+    # sufficient because mkfs/reset starts a new counter epoch and can
+    # reuse the same id.
+    snapshot_events = {}
+    for kind in KINDS:
+        state_path = folder / f'{kind}-start.json'
+        if not state_path.is_file():
+            continue
+        current_epoch = read_json(state_path)['epoch']
+        for suffix in ('before', 'after', 'post-cleanup'):
+            sample_path = folder / f'{kind}-{suffix}.json'
+            if not sample_path.exists():
+                continue
+            sample_event = select_snapshot_event(
+                events, read_json(sample_path), devices.get(kind),
+                {'epoch': current_epoch})
+            if sample_event is not None:
+                snapshot_events[f'{kind}-{suffix}'] = snapshot_event_identity(sample_event)
+    intervals, reset_boundaries = [], []
+    for kind in KINDS:
+        required = [folder / (kind+'-'+s+'.json') for s in ('start', 'end', 'before', 'after')]
+        if not all(p.exists() for p in required):
+            manifest['issues'].append(kind+':missing_interval_files'); continue
+        for path in required:
+            shutil.copy2(path, analysis / path.name)
+        start_state, end_state = read_json(required[0]), read_json(required[1])
+        snapshots = [kind+'-before.json', kind+'-after.json']
+        post_cleanup = folder / (kind+'-post-cleanup.json')
+        if post_cleanup.exists():
+            shutil.copy2(post_cleanup, analysis / post_cleanup.name)
+            snapshots.append(post_cleanup.name)
+        previous_epoch = None
+        if carry_available:
+            previous_end = carry_folder / (kind+'-end.json')
+            if previous_end.is_file():
+                previous_epoch = read_json(previous_end).get('epoch')
+        boundary = reset_boundary_evidence(
+            folder, manifest, kind, devices.get(kind), start_state, end_state, previous_epoch)
+        if boundary:
+            reset_boundaries.append(boundary)
+        if carry_available and not boundary:
+            previous_anchor = (kind+'-post-cleanup.json'
+                               if (carry_folder / (kind+'-post-cleanup.json')).exists()
+                               else kind+'-after.json')
+            anchor_name = kind+'-carry.json'
+            previous_anchor_path = carry_folder / previous_anchor
+            if not previous_anchor_path.exists():
+                manifest['issues'].append(kind+':missing_carry_anchor_file')
+                continue
+            shutil.copy2(previous_anchor_path, analysis / anchor_name)
+            anchor = read_json(analysis / anchor_name)
+            carry_manifest = read_json(carry_folder / 'manifest.json')
+            anchor_identity = (carry_manifest.get('snapshot_events') or {}).get(
+                pathlib.Path(previous_anchor).stem)
+            begin = select_snapshot_event(
+                events, anchor, devices[kind], anchor_identity)
+            if begin is None:
+                manifest['issues'].append(kind+':missing_carry_anchor')
+            else:
+                atomic_json(analysis / (kind+'-start.json'),
+                            dict(epoch=begin['epoch'], seq=begin['seq']-1, active=0))
+            snapshots.insert(0, anchor_name)
+        if checkpoint_folder is not None:
+            shutil.copy2(checkpoint_folder / (kind+'-final.json'), analysis / (kind+'-final.json'))
+            shutil.copy2(checkpoint_folder / (kind+'-final-state.json'), analysis / (kind+'-end.json'))
+            snapshots.append(kind+'-final.json')
+        intervals.append(dict(name=kind+'-'+manifest['mode'], mode=manifest['mode'], dev=devices.get(kind),
+                              start=kind+'-start.json', end=kind+'-end.json', snapshots=snapshots))
+    return intervals, snapshot_events, reset_boundaries
+
+
 def timed_stage(name):
     def decorate(fn):
         @functools.wraps(fn)
@@ -379,7 +525,15 @@ def timed_stage(name):
             try:
                 return fn(self, *args, **kwargs)
             finally:
-                self.record_time(name, time.monotonic()-start)
+                elapsed = time.monotonic()-start
+                if name == 'analysis' and args:
+                    # finalize(previous) runs after the next segment's timing
+                    # bucket has been opened.  Charge analysis to the folder
+                    # actually analyzed, not to whichever segment is current.
+                    self.record_time(name, elapsed, segment=False)
+                    self.record_segment_time(pathlib.Path(args[0]), name, elapsed)
+                else:
+                    self.record_time(name, elapsed)
         return wrapper
     return decorate
 
@@ -533,13 +687,30 @@ class Runner:
         print(f'run_dir={self.run}', flush=True)
         self.progress(f'CAMPAIGN START mode={args.mode} duration_limit={args.duration_seconds}s')
 
-    def record_time(self, stage, seconds):
-        for attr in ('timings', 'segment_timings'):
+    def record_time(self, stage, seconds, segment=True):
+        attrs = ('timings', 'segment_timings') if segment else ('timings',)
+        for attr in attrs:
             if not hasattr(self, attr):
                 setattr(self, attr, {})
             row = getattr(self, attr).setdefault(stage, dict(seconds=0.0, calls=0))
             row['seconds'] = round(row['seconds'] + seconds, 6)
             row['calls'] += 1
+
+    @staticmethod
+    def record_segment_time(folder, stage, seconds):
+        """Persist a stage against its owning segment, independent of loop state."""
+        manifest_path = pathlib.Path(folder) / 'manifest.json'
+        if not manifest_path.is_file():
+            return
+        try:
+            manifest = read_json(manifest_path)
+        except (OSError, ValueError, EOFError):
+            return
+        timings = manifest.setdefault('stage_timings', {})
+        row = timings.setdefault(stage, dict(seconds=0.0, calls=0))
+        row['seconds'] = round(float(row.get('seconds', 0.0)) + seconds, 6)
+        row['calls'] = int(row.get('calls', 0)) + 1
+        atomic_json(manifest_path, manifest)
 
     def progress(self, message, wall_ns=None):
         stamp = datetime.fromtimestamp((wall_ns or time.time_ns()) / 1e9, DISPLAY_TZ)
@@ -1043,6 +1214,9 @@ class Runner:
                     m.get('object_sharing', 'private'), ordinal,
                     resource_every, fresh_every)
                 candidate = None
+                planned_template = resource_template
+                template_slot = None
+                resource_reason = None
                 # A configured fresh slot is an exploration lane and must be
                 # able to override the resource cadence.  Previously the
                 # resource branch ran first, so resource_valid_every=1 made
@@ -1060,22 +1234,15 @@ class Runner:
                     # gains explicit.  A seed-only arm never consumes a
                     # feedback parent.  A parent-only arm may need one typed
                     # seed to bootstrap the resource-parent corpus; that
-                    # exceptional slot is recorded as a bootstrap, not hidden
+                    # seed slot is recorded as a bootstrap, not hidden
                     # inside the combined policy.
-                    if resource_mutation_mode == 'seed_only':
-                        candidate = None
-                        task = 'resource_valid_seed'
-                    else:
-                        candidate = self.feedback.parent_candidate(resource_only=True)
-                        task = ('resource_mutate' if candidate else
-                                ('resource_parent_bootstrap' if
-                                 resource_mutation_mode == 'parent_only' else
-                                 'resource_valid_seed'))
-                    if candidate:
-                        parent_meta_path = pathlib.Path(str(candidate['path'])).with_suffix('.json')
-                        if parent_meta_path.is_file():
-                            parent_meta = read_json(parent_meta_path)
-                            resource_template = parent_meta.get('resource_template', resource_template)
+                    if not hasattr(self, 'resource_template_slots'):
+                        self.resource_template_slots = {}
+                    template_slot = self.resource_template_slots.get(resource_template, 0)
+                    self.resource_template_slots[resource_template] = template_slot + 1
+                    candidate, task, resource_reason = resource_input_candidate(
+                        self.feedback, resource_template, template_slot, resource_mutation_mode,
+                        getattr(self.args, 'resource_seed_refresh_every', 4))
                 else:
                     candidate = self.feedback.parent_candidate()
                     task = 'mutate' if candidate else 'generate_no_corpus'
@@ -1087,6 +1254,11 @@ class Runner:
                                 fresh_generate_every=fresh_every, input_mode=input_mode,
                                 resource_mutation_mode=resource_mutation_mode,
                                 force_fresh=force_fresh, task=task,
+                                planned_resource_template=planned_template,
+                                resource_template_slot=template_slot,
+                                resource_selection_reason=resource_reason,
+                                resource_seed_refresh_every=getattr(
+                                    self.args, 'resource_seed_refresh_every', 4),
                                 resource_template=resource_template,
                                 scheduler_policy=self.args.scheduler_policy,
                                 feedback_mode=self.args.feedback_mode,
@@ -1134,6 +1306,10 @@ class Runner:
                 m['generated_syscalls'] = m.get('generated_syscalls', 0) + len(program['calls'])
                 m.setdefault('scheduler_decisions', []).append(dict(
                     program=target.name, task=program['task'],
+                    planned_resource_template=planned_template,
+                    resource_template=program.get('resource_template', resource_template),
+                    resource_template_slot=template_slot,
+                    resource_selection_reason=resource_reason,
                     parent_sha256=program['parent_sha256'],
                     selection_index=program['selection_index'], seed=seed,
                     requested_calls=call_budget, actual_calls=len(program['calls']),
@@ -1505,64 +1681,14 @@ class Runner:
             (analysis / p.name).write_text(''.join(f'{key}: {value}\n' for key, value in delta.items()))
             self.previous_loss[p.name] = current
         events, _ = parse_trace(analysis / 'trace.txt')
-        # Record the current segment's stable snapshot identities before
-        # adding it to the carry chain.  The operation id alone is not
-        # sufficient because mkfs/reset starts a new counter epoch and can
-        # reuse the same id.
-        snapshot_events = {}
-        for kind in KINDS:
-            for suffix in ('before', 'after', 'post-cleanup'):
-                sample_path = folder / f'{kind}-{suffix}.json'
-                if not sample_path.exists():
-                    continue
-                sample_event = select_snapshot_event(
-                    events, read_json(sample_path), self.meta['devices'].get(kind))
-                if sample_event is not None:
-                    snapshot_events[f'{kind}-{suffix}'] = snapshot_event_identity(sample_event)
-        intervals = []
-        for kind in KINDS:
-            required = [folder / (kind+'-'+s+'.json') for s in ('start', 'end', 'before', 'after')]
-            if not all(p.exists() for p in required):
-                m['issues'].append(kind+':missing_interval_files'); continue
-            for path in required:
-                shutil.copy2(path, analysis / path.name)
-            snapshots = [kind+'-before.json', kind+'-after.json']
-            post_cleanup = folder / (kind+'-post-cleanup.json')
-            if post_cleanup.exists():
-                shutil.copy2(post_cleanup, analysis / post_cleanup.name)
-                snapshots.append(post_cleanup.name)
-            if carry_available:
-                previous_anchor = (kind+'-post-cleanup.json'
-                                   if (carry_folder / (kind+'-post-cleanup.json')).exists()
-                                   else kind+'-after.json')
-                anchor_name = kind+'-carry.json'
-                previous_anchor_path = carry_folder / previous_anchor
-                if not previous_anchor_path.exists():
-                    m['issues'].append(kind+':missing_carry_anchor_file')
-                    continue
-                shutil.copy2(previous_anchor_path, analysis / anchor_name)
-                anchor = read_json(analysis / anchor_name)
-                carry_manifest = read_json(carry_folder / 'manifest.json')
-                anchor_identity = (carry_manifest.get('snapshot_events') or {}).get(
-                    pathlib.Path(previous_anchor).stem)
-                begin = select_snapshot_event(
-                    events, anchor, self.meta['devices'][kind], anchor_identity)
-                if begin is None:
-                    m['issues'].append(kind+':missing_carry_anchor')
-                else:
-                    atomic_json(analysis / (kind+'-start.json'),
-                                dict(epoch=begin['epoch'], seq=begin['seq']-1, active=0))
-                snapshots.insert(0, anchor_name)
-            if checkpoint:
-                shutil.copy2(self.run / 'checkpoint' / (kind+'-final.json'), analysis / (kind+'-final.json'))
-                shutil.copy2(self.run / 'checkpoint' / (kind+'-final-state.json'), analysis / (kind+'-end.json'))
-                snapshots.append(kind+'-final.json')
-            intervals.append(dict(name=kind+'-'+m['mode'], mode=m['mode'], dev=self.meta['devices'].get(kind),
-                                  start=kind+'-start.json', end=kind+'-end.json', snapshots=snapshots))
+        intervals, snapshot_events, reset_boundaries = lifecycle_intervals(
+            folder, m, events, self.meta['devices'], carry_folder if carry_available else None,
+            self.run / 'checkpoint' if checkpoint else None)
+        m['reset_boundaries'] = reset_boundaries
         atomic_json(analysis / 'chain-manifest.json',
                     dict(schema=2, run_id=self.run.name, boot_id=self.meta['boot_id'],
                          require_native_syscalls=m['status']=='complete',
-                         carry_available=carry_available,
+                         carry_available=carry_available, reset_boundaries=reset_boundaries,
                          carry_source=(str(carry_folder.name) if carry_available else None),
                          intervals=intervals))
         # Last complete stable snapshot scopes become the next bounded carry anchor.
@@ -1913,7 +2039,9 @@ class Runner:
                 if previous:
                     wait_start = time.monotonic()
                     self.collector.wait(previous.name, sealed=True)
-                    self.record_time('trace_wait', time.monotonic() - wait_start)
+                    elapsed = time.monotonic() - wait_start
+                    self.record_time('trace_wait', elapsed, segment=False)
+                    self.record_segment_time(previous, 'trace_wait', elapsed)
                     passed = self.finalize(previous)
                     self.record_lifecycle_fault_candidate(previous)
                     if not passed:
@@ -2129,6 +2257,9 @@ def main():
                    help='schedule a resource-valid typed seed or parent mutation every N program slots; 0 disables (default 50 percent)')
     p.add_argument('--fresh-generate-every', type=int, default=5,
                    help='force fresh ordinary Generate every N slots; 0 disables')
+    p.add_argument('--resource-seed-refresh-every', type=int, default=4,
+                   help='combined mode refreshes each template seed every N typed slots '
+                        'of that template; 0 disables periodic refresh')
     p.add_argument('--resource-mutation-mode',
                    choices=('combined', 'seed_only', 'parent_only'),
                    default='combined',
@@ -2139,7 +2270,7 @@ def main():
     p.add_argument('--feedback-mode', choices=('pc', 'pc_edge', 'pc_semantic', 'pc_edge_semantic', 'none'),
                    default='pc_edge_semantic', help='signals allowed to admit corpus programs')
     p.add_argument('--target-scope', choices=('all', 'ext4_jbd2'), default='all',
-                   help='PC admission scope; ext4_jbd2 makes target PCs the primary signal')
+                   help='PC and edge feedback scope; ext4_jbd2 restricts both to the target')
     p.add_argument('--effect-aware-admission', action=argparse.BooleanOptionalAction, default=True,
                    help='admit corpus feedback only from native-verified calls on the target filesystem')
     p.add_argument('--require-target-success', action='store_true',
@@ -2164,6 +2295,7 @@ def main():
                   max_trace_mb=(1,256), max_run_mb=(32,102400), min_free_mb=(0,102400),
                   port=(1024,65535), seed=(1,2**31-1), syz_calls=(1,256), resource_valid_every=(0,1000),
                   fresh_generate_every=(0,1000), max_mutation_calls=(1,256),
+                  resource_seed_refresh_every=(0,1000),
                   random_fault_probability_ppm=(1,1000000))
     for key, (lo, hi) in bounds.items():
         if not lo <= getattr(a, key) <= hi:

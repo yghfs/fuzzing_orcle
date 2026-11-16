@@ -2,6 +2,14 @@
 
 Updated: 2026-11-11 (Asia/Shanghai). Current evidence inventory: [documentation audit](../../DOCUMENTATION-AUDIT-20261111.md).
 
+2026-11-12 feedback follow-up: template-specific resource parent selection and
+periodic per-template seed refresh are connected to the runner. Edge admission,
+rarity and child-edge yield now honor the configured ext4/JBD2 scope. Completed
+filesystem resets establish a new lifecycle interval only for the reset device;
+new guest reset evidence records before/after counter epochs and device identity.
+The original historical reports remain unchanged. Validation details are recorded
+in [the follow-up report](research/2026-11-12-feedback-diagnosis/IMPLEMENTATION.md).
+
 The formula families added after the original counter chain are implemented in
 the development tree and have a passing bounded relation run. The authoritative
 scope, evidence and limits are documented in
@@ -52,12 +60,13 @@ retained.
 After a random hit the target filesystem is marked tainted. The next segment
 that would use it runs an in-guest `mke2fs`/mount reset before collecting a new
 workload; the reset evidence is retained and its counter epoch boundary is
-accepted by campaign aggregation as a reset boundary. This does not prove that
-every per-segment lifecycle carry handles the new epoch correctly: the retained
+accepted by campaign aggregation as a reset boundary. The retained historical
 twelve-hour PC-only/full-feedback runs have 7/3 analysis failures immediately
 after reset, with epoch/sequence and device-identity issues. Their KCOV samples
-are complete but overall coverage/lifecycle validation is not. A tainted
-filesystem is reset before reuse; continuity across that reset still needs validation.
+are complete but the original overall coverage/lifecycle validation is not.
+The 2026-11-12 follow-up reanalyzes these ten segments independently and verifies
+the new per-device reset boundary; see the follow-up report above. Reanalysis
+does not change the original reports or revalidate every historical segment.
 
 The ext4 per-mount rule selects one operation, errno and count, with an optional
 target PID. `program` and `call_index` are captured trace labels; they do not
