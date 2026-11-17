@@ -54,6 +54,6 @@ syzkaller 生成器现将 `-calls N` 补齐为恰好 N 个 syscall，而不把 s
 - 离线 `BLOCK_UNINIT` 已按受支持布局重算；`META_BG` descriptor placement 明确拒绝，不能报告有效通过。bigalloc 特性识别于 2026-11-11 修正。
 - worker 外的后台释放/跨线程 parent-operation 因果仍不能完整归属；相关事件保持 ambiguous/unverified。
 - eviction、orphan、xattr 错误出口已有独立注入与复核摘要，原始旧定点运行已清理；不能再称为尚无 fixture，也不能据此确认独立持久化 bug。适用结论见根目录 `BUG-INVENTORY.md`。
-- 自定义反馈尚无多 VM corpus 合并或跨重启自动恢复。当前有十二小时两臂运行和吞吐审计，但生命周期未通过，不能宣称完整十二小时公式链验收；见 [覆盖审计](research/2026-11-11-target-coverage/README.md)。
+- 自定义反馈尚无多 VM corpus 合并或跨重启自动恢复。十二小时两臂运行和吞吐审计仅保留历史摘要（原始结果于 2026-11-17 清理），且当时生命周期未通过，不能宣称完整十二小时公式链验收；见 [实现状态](IMPLEMENTATION-STATUS.md)。
 
 这些边界不阻止受控单 VM 长跑启动，但不应被写成已覆盖或已验证。

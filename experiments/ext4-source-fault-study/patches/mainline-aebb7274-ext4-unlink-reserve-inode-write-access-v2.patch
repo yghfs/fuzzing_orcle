@@ -1,0 +1,113 @@
+From e6f7700dc9c17e6a591198412c11667d52d4a6a2 Mon Sep 17 00:00:00 2001
+From: Alan <3164729207@qq.com>
+Date: Tue, 17 Nov 2026 01:16:00 +0800
+Subject: [PATCH v2] ext4: reserve inode write access before unlinking entry
+To: Theodore Ts'o <tytso@mit.edu>
+Cc: Andreas Dilger <adilger.kernel@dilger.ca>,
+    Baokun Li <libaokun@linux.alibaba.com>,
+    Jan Kara <jack@suse.cz>,
+    Ojaswin Mujoo <ojaswin@linux.ibm.com>,
+    Ritesh Harjani <ritesh.list@gmail.com>,
+    Zhang Yi <yi.zhang@huawei.com>,
+    Harshad Shirwadkar <harshadshirwadkar@gmail.com>,
+    linux-ext4@vger.kernel.org,
+    linux-kernel@vger.kernel.org,
+    stable@vger.kernel.org
+In-Reply-To: <otvuclstcoaysrnywzdttapxbxg7hq3p7lp3iexy7u5cuj6plx@waqfsi2dg2p4>
+References: <tencent_D60E766CE07D3A1847B81DE9BC37B4466908@qq.com>
+ <tencent_69B311F4356254E166A5EFDC981AA138D80A@qq.com>
+ <otvuclstcoaysrnywzdttapxbxg7hq3p7lp3iexy7u5cuj6plx@waqfsi2dg2p4>
+
+__ext4_unlink() removes the directory entry before decrementing the target
+inode's link count. It then dirties the parent inode. If the parent
+inode-table block cannot be read, parent inode dirtying fails after the
+entry has been removed, and unlink returns without dropping the target
+inode's link count. With errors=continue, this read error need not abort
+the journal transaction, so the directory update can be committed without
+the corresponding link-count update.
+
+Reserve the inode locations and journal write access for the parent and
+target inodes before removing the directory entry. This makes inode-table
+read and access errors fail before the namespace is changed. Keep the
+existing namespace and link-count update order, and release the inode
+location references on every exit path. Fast-commit replay can skip the
+parent update when the directory entry does not match the target inode, so
+reserve only the target inode in that case.
+
+The original source-derived injection at the journal write-access boundary
+is not evidence for a committed inconsistency: an error after the journal
+has already aborted cannot establish a committed transaction. The relevant
+failure is an actual inode-table READ EIO before journal write access.
+
+Tested on Linux 7.4-rc3 (torvalds/linux commit
+aebb7274476403040d582c61478df8f4a7bf9cd3) with QEMU blkdebug and
+errors=continue. On the unpatched kernel, the READ EIO leaves the directory
+entry removed with Links: 1 after normal unmount; the JBD2 trace shows no
+journal abort and records the transaction commit, and e2fsck -fn reports
+an unattached inode. With this patch, the same error is returned before the
+directory entry is removed; the file remains present with Links: 1 and
+e2fsck -fn passes. No-fault controls pass on both kernels. Also built
+fs/ext4/namei.o with W=1.
+
+Fixes: 4209ae12b122 ("ext4: handle ext4_mark_inode_dirty errors")
+Link: https://lore.kernel.org/linux-ext4/tencent_D60E766CE07D3A1847B81DE9BC37B4466908@qq.com/
+Cc: stable@vger.kernel.org
+---
+ fs/ext4/namei.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+v2:
+- Clarify that the committed inconsistency is reproduced by an inode-table
+  READ EIO before journal write access, not by an already-aborted journal.
+- Revalidate the unmodified and fixed paths on current Linux 7.4-rc3 mainline.
+
+diff --git a/fs/ext4/namei.c b/fs/ext4/namei.c
+index 354fc2d22df1aa..4c16aa9ad78176 100644
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -3233,6 +3233,7 @@ int __ext4_unlink(struct inode *dir, const struct qstr *d_name,
+ 	int retval = -ENOENT;
+ 	struct buffer_head *bh;
+ 	struct ext4_dir_entry_2 *de = NULL;
++	struct ext4_iloc dir_iloc, inode_iloc;
+ 	handle_t *handle;
+ 	int skip_remove_dentry = 0;
+ 
+@@ -3269,6 +3270,22 @@ int __ext4_unlink(struct inode *dir, const struct qstr *d_name,
+ 	if (IS_DIRSYNC(dir))
+ 		ext4_handle_sync(handle);
+ 
++	/*
++	 * Read the inode-table blocks and get journal write access before
++	 * removing the directory entry. Otherwise, a read error while updating
++	 * either inode can leave the name removed but the link count unchanged.
++	 */
++	dir_iloc.bh = NULL;
++	inode_iloc.bh = NULL;
++	if (!skip_remove_dentry) {
++		retval = ext4_reserve_inode_write(handle, dir, &dir_iloc);
++		if (retval)
++			goto out_handle;
++	}
++	retval = ext4_reserve_inode_write(handle, inode, &inode_iloc);
++	if (retval)
++		goto out_handle;
++
+ 	if (!skip_remove_dentry) {
+ 		retval = ext4_delete_entry(handle, dir, de, bh);
+ 		if (retval)
+@@ -3293,6 +3310,10 @@ int __ext4_unlink(struct inode *dir, const struct qstr *d_name,
+ 	if (dentry && !retval)
+ 		ext4_fc_track_unlink(handle, dentry);
+ out_handle:
++	if (dir_iloc.bh)
++		brelse(dir_iloc.bh);
++	if (inode_iloc.bh)
++		brelse(inode_iloc.bh);
+ 	ext4_journal_stop(handle);
+ out_bh:
+ 	brelse(bh);
+
+base-commit: d135ab453a7400a34930bdda1ef4bdc8acfac80e
+-- 
+2.53.0

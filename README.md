@@ -1,15 +1,13 @@
 # ext4 filesystem fuzzing and consistency experiments
 
-Linux x86-64 project for building instrumented Linux 6.12.1 kernels and
-running repeatable ext4 accounting and fault-injection experiments under QEMU.
-The test code, kernel patches, kernel configurations, and analysis reports are
-versioned. Official Linux source, compiler output, guest
-images, generated programs, SSH credentials, and raw campaign results are
-created locally and excluded from Git.
+Linux x86-64 project for building instrumented Linux 6.12.1 kernels and running
+repeatable ext4 accounting and fault-injection experiments under QEMU.
+Source, patches, configurations and final reports are versioned; kernels, guest images and raw results are local.
 
-Current implementation, retained evidence, and the 2026-11-11 offline bigalloc
-checker correction are indexed in [the documentation audit](DOCUMENTATION-AUDIT-20261111.md).
-Historical test summaries are distinguished there from locally available raw evidence.
+Current implementation and evidence availability are indexed in
+[implementation status](experiments/ext4-counter-trace/IMPLEMENTATION-STATUS.md).
+Final findings are indexed in [BUG-INVENTORY.md](BUG-INVENTORY.md), including the
+[recognized and fixed __ext4_unlink() bug](experiments/ext4-source-fault-study/UNLINK-FINAL.md).
 
 ## Build a Debian or Ubuntu host
 

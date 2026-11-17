@@ -1,87 +1,32 @@
-# Implementation status
+# 实现状态
 
-Updated: 2026-11-11 (Asia/Shanghai). Current evidence inventory: [documentation audit](../../DOCUMENTATION-AUDIT-20261111.md).
+更新时间：2026-11-17（Asia/Shanghai）。
 
-2026-11-12 feedback follow-up: template-specific resource parent selection and
-periodic per-template seed refresh are connected to the runner. Edge admission,
-rarity and child-edge yield now honor the configured ext4/JBD2 scope. Completed
-filesystem resets establish a new lifecycle interval only for the reset device;
-new guest reset evidence records before/after counter epochs and device identity.
-The original historical reports remain unchanged. Validation details are recorded
-in [the follow-up report](research/2026-11-12-feedback-diagnosis/IMPLEMENTATION.md).
+## 实现入口
 
-The formula families added after the original counter chain are implemented in
-the development tree and have a passing bounded relation run. The authoritative
-scope, evidence and limits are documented in
-[`FORMULA-RELATIONS-IMPLEMENTATION.md`](FORMULA-RELATIONS-IMPLEMENTATION.md).
-The original bounded relation run directory has been pruned. Historical directed
-validation does not prove that every fault-injection exit has executed.
+- [README.md](README.md)：构建、运行和使用方法。
+- [第一条链](FIRST-CHAIN.md)、[第二条链](SECOND-CHAIN.md)：逐点事件、操作出口、稳定态及长时采集。
+- [公式覆盖](FORMULA-SOURCE-COVERAGE.md)、[新增关系](FORMULA-RELATIONS-IMPLEMENTATION.md)：公式实现、锁边界和适用范围。
+- [KCOV 反馈](KCOV-FEEDBACK.md)：逐调用准入、PC/目标 edge/语义反馈与调度。
+- [源码审计](audit/SOURCE-AUDIT.md)：源码与构建身份；重新核验使用 `scripts/source_audit.py --require-build`。
 
-The Linux 6.12.1 counter-trace implementation, source audit, schema-3 write
-audit, and no-trace build have historical passing records. The source/build
-binding was checked again on 2026-11-11 and passed. The disk-layout regression
-checks were rerun for the bigalloc correction; the older lifecycle, syzkaller,
-KCOV and campaign test results are historical, not fresh runs of this audit.
+模板父本分池、每模板 seed 刷新、目标 edge 口径及按设备验证的 reset/carry 边界已接入 runner。
+manager 级多 VM corpus 合并、跨重启自动恢复和通用跨线程 parent 归因仍未完成。
+离线 BIGALLOC 特性使用 superblock offset 100 的 ro-compat `0x0200`；META_BG 明确拒绝。
 
-Historical chain, smoke, and superseded campaign run directories have been pruned.
-`results/campaign-lhze43mu`, `results/campaign-k3gxmeex`, its post-report,
-and `results/campaign-fmxs5w3e` are absent on the audited host. Their remaining
-written summaries must not be presented as available raw evidence. Current
-retained coverage runs are indexed in [the coverage audit](research/2026-11-11-target-coverage/README.md).
-The fast-commit claim-retry comparison was also historical material and its result directory
-has been pruned; only the source-level conclusion is retained in `BUG-INVENTORY.md`.
+## 证据状态
 
-Feedback comparison outputs remain only where they are independent retained summaries;
-removed campaign directories are historical material and are not referenced as active
-evidence. Manager-level feedback remains outside this single-VM campaign.
+2026-11-17 已清空 `results/` 的全部历史结果（415,334 个文件，约 29.3 GiB）。
+当前没有保留的原始 campaign、逐段 trace 或实验磁盘；旧汇报、实验过程和重复清理记录已删除。
+`research/` 中保留的机器可读摘要不能替代原始数据，也不代表本轮重新验证。
+历史通过字段及计数仅描述旧运行，后续验收需重跑对应工具和测试。
 
-## Deterministic fault injection
+最终漏洞结论维护在 [漏洞总表](../../BUG-INVENTORY.md)，
+fast-commit 目录计数的唯一分析见 [finding report](FAST-COMMIT-DIR-COUNT-FINDING.md)。
+独立 source-fault 子项目的 [unlink 最终证据](../ext4-source-fault-study/UNLINK-FINAL.md) 保留完整。
 
-The formula-focused runner retains 12 deterministic plans: one allocation error
-control and 11 hook cases with observed postcondition violations. Their historical result
-directories have been pruned; formula, stable-state, persistence and recovery limits are
-recorded once in the root `BUG-INVENTORY.md`.
-An observed injected violation is not evidence of natural syscall reachability.
-The independent `fast_commit_inode_claim` replay control was a passing historical check;
-its result directory is not retained.
+## 验证边界
 
-The errno catalog separates kernel capability from campaign admission. Every
-hook marked `runtime_random` has a source-level errno contract and can be
-selected explicitly, but the default long-run pool is the smaller
-`random_admission` set (`mballoc_mark`, `unlink_inode_dirty`, and
-`inode_evict_final_dirty`) with reviewed fixture/return-chain evidence. Other
-compiled hooks are recorded as `experimental` when explicitly selected and do
-not silently expand a long run. The fast-commit replay hook remains
-deterministic-only. Historical campaign evidence preserves the operation and
-errno policy used at the time of each run. The root kernel's legacy checker,
-its additional count models, existing tests and evidence are explicitly
-retained.
-
-After a random hit the target filesystem is marked tainted. The next segment
-that would use it runs an in-guest `mke2fs`/mount reset before collecting a new
-workload; the reset evidence is retained and its counter epoch boundary is
-accepted by campaign aggregation as a reset boundary. The retained historical
-twelve-hour PC-only/full-feedback runs have 7/3 analysis failures immediately
-after reset, with epoch/sequence and device-identity issues. Their KCOV samples
-are complete but the original overall coverage/lifecycle validation is not.
-The 2026-11-12 follow-up reanalyzes these ten segments independently and verifies
-the new per-device reset boundary; see the follow-up report above. Reanalysis
-does not change the original reports or revalidate every historical segment.
-
-The ext4 per-mount rule selects one operation, errno and count, with an optional
-target PID. `program` and `call_index` are captured trace labels; they do not
-filter inside the kernel. Formula-stage evidence must therefore prove the hit
-falls inside the unique target syscall of the single-worker fixture. Schema 1
-is specific to the pre-mutation `mballoc_mark` error; schema 2 records expected
-formula states and fault-specific persistence/recovery outcomes.
-
-The formula evidence path now derives its hook contract from the errno catalog
-and hook/formula matrix, including every declared mutation stage and caller
-return contract. The runner keeps `test.raw` immutable, copies it to
-`recovery.raw` before offline checks, and archives boundary hashes in
-`image-integrity.json`. The collector emits `association-index.json`; the v2
-validator rebuilds its hit-to-syscall-to-formula-to-object-to-snapshot links
-from raw trace lines. `run-fault-formula-control.sh` provides a matched
-no-injection control, while `run-blkdebug-io-validation.py` independently
-checks QEMU block-layer errno propagation. These controls are classified
-separately from ext4 helper-fault findings.
+未证明稳定窗口、设备身份、原生 syscall 归属或 trace 完整性的事件应为 `unverified`。
+错误注入命中和在线 mismatch 不自动等于已持久化的内核缺陷。
+长时间反馈收益仍需相同负载、镜像策略、调用集合及多个 seed 的受控比较。

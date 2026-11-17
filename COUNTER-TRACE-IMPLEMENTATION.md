@@ -152,7 +152,7 @@ unverified_reason snapshot_validity
 
 覆盖普通/bigalloc、命名空间和正常/资源失败路径；完成轨迹、出口/静止态分类及持久化检查报告。
 
-VM 验证已覆盖普通、bigalloc、无 journal、lazy init、四 worker、并发扫描、非零保留分配、自然 ENOSPC 和命名空间操作。sync 前稳定快照、独立增量、轨迹完整性及卸载后 fsck 均通过；关机确认后由 `scripts/check-disk.py` 完成 `P-DISK` 与离线 `R-UG/R-LINK` 检查，四种镜像通过。运行时 `R-UG/R-LINK` 全 filesystem 稳定扫描、dirent/nlink 子步骤事件，以及 corruption、FC replay、resize、bigalloc rereserve 的独立 expected 和定向命中验证已实现并通过，以上为历史验证摘要；当前实现范围见 `FIRST-CHAIN.md`、`PROBE-API-SNAPSHOT.md`，证据可用性见根目录 `DOCUMENTATION-AUDIT-20261111.md`。准确的同线程原生 syscall 返回关联已实现；通用跨线程 parent 仍 pending。离线 `BLOCK_UNINIT` 已按布局重算受支持格式，META_BG 明确拒绝；2026-11-11 修正 bigalloc 特性字段并通过真实镜像回归。并发扫描不能证明稳定时按协议返回 `unverified`。
+VM 验证已覆盖普通、bigalloc、无 journal、lazy init、四 worker、并发扫描、非零保留分配、自然 ENOSPC 和命名空间操作。sync 前稳定快照、独立增量、轨迹完整性及卸载后 fsck 均通过；关机确认后由 `scripts/check-disk.py` 完成 `P-DISK` 与离线 `R-UG/R-LINK` 检查，四种镜像通过。运行时 `R-UG/R-LINK` 全 filesystem 稳定扫描、dirent/nlink 子步骤事件，以及 corruption、FC replay、resize、bigalloc rereserve 的独立 expected 和定向命中验证已实现并通过，以上为历史验证摘要；当前实现范围见 `FIRST-CHAIN.md`、`PROBE-API-SNAPSHOT.md`，证据可用性见根目录 `experiments/ext4-counter-trace/IMPLEMENTATION-STATUS.md`。准确的同线程原生 syscall 返回关联已实现；通用跨线程 parent 仍 pending。离线 `BLOCK_UNINIT` 已按布局重算受支持格式，META_BG 明确拒绝；2026-11-11 修正 bigalloc 特性字段并通过真实镜像回归。并发扫描不能证明稳定时按协议返回 `unverified`。
 
 最终验收：
 

@@ -8,7 +8,7 @@
 
 本文件以干净上游行号记录初版设计，供 review 与插桩定位。初版表中的 pending 是设计时状态；当前实现状态以文末“第一版实现状态”及 `PROBE-API-SNAPSHOT.md` 为准。development 源码与上游参照分开保存。
 
-当前状态以 `IMPLEMENTATION-STATUS.md` 和根目录 `DOCUMENTATION-AUDIT-20261111.md` 为准；本表用于逐公式实现定位。下方源码点位矩阵描述写入路径/锁边界及定向验证范围；其中保留的 `pending` 表示该源码路径没有独立 fault/layout fixture 或细粒度阶段证明，不表示该写入点未被 runtime trace 覆盖。未验证布局必须返回 `unverified`，不能按一致计入。
+当前状态以 `IMPLEMENTATION-STATUS.md` 和根目录 `IMPLEMENTATION-STATUS.md` 为准；本表用于逐公式实现定位。下方源码点位矩阵描述写入路径/锁边界及定向验证范围；其中保留的 `pending` 表示该源码路径没有独立 fault/layout fixture 或细粒度阶段证明，不表示该写入点未被 runtime trace 覆盖。未验证布局必须返回 `unverified`，不能按一致计入。
 
 ## 结论与插桩规则
 

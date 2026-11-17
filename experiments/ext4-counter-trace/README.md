@@ -1,25 +1,21 @@
 # ext4 公式检查与运行时追踪实验
 
-更新时间：2026-11-11（Asia/Shanghai）
+更新时间：2026-11-17（Asia/Shanghai）
+
+2026-11-17 已清空 `results/` 中的全部历史结果，当前没有保留的原始运行报告。
+实现与证据边界见 [实现状态](IMPLEMENTATION-STATUS.md)。
 
 依据根目录 `公式.md` 和 `COUNTER-TRACE-IMPLEMENTATION.md`，在独立官方 Linux 6.12.1 上开发新的子项目 checker。主线项目中的历史 checker 仅作选择性复用参考，不要求完整移植或先运行历史 checker 回归。
 
 当前第一条“逐点差值 → 操作出口 → 稳定态”链已实现并完成有限 VM 验证。
-实现和适用边界见 [FIRST-CHAIN.md](FIRST-CHAIN.md)。原始 chain、短测和三小时单 worker
-`campaign-lhze43mu` 目录已清理；其历史结论见根目录 `汇报.md` 和
-[候选复核摘要](research/2026-10-31-single-random-fault/lhze-candidates/bug-adjudication.md)。
-
-第二条“长时采集 → 轮转 → 分段/整轮分析 → 可靠持久化”运行链也已实现，
-说明见 [SECOND-CHAIN.md](SECOND-CHAIN.md)。历史双 worker 的
-`campaign-k3gxmeex`、其 postreport 和 `campaign-fmxs5w3e` 原始目录已清理。
-当前保留的一小时三臂对照和十二小时两条自定义臂审计见
-[覆盖审计](research/2026-11-11-target-coverage/README.md)；存在结果目录不等于整轮通过。
+实现和适用边界见 [FIRST-CHAIN.md](FIRST-CHAIN.md)。第二条长时采集、轮转和整轮分析链
+见 [SECOND-CHAIN.md](SECOND-CHAIN.md)。原始运行均已清理，重新验证需运行下方命令。
 
 根目录 `公式.md` 后续新增的 `R-IH`、`R-IEVICT`、`R-IDELTA-EVICT`、
 `O-LIFE`、`O-LIFE-DELTA`、`O-LIFE-FREE`、`XATTR-REF` 和
 `XATTR-REF-DELTA` 已接入运行时 checker。实现边界与定向证据见
 [新增公式实现](FORMULA-RELATIONS-IMPLEMENTATION.md)；文中关系短测的原始运行目录
-已清理，当前保留运行以 `IMPLEMENTATION-STATUS.md` 和根目录 `BUG-INVENTORY.md` 为准。
+已清理；当前实现与历史证据边界见 `IMPLEMENTATION-STATUS.md` 和根目录 `BUG-INVENTORY.md`。
 
 当前 campaign 的批次操作序列由仓库内固定负载替换为 syzkaller 生成：
 `syzgen` 使用 upstream syzkaller 的 typed `Generate`/`Mutate` API，精确限制在
@@ -33,16 +29,8 @@ KCOV 与 native syscall 生命周期按 `(program, call_index)` 关联。默认 
 区分目标设备上的成功/失败、修复/改写调用、非目标设备调用及未核验调用；只有目标设备上
 未修复/未改写调用的 PC、edge 和语义特征可作为 corpus 准入和父代收益。可启用
 `--require-target-success`，进一步要求至少有一个成功且未改写的目标设备调用。所有完整样本的
-原始覆盖仍单独保留作诊断。历史两段、32 syscall 的 VM 验证（`campaign-0_6qrnow`，原始目录已清理）记录为通过：
-2/2 KCOV 样本完整，0 个无效/缺失/饱和样本；32/32 个 native syscall 已核验。两个程序均满足
-effect 准入。第一段由 resource-valid typed seed 经 `ResourceSeedMutate` 产生，包含 5 个
-typed mutation 调用和 11 个保留 seed 调用；第二段从已准入资源父程序执行 `ResourceMutate`，
-资源父程序被选择 1 次，包含 3 个 typed mutation 调用和 13 个保留的父调用，连续未变 seed
-前缀分别为 11 和 1 个调用。32 个调用中，23 个为目标设备成功且未改写、1 个为目标设备失败且
-未改写、2 个为目标设备成功但经过改写、6 个为非目标；没有未核验调用。ext4/JBD2 原始、
-效果限定和已准入 corpus 目标覆盖均为 2,391 PC（ext4 2,115，JBD2 276）；全内核原始覆盖为
-6,550 PC，效果限定/准入 corpus 覆盖为 6,535 PC。此短测证明逐调用反馈和 typed mutation
-路径接通，不构成长时间覆盖收益结论。
+原始覆盖在每次新运行中单独保存作诊断。模板父本按模板选择，每个模板有独立 seed
+刷新份额；目标 edge 的准入、rarity 和子代收益遵循配置的 ext4/JBD2 范围。
 
 这条路径仍不是 syzkaller manager 的多 VM 反馈服务。长时间运行前应继续检查逐调用 syscall
 结果、目标设备身份、资源关系和 KCOV 累计完整性证据。
@@ -75,15 +63,9 @@ make TARGETOS=linux TARGETARCH=amd64 manager executor
 补丁把 coverage 输出区扩大到 14 MiB，匹配 executor comparison 输出容量。60 秒验证未再
 出现 `SYZFAIL: can't reallocate`；长跑仍需持续检查 executor failure 计数。
 
-KCOV 反馈闭环的实现说明见 [KCOV-FEEDBACK.md](KCOV-FEEDBACK.md)。旧的 E2/E3 协议、结果和历史
-运行记录已清理；后续的一小时三臂对照和十二小时自定义臂审计另见
-[覆盖审计](research/2026-11-11-target-coverage/README.md)。不同实验不得合并为一次有效性结论。
-反馈和 syzkaller 短测的历史运行目录已清理；当前保留的公式链和 campaign 报告只用于追踪器回归，
-不作为 bug 证据。
-
-逐点报告由 `scripts/point_report.py` 生成，CSV/JSONL 保存差值及原始 trace 位置；
-现场和重建比较分别统计，带入锚点不重复计数。旧 `campaign-lhze43mu` 的
-point-report.md/html 已清理，当前可用结果以覆盖审计及实际存在的目录为准。
+KCOV 反馈实现和数据口径见 [KCOV-FEEDBACK.md](KCOV-FEEDBACK.md)。逐点报告由
+`scripts/point_report.py` 生成，CSV/JSONL 保存差值及原始 trace 位置；现场和重建比较
+分别统计，带入锚点不重复计数。当前没有保留的原始 campaign 或覆盖对照结果。
 
 ```sh
 bash experiments/ext4-counter-trace/scripts/build.sh

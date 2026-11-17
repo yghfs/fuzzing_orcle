@@ -10,7 +10,7 @@
 `experiments/ext4-source-fault-study/results/qemu-source-replay-20261101/`、
 `experiments/ext4-source-fault-study/results/qemu-source-replay-20261101-native-jbd2/`
 以及既有的无注入 rename stress 结果。审计没有修改 ext4 修复代码；工作区中已有的
-unlink 修复只用于独立验证。
+unlink 已认可并修复，最终证据统一见 [UNLINK-FINAL.md](UNLINK-FINAL.md)。
 
 ## 结论
 
@@ -58,7 +58,6 @@ xattr-release 也不作为独立核心计数 finding。
 | `group-add-ENOMEM` | 在 `ext4_mb_add_groupinfo()` 调用结果边界替代其真实分配失败 `-ENOMEM` | 无全局 abort；原错误出口 stop 当前 transaction | superblock 仍只暴露 1 group；descriptor 和 resize-inode metadata 已 dirty。`e2fsck` 报 resize inode 7 引用旧 block count 之外的块，并报 `i_blocks` mismatch。group-1 descriptor 只是佐证，未发布 descriptor 本身不作为计数不变量错误 | **明确** |
 | `mkdir-parent-EIO` | 在 `ext4_mark_inode_dirty()` 调用结果边界替代其可传播的 `-EIO`，执行原 caller 错误分支 | 无全局 abort | `e2fsck`: inode 13 ref count 3 应为 2；目录项仍指向 deleted/unused inode 14 | **明确** |
 | `rmdir-child-ENOMEM` | 在 `ext4_mark_inode_dirty()` 调用结果边界替代其可传播的 `-ENOMEM`，执行原 caller 错误分支 | 无全局 abort | `e2fsck`: inode 13 ref count 3 应为 2 | **明确** |
-| `unlink-parent-EIO` | inode-table/access 路径真实可返回 `-EIO`；另有 reserve/access 和 inode-read 深层复核 | 无全局 abort | inode 13 `Links: 1` 且无目录项；`e2fsck`: `Unattached inode 13` | **明确** |
 | `rename-source-EIO` | 在 `ext4_mark_inode_dirty()` 调用结果边界替代其可传播的 `-EIO`，执行原 caller 错误分支 | 无全局 abort | inode 13 有两个目录项引用但 `nlink=1`；`e2fsck`: ref count 1 应为 2 | **明确** |
 | `rename-setent-dirty-enospc` | faultable ext4 dirty-metadata wrapper 在调用边界替代合法 `-ENOSPC` 返回，并路由到 ext4 通用 dirty-error handler；本次 hook 跳过 `jbd2_journal_dirty_metadata()`，未执行其 credit check | 仅当前 handle abort，无全局 `Aborting journal` | inode 14 ref count 1 应为 2，inode 15 unattached | **确认同一 rename 缺陷的条件性 caller path；不证明实际 credit exhaustion** |
 

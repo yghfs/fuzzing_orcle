@@ -4,7 +4,7 @@
 修复扩展到 `ext4_ext_grow_indepth()` 中新块接入 extent tree 之前的全部
 三个失败出口。正式邮件补丁：
 [0002-ext4-free-unreachable-extent-block-on-error-v2.patch](patches/0002-ext4-free-unreachable-extent-block-on-error-v2.patch)。
-首版补丁及其证据保留，v2 是首版的完整替代补丁，应在未应用首版的基线上应用。
+v2 是完整修复补丁，应在未应用首版的基线上应用；本文统一维护最终验证证据。
 
 ## 代码与范围
 
@@ -84,11 +84,6 @@ gcc-14、QEMU 和 e2fsprogs。负载支持指定预期 errno，旧 ENOMEM 用法
 重新应用最终邮件补丁所得的完整生产源码与构建前保存的源码逐字节一致；
 加入相同 hook 后与实际构建修复版内核的完整测试源码逐字节一致。
 主线本轮只验证应用与补丁格式，没有声称完成主线构建或运行。
-
-正式 v2 的 send-email dry-run 已核对维护者、Jan Kara 和邮件列表收件人，
-以及实际首版 Message-ID 对应的 `In-Reply-To`。发给自己的测试副本单独
-去掉了外部收件人，dry-run 确认只有 `3164729207@qq.com`。
-这些操作都没有实际发送邮件。命令见 [v2 提交指南](EXTENT-GROW-V2-SUBMISSION.md)。
 
 ## 原始证据
 

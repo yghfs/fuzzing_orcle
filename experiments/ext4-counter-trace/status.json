@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-11",
+  "updated_at": "2026-11-17",
   "implementation_document": "../../COUNTER-TRACE-IMPLEMENTATION.md",
   "legacy_checker_migration_required": false,
   "main_project_snapshot": "baselines/20261009-130905+0800",
@@ -154,7 +154,7 @@
     }
   },
   "long_run_gate_short_validation_passed": true,
-  "requested_12_hour_campaign_found": true,
+  "requested_12_hour_campaign_found": false,
   "long_run_partial_duration_seconds": null,
   "long_run_partial_stop_reason": null,
   "latest_campaign_complete_segments": null,
@@ -173,14 +173,23 @@
     "point_report_lazy_next_segment_join": true
   },
   "latest_campaign_requires_rerun_for_12h_evidence": true,
-  "documentation_audit": "../../DOCUMENTATION-AUDIT-20261111.md",
-  "current_coverage_audit": "research/2026-11-11-target-coverage/README.md",
+  "documentation_audit": "IMPLEMENTATION-STATUS.md",
+  "current_coverage_audit": null,
   "current_source_build_binding_verified": true,
   "current_source_build_binding_checked_at": "2026-11-11",
-  "historical_validation_flags_scope": "Legacy top-level *_passed and trace_loss_detected flags, short-test counts and long_run_gates describe earlier bounded runs, often pruned; they do not validate the current retained twelve-hour campaigns",
+  "historical_validation_flags_scope": "All top-level validation flags, counts, historical campaign states and long_run_gates describe earlier runs. All raw results under results/ were deleted on 2026-11-17; these fields do not establish current validation or raw evidence availability.",
   "offline_bigalloc_feature_field": "s_feature_ro_compat (superblock offset 100), bit 0x0200",
   "offline_bigalloc_regression_combinations": 4,
-  "retained_12_hour_campaigns": {
+  "retained_12_hour_campaigns": {},
+  "pruned_campaigns": [
+    "results/campaign-lhze43mu",
+    "results/campaign-k3gxmeex",
+    "results/campaign-k3gxmeex-postreport",
+    "results/campaign-fmxs5w3e"
+  ],
+  "current_retained_12_hour_validation_passed": false,
+  "current_retained_12_hour_status": "results_deleted",
+  "historical_12_hour_campaigns": {
     "pc_only": {
       "path": "results/campaign-9chz7m3j",
       "passed": false,
@@ -190,7 +199,9 @@
       "counter_validation_passed": false,
       "source_attribution_complete": false,
       "analysis_failed_segments": 7,
-      "status": "candidate_review_required"
+      "status": "candidate_review_required",
+      "raw_results_available": false,
+      "raw_results_deleted_at": "2026-11-17"
     },
     "full_feedback": {
       "path": "results/campaign-fyubc_lv",
@@ -201,15 +212,19 @@
       "counter_validation_passed": false,
       "source_attribution_complete": false,
       "analysis_failed_segments": 3,
-      "status": "candidate_review_required"
+      "status": "candidate_review_required",
+      "raw_results_available": false,
+      "raw_results_deleted_at": "2026-11-17"
     }
   },
-  "pruned_campaigns": [
-    "results/campaign-lhze43mu",
-    "results/campaign-k3gxmeex",
-    "results/campaign-k3gxmeex-postreport",
-    "results/campaign-fmxs5w3e"
-  ],
-  "current_retained_12_hour_validation_passed": false,
-  "current_retained_12_hour_status": "candidate_review_required"
+  "results_cleanup": {
+    "date": "2026-11-17",
+    "path": "results/",
+    "all_historical_results_deleted": true,
+    "raw_results_available": false,
+    "retained_top_level_entries": 0,
+    "deleted_top_level_entries": 75,
+    "deleted_files": 415334,
+    "document": "IMPLEMENTATION-STATUS.md"
+  }
 }

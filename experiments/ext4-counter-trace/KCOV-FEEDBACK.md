@@ -91,8 +91,6 @@ bash experiments/ext4-counter-trace/scripts/run-campaign.sh \
 `syz-manager`、custom PC-only 和 custom full-feedback；旧 E2/E3 矩阵入口已删除。
 单独运行各臂时仍可使用 `run-campaign.sh` 和独立结果目录。
 
-当前保留结果见 [覆盖审计](research/2026-11-11-target-coverage/README.md)。一小时实验
-full-feedback 的 admitted-corpus 目标覆盖较高，但全部完整样本并集略低；十二小时
-单 seed 审计中 full-feedback 的 effect/corpus 和 raw 目标覆盖均低于 PC-only。
-不能据此宣称联合反馈稳定提升覆盖，也不能把单次较低结果当作机制无效的因果证明。
-KCOV 样本完整、公式生命周期完整和整轮通过是三个不同的字段；十二小时两臂只满足前者。
+当前没有保留的原始覆盖对照结果，结果可用性见 [实现状态](IMPLEMENTATION-STATUS.md)。
+KCOV 样本完整、公式生命周期完整和整轮通过需要分别检查。
+联合反馈收益需在可比工作负载、相同覆盖口径及多个 seed 下重新验证。
