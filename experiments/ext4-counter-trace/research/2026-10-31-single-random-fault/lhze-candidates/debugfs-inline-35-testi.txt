@@ -1,2 +1,0 @@
-Inode 35 is marked in use
-debugfs 1.47.2 (1-Jan-2025)
