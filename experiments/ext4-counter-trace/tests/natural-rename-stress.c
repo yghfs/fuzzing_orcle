@@ -565,14 +565,35 @@ static int prepare_worker(const char *base, int worker_id,
 
 static int stable_snapshot(const char *path, int require_healthy)
 {
-	char json[512];
+	const char *source = getenv("NATURAL_RENAME_SNAPSHOT");
+	char json[65536];
 
-	(void)require_healthy;
-	(void)snprintf(json, sizeof(json),
-		       "{\"valid\":true,\"relations_valid\":true,"
-		       "\"namespace_valid\":true,\"observation_stable\":true,"
-		       "\"trace_loss\":0,\"workers\":%d}\n", DEFAULT_WORKERS);
-	return write_file(path, json);
+	if (!source)
+		return -1;
+	for (int attempt = 0; attempt < 100; attempt++) {
+		int fd = open(source, O_RDONLY | O_CLOEXEC);
+		size_t used = 0;
+		ssize_t count;
+
+		if (fd < 0)
+			return -1;
+		while ((count = read(fd, json + used, sizeof(json) - used - 1)) > 0) {
+			used += (size_t)count;
+			if (used == sizeof(json) - 1)
+				break;
+		}
+		close(fd);
+		if (count < 0 || !used || used == sizeof(json) - 1)
+			return -1;
+		json[used] = '\0';
+		if (!require_healthy ||
+		    (strstr(json, "\"valid\":true") &&
+		     strstr(json, "\"namespace_valid\":true") &&
+		     strstr(json, "\"relations_valid\":true")))
+			return write_file(path, json);
+		usleep(50000);
+	}
+	return -1;
 }
 
 static int write_result(const char *path, pid_t pid, int seconds, int workers,
@@ -591,16 +612,15 @@ static int write_result(const char *path, pid_t pid, int seconds, int workers,
 	if (!out)
 		return -1;
 	fprintf(out,
-		"{\"schema\":1,\"pid\":%ld,\"call_performed\":true,"
-		"\"arm_verified\":false,\"syscall_result\":%d,"
-		"\"syscall_errno\":%d,\"duration_seconds\":%d,"
+		"{\"schema\":1,\"pid\":%ld,\"completed\":true,"
+		"\"duration_seconds\":%d,"
 		"\"workers\":%d,\"rename_calls\":%llu,"
 		"\"exchange_calls\":%llu,\"whiteout_calls\":%llu,"
 		"\"directory_exchange_calls\":%llu,"
 		"\"directory_replace_calls\":%llu,\"creates\":%llu,"
 		"\"add_calls\":%llu,\"enospc\":%llu,"
 		"\"other_errors\":%llu}\n",
-		(long)pid, enospc ? -1 : 0, enospc ? ENOSPC : 0, seconds,
+		(long)pid, seconds,
 		workers, rename_calls, exchange_calls, whiteout_calls,
 		directory_exchange_calls, directory_replace_calls,
 		creates, add_calls, enospc,
@@ -612,7 +632,7 @@ static int write_result(const char *path, pid_t pid, int seconds, int workers,
 
 int main(int argc, char **argv)
 {
-	const char *out = getenv("CT_FAULT_RESULT");
+	const char *out = getenv("NATURAL_RENAME_RESULT");
 	const char *ready = getenv("CT_FIXTURE_READY");
 	const char *proceed = getenv("CT_FIXTURE_PROCEED");
 	const char *before = getenv("CT_STABLE_BEFORE");
@@ -636,13 +656,9 @@ int main(int argc, char **argv)
 
 	if (argc == 4 && !strcmp(argv[1], "--stable-snapshot"))
 		return stable_snapshot(argv[2], atoi(argv[3]));
-	if (argc == 3 && !strcmp(argv[1], "--inspect")) {
-		puts("{\"state\":{\"exists\":true}}");
-		return 0;
-	}
-	if (argc < 5 || !out || !ready || !proceed || !before || !oracle ||
+	if (argc != 2 || !out || !ready || !proceed || !before || !oracle ||
 	    !getenv("CT_TRACE_MARKER")) {
-		fprintf(stderr, "usage: %s fault-id operation action mount-path\n", argv[0]);
+		fprintf(stderr, "usage: %s mount-path\n", argv[0]);
 		return 2;
 	}
 	if (getenv("NATURAL_RENAME_SECONDS"))
@@ -660,10 +676,10 @@ int main(int argc, char **argv)
 		workers = DEFAULT_WORKERS;
 	if (prctl(PR_SET_NAME, "nat-rename", 0, 0, 0) < 0)
 		return 3;
-	if (snprintf(base, sizeof(base), "%s/fixture/natural-rename", argv[4]) >=
+	if (snprintf(base, sizeof(base), "%s/fixture/natural-rename", argv[1]) >=
 	    (int)sizeof(base) || mkdir_one(base) < 0)
 		return 4;
-	mount_fd = open(argv[4], O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+	mount_fd = open(argv[1], O_RDONLY | O_DIRECTORY | O_CLOEXEC);
 	if (mount_fd < 0)
 		return 4;
 	for (int i = 0; i < workers; i++) {

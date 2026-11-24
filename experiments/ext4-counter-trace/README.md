@@ -1,11 +1,38 @@
 # ext4 公式检查与运行时追踪实验
 
-更新时间：2026-11-17（Asia/Shanghai）
+更新时间：2026-11-24（Asia/Shanghai）
 
-2026-11-17 已清空 `results/` 中的全部历史结果，当前没有保留的原始运行报告。
-实现与证据边界见 [实现状态](IMPLEMENTATION-STATUS.md)。
+2026-11-24 已清空 `results/` 中的历史结果。短测和历史验证的结论见
+[实现状态](IMPLEMENTATION-STATUS.md)。
 
-依据根目录 `公式.md` 和 `COUNTER-TRACE-IMPLEMENTATION.md`，在独立官方 Linux 6.12.1 上开发新的子项目 checker。主线项目中的历史 checker 仅作选择性复用参考，不要求完整移植或先运行历史 checker 回归。
+依据根目录 [`公式.md`](../../公式.md) 和 [实施文档](../../COUNTER-TRACE-IMPLEMENTATION.md)，
+在校验过的官方 Linux 6.12.1 上实现统一 checker，由 `CONFIG_EXT4_COUNTER_TRACE` 启用。
+位图、描述符、目录链接、orphan 槽和共享 xattr 使用新版稳定扫描；旧版独有的
+extent/间接块可达性、extent status、reservation、EA inode、flex、buddy、延迟释放和
+事务/操作后置条件作为补充模型。
+
+## 普通构建和回归
+
+在[根目录](../../README.md)完成宿主和 guest 准备后运行：
+
+```sh
+bash experiments/ext4-counter-trace/scripts/build.sh --normal
+bash experiments/ext4-counter-trace/scripts/run-smoke.sh
+bash experiments/ext4-counter-trace/scripts/run-chain.sh
+```
+
+`build.sh` 使用 `dev/linux-6.12.1/` 源码构建统一 checker，输出到
+`build/linux-counter-trace-normal/`。`--normal` 可省略。普通回归、专项测试和
+覆盖对照都默认使用这套构建。路径和环境变量见 [tools/README.md](../../tools/README.md)。
+
+两项回归默认使用 `work/debian-normal.img`。该镜像由 `tools/create-vm-image.sh` 从
+Debian 基础镜像生成，在副本上关闭 ext4 的 `orphan_file` 特性并做一致性校验。
+smoke 检查 trace、稳定快照和模型统计。两个读取入口使用同一套稳定扫描：
+`/sys/fs/ext4/<device>/counter_snapshot` 输出 JSON；
+`/sys/kernel/debug/ext4/<device>/invariant_summary` 追加较重的 EA、flex 和分配器等模型，
+并汇总每项的检查、违例和未验证次数。`invariant_check` 同时输出事务及操作诊断。
+
+## 追踪与采集
 
 当前第一条“逐点差值 → 操作出口 → 稳定态”链已实现并完成有限 VM 验证。
 实现和适用边界见 [FIRST-CHAIN.md](FIRST-CHAIN.md)。第二条长时采集、轮转和整轮分析链
@@ -45,14 +72,14 @@ native syscall 和共同 inode/目录 inode；同 inode 状态遇到并发写入
 ## Native syz-manager ext4 覆盖对照
 
 三臂对照由 `scripts/run-target-coverage-comparison.sh` 并行运行 native `syz-manager`、
-PC-only 和 full-feedback 自定义单 worker。两条自定义臂启用相同的随机错误策略，默认
-`1000 ppm` 并在命中后隔离 workload；`--random-fault-probability-ppm` 可在短测中提高概率。
+PC-only 和 full-feedback 自定义单 worker。两条自定义臂使用相同的初始镜像和负载配置。
 native seed 用私有 seed-only syzkaller view，seed 内嵌 raw ext4 镜像与另外两臂的 regular
 image 做 SHA-256 对照。只有 seed 执行证据、非空目标 rawcover、完整自定义 KCOV 和目标文件
 系统操作证据均有效，比较报告才会标为完整；executor `SYZFAIL` 会阻止完整判定。
 
 上游 syzkaller 源码位于本机忽略目录 `tools/src/`。raw KCOV 饱和程序可能超过 executor
-原先 6 MiB 输出区；使用前先应用本仓库跟踪的补丁并同步重建 manager/executor：
+原先 6 MiB 输出区；本机副本已应用 14 MiB 补丁。它没有 Git 元数据，安装脚本只能核对
+项目的版本声明，不能确认本地副本的上游提交。手动准备未修改的 syzkaller 源码时，可在构建前执行：
 
 ```sh
 cd tools/src/syzkaller-master
@@ -60,7 +87,8 @@ patch -p1 < ../../../experiments/ext4-counter-trace/patches/0002-syzkaller-rawco
 make TARGETOS=linux TARGETARCH=amd64 manager executor
 ```
 
-补丁把 coverage 输出区扩大到 14 MiB，匹配 executor comparison 输出容量。60 秒验证未再
+补丁把 coverage 输出区扩大到 14 MiB，匹配 executor comparison 输出容量。当前副本的
+`kMaxOutputCoverage` 已核对为 `14 << 20`；60 秒验证未再
 出现 `SYZFAIL: can't reallocate`；长跑仍需持续检查 executor failure 计数。
 
 KCOV 反馈实现和数据口径见 [KCOV-FEEDBACK.md](KCOV-FEEDBACK.md)。逐点报告由
@@ -68,78 +96,13 @@ KCOV 反馈实现和数据口径见 [KCOV-FEEDBACK.md](KCOV-FEEDBACK.md)。逐�
 分别统计，带入锚点不重复计数。当前没有保留的原始 campaign 或覆盖对照结果。
 
 ```sh
-bash experiments/ext4-counter-trace/scripts/build.sh
 python3 experiments/ext4-counter-trace/scripts/export-patch.py
-bash experiments/ext4-counter-trace/scripts/run-chain.sh
 python3 experiments/ext4-counter-trace/tests/test-lifecycle.py
-bash experiments/ext4-counter-trace/scripts/run-campaign.sh --duration-seconds 3600 --segments 10000
 python3 experiments/ext4-counter-trace/tests/test-campaign.py
 python3 experiments/ext4-counter-trace/tests/test-disk-layouts.py
 python3 experiments/ext4-counter-trace/tests/test-points.py
 python3 experiments/ext4-counter-trace/tests/test-syzkaller.py
 ```
-
-## 单 worker 随机错误注入
-
-长跑可启用按种子复现的运行时错误注入。默认只抽样已经完成单 worker 恢复闭环的
-`mballoc_mark`、`unlink_inode_dirty` 和 `inode_evict_final_dirty` hook；概率按每次经过
-候选 hook 的调用计算，默认 `1000 ppm`（0.1%）。默认 errno 策略是 `native`，也可以按 hook 白名单指定 errno；
-`native` 表示命中时从当前 hook 的错误集合中按种子选择。错误只影响命中的那次 ext4 调用，
-不代表发现漏洞。单 worker 随机注入默认启用命中隔离：触发 syscall 返回后立即截断当前
-workload，执行正常同步、卸载和该 segment 的离线 `e2fsck -fn`，再把受影响 filesystem
-标记为 tainted 并在下一个 segment 前重置。这样单次 fault 的持久化结果不会被后续 syscall 覆盖。
-运行 `--no-fault-isolation` 可保留连续 workload 形态，但这类结果只作为探索材料。
-隔离检查结束后 runner 会恢复全局 `ext4_counter_event`，确保后续 segment 仍有计数器事件。
-如果前一段分析失败且没有 bounded carry trace，runner 会记录 `missing_carry_trace` 并让后续段
-只使用自己的原始 trace；该证据缺口会在最终报告中保留，不会因 carry 文件缺失直接中止长跑。
-无注入 workload 正常结束后，runner 检查稳定快照并把不一致记为候选，然后继续下一个 workload；
-整轮运行仍受时长、segment 上限和基础设施错误约束。结束时再对镜像做离线 fsck 与磁盘检查，
-命中的 segment、稳定点、lifecycle 和离线磁盘异常会汇总到 campaign 报告中供复核。
-每个 segment 只运行一个带注入策略的 workload batch；策略由 worker 在准备好测试目录后、
-执行 syzkaller workload 前启用，并限制到该 worker 的 PID，workload 结束后立即关闭。
-前置和后置稳定快照不参与随机抽样。
-
-```sh
-bash experiments/ext4-counter-trace/scripts/run-campaign.sh \
-  --mode single \
-  --duration-seconds 36000 \
-  --segments 100000 \
-  --segment-seconds 10 \
-  --max-batches 1 \
-  --batch-timeout 60 \
-  --workers 1 \
-  --cpus 2 \
-  --random-fault-injection \
-  --random-fault-probability-ppm 1000 \
-  --seed 20261025 \
-  --port 11884
-```
-
-这项长跑是“最多运行 10 小时，或达到其他运行上限/基础设施停止条件时结束”。campaign
-报告分别统计 hook 命中、隔离状态、每次命中的离线检查和待复核候选；仅命中不会被当作漏洞发现。
-提高概率可用
-`--random-fault-probability-ppm 10000`；指定候选 hook 用
-`--random-fault-operations mballoc_mark,inode_evict_final_dirty`。`fast_commit_inode_claim` 需要
-crash/replay mount，不在这个普通 workload 随机池中。
-
-各运行时 hook 的可选 errno 和来源见 [fault-errno-catalog.json](fault-errno-catalog.json)。
-`mballoc_mark` 支持 `EIO, ENOMEM, EINVAL, ENOSPC, EROFS, EFSCORRUPTED, EFSBADCRC`；
-`inode_evict_final_dirty` 支持 `EIO, ENOMEM, EINVAL, ENOSPC, EROFS, EFSCORRUPTED`。
-其中 `EUCLEAN` 是 `EFSCORRUPTED` 的内核别名，`EBADMSG` 是 `EFSBADCRC` 的内核别名，
-每个候选数值只登记一次，避免同一列表被内核按重复 errno 拒绝。
-用 `--random-fault-errnos native` 可从当前 hook 的集合抽取；`--random-fault-errnos EIO,ENOSPC`
-会对所选 hooks 共用这组错误。不属于 hook 集合的 errno 会在 arm 前拒绝。修改目录后运行
-`python3 experiments/ext4-counter-trace/scripts/generate-fault-errno-header.py` 更新内核查表。
-名称也可以写成 catalog 中的负数值，例如 `-5,-28,-117,-74`；host 会先归一化为
-`EIO,ENOSPC,EFSCORRUPTED,EFSBADCRC`。
-`EFSCORRUPTED` 和 `EFSBADCRC` 是 ext4/jbd2 使用的内核别名，trace/status 中记录其实际数值
-`-117`（`EUCLEAN`）和 `-74`（`EBADMSG`）；它们不一定有 libc 符号名。
-例如，只让 `mballoc_mark` 从自己的完整集合抽取：`--random-fault-operations mballoc_mark --random-fault-errnos native`。若只想注入 checksum 错误，可改成 `--random-fault-errnos EFSBADCRC`；同一个选项用于 inode hook 会在启动前被拒绝。
-同一轮需要给不同 hook 使用不同子集时，用分号分隔的按 hook 形式，例如
-`--random-fault-errnos 'mballoc_mark=EFSBADCRC;inode_evict_final_dirty=native'`。
-按 hook 形式必须覆盖 `--random-fault-operations` 中的每个 hook，且每个列表都会按该 hook
-自己的 catalog 白名单校验；命中后的 status 会带 `errno_operation` 和该 hook 实际候选列表。
-同一 catalog 同时驱动定向 hook 的内核白名单、随机 errno 选择和证据校验；新增 hook 时需要登记每个 errno 的原生来源、传播路径和错误出口，生成头文件后由 runner 拒绝不支持的组合。命中证据还会核对实际 errno、choice index/draw 与 status 回读，缺少这些字段会判为未验证。`inode_evict_final_dirty` 返回的是 `ext4_mark_inode_dirty()` 的内部错误；其外层 `ext4_evict_inode()` 为 `void`，所以该错误不会成为 `close()` 或 `unlink()` 的 syscall errno。
 
 ## 本次工作范围与状态
 
@@ -148,7 +111,7 @@ crash/replay mount，不在这个普通 workload 随机池中。
 - 官方源码下载、官方 SHA256 比对、解压及逐文件校验已完成；结果见 `source/provenance.json` 和 `source/verification.json`。
 - 初版公式—源码覆盖矩阵已完成：`FORMULA-SOURCE-COVERAGE.md`。它按六类检查阶段列出权威字段、独立 expected、写入/发布点、锁和事务边界，以及 lazy init、corrupt group、resize、bigalloc、fast-commit replay 和 link-count 的特殊语义。
 - 矩阵 review、probe API 和稳定快照协议已实现第一版，见 [PROBE-API-SNAPSHOT.md](PROBE-API-SNAPSHOT.md)。开发树在 `dev/linux-6.12.1/`，官方原始树仍通过 SHA256 清单校验。
-- 新 checker 使用 `CONFIG_EXT4_COUNTER_TRACE`，已完成开启配置的完整 GCC 14 构建、关闭配置的 ext4 构建，以及普通/bigalloc/无 journal/lazy init 的 VM smoke。这是历史构建/VM 验证摘要；当前源码与构建绑定以 `scripts/source_audit.py --require-build` 为准，证据状态见 [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md)。
+- 公式追踪使用 `CONFIG_EXT4_COUNTER_TRACE`。当前统一 normal 构建采用 GCC 14，并已通过构建绑定、源码审计，以及普通/bigalloc/无 journal/lazy init 的 VM smoke。对应构建的校验方式见 [源码审计](audit/SOURCE-AUDIT.md)，历史验证的证据状态见 [实现状态](IMPLEMENTATION-STATUS.md)。
 - 运行时全 filesystem `R-UG/R-LINK` 扫描已实现：`counter_snapshot` 会遍历 inode bitmap、
   `ext4_iget()` 读取每个 inode、统计目录 inode 并扫描目录数据块中的 dirent 引用，再与
   `i_nlink` 比较；扫描期间出现任何 writer（epoch/version/active 变化）时结果记为
@@ -158,28 +121,20 @@ crash/replay mount，不在这个普通 workload 随机池中。
   `dir_nlink_before/after` 和 `step` 字段，schema 2 另有 applied `ref_delta`、`dir_ino`、
   独立 `result`、inode generation/birth/death。
 - 特殊路径各自带独立 expected，并由 `scripts/run-special.sh` 做定向命中验证：
-  bigalloc rereserve、online resize、fast-commit replay 和 corruption exclusion。
+  bigalloc rereserve、online resize 和 fast-commit replay。
   历史命中范围见 [FORMULA-SOURCE-COVERAGE.md](FORMULA-SOURCE-COVERAGE.md) 和 [FORMULA-RELATIONS-IMPLEMENTATION.md](FORMULA-RELATIONS-IMPLEMENTATION.md)；已清理的原始运行不作为本轮重验。
 
-## 第一版构建与验证
+## 源码、快照和专项记录
 
-```sh
-bash experiments/ext4-counter-trace/scripts/build.sh
-bash experiments/ext4-counter-trace/scripts/run-smoke.sh
-bash experiments/ext4-counter-trace/scripts/run-special.sh
-python3 experiments/ext4-counter-trace/scripts/export-patch.py
-```
-
-`build.sh` 在独立输出目录使用保存的配置和 GCC 14。原始源码位于 `kernel/`，开发副本位于 `dev/`；新增 tracepoint、API 与快照代码不复制主线项目的历史 checker。
+`build.sh` 在独立输出目录使用保存的配置，优先选择 GCC 14。原始源码位于 `kernel/`，开发副本位于 `dev/`。
 补丁与逐文件 SHA256 位于 `patches/`，重放验证在独立临时目录完成。
 快照读取 `/sys/fs/ext4/<device>/counter_snapshot`，序号端点读取 `counter_trace_state`；
 原始事件通过 tracefs 的 `ext4_counter:ext4_counter_event` 导出。
 
 special 路径的原始运行目录已清理；其 fast-commit replay `R-UG` 持久差异由 [finding report](FAST-COMMIT-DIR-COUNT-FINDING.md) 单独保留。报告覆盖该路径的触发条件、离线 checker 和 `e2fsck` 结论。
 
-此前两次长跑产物 `campaign-pim9b6u4` 与 `campaign-3cp9_siz` 已按要求清理，长跑历史指标不再在此维护。
-`campaign-0mwk51uk` 的 12 小时历史结果也已清理，仅保留调度审计摘要。后续将重新运行
-PC-only、PC+edge、PC+语义和联合反馈长跑，并以新 campaign 报告记录每种反馈配置的覆盖收益与完整性。
+长跑和覆盖对照的原始 campaign 目录已清理，历史指标不再作为当前证据；后续重新运行时，
+应以新的 campaign 报告记录每种反馈配置的覆盖收益与完整性。
 
 ## 2026-10-18 收尾修复
 
@@ -187,14 +142,6 @@ runner 现在在采集停止后设置 `finalizing=true`，checkpoint、最后一
 离线校验不再被 collection wall watchdog 截断；`scp` 单次超时为 300 秒，仍保留 4 次有限重试。
 逐点汇总也先使用当前段的生命周期时间线，只有当前段存在未匹配原始事件时才读取下一段的 carry 时间线，
 减少长跑中的重复扫描。42 个 campaign 回归测试通过；需要重新运行长跑才能取得新的完整 12 小时证据。
-
-## Source and generated files
-
-The historical multi-gigabyte project snapshot, source trees, VM images,
-credentials, and campaign output are machine-local and are not part of this
-Git repository. A clean checkout rebuilds Linux 6.12.1 from the verified
-kernel.org archive using the tracked patches and configuration. Use
-`tools/bootstrap.sh` from the repository root to prepare a new host.
 
 ## 官方源码准备
 
@@ -225,13 +172,12 @@ python3 experiments/ext4-counter-trace/scripts/download-official.py
 python3 experiments/ext4-counter-trace/scripts/prepare-source.py
 ```
 
-本轮验证通过：版本 6.12.1，共 92,438 个条目、86,618 个普通文件；全部文件内容、权限和 symlink 目标与官方 tarball 一致，无额外文件，新树无 checker.c、.config、bzImage。
+本轮验证通过：版本 6.12.1，共 92,438 个条目、86,618 个普通文件；全部文件内容、权限和 symlink 目标与官方 tarball 一致，无额外文件，官方树无 `checker.c`、`.config` 或 `bzImage`。
 
-准备完成后重新校验源码：
+准备完成后，从仓库根目录重新校验源码：
 
 ```sh
-cd kernel
-sha256sum -c ../source/pristine-files.sha256
+(cd experiments/ext4-counter-trace/kernel && sha256sum --quiet -c ../source/pristine-files.sha256)
 ```
 
 `environment.json` 记录本地 GCC 14/15、QEMU、e2fsck、tar、Python 的路径与版本。当前没有 `/dev/kvm`，本轮 VM 使用 TCG。配置已保存到 `config/counter-trace.config`，构建输出与官方树分离；当前验证采用 GCC 14。

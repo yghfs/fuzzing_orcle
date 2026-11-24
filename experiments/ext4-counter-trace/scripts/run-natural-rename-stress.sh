@@ -3,11 +3,14 @@ set -euo pipefail
 
 project=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 root=$(cd "$project/../.." && pwd)
+. "$root/tools/kernel-paths.sh"
+mkdir -p "$project/results"
 run=${1:-$(mktemp -d "$project/results/natural-rename-XXXXXXXX")}
 port=${2:-11920}
 seconds=${NATURAL_RENAME_SECONDS:-20}
 workers=${NATURAL_RENAME_WORKERS:-4}
 fillers=${NATURAL_RENAME_FILLERS:-640}
+trace_buffer_kb=${NATURAL_RENAME_TRACE_BUFFER_KB:-32768}
 mount_options=${NATURAL_RENAME_MOUNT_OPTIONS:-}
 block_size=${NATURAL_RENAME_BLOCK_SIZE:-4096}
 block_count=${NATURAL_RENAME_BLOCK_COUNT:-40000}
@@ -21,11 +24,12 @@ if find "$run" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
 fi
 run=$(cd "$run" && pwd)
 key="$root/work/debian.id_rsa"
-kernel="$project/build/linux-counter-trace/arch/x86/boot/bzImage"
-base_image="$root/work/debian-clean-smalljournal.img"
+kernel="$FUZZING_ORCLE_BZIMAGE"
+base_image="$FUZZING_ORCLE_ROOTFS"
 disk_image="$run/test.raw"
 recovery_image="$run/recovery.raw"
 guest_bin="$run/natural-rename-stress"
+guest_evidence=/tmp/natural-rename-evidence
 qemu_pidfile="$run/qemu.pid"
 
 test -s "$kernel"
@@ -51,7 +55,7 @@ e2fsck -fn "$disk_image" > "$run/baseline-fsck.txt" 2>&1 || {
 	[ "$rc" -le 1 ] || exit "$rc"
 }
 
-qemu-system-x86_64 -machine q35,accel=tcg -cpu max -m 1536 -smp 2 \
+qemu-system-x86_64 -machine q35,accel=tcg -cpu qemu64 -m 1536 -smp 2 \
 	-kernel "$kernel" -drive "file=$run/root.qcow2,format=qcow2,if=virtio" \
 	-drive "file=$disk_image,format=raw,if=virtio" \
 	-netdev "user,id=n0,hostfwd=tcp:127.0.0.1:$port-:22" \
@@ -88,13 +92,13 @@ scp -q "${scp_opts[@]}" "$guest_bin" \
 set +e
 ssh "${ssh_opts[@]}" root@127.0.0.1 \
 	"NATURAL_RENAME_SECONDS='$seconds' NATURAL_RENAME_WORKERS='$workers' NATURAL_RENAME_FILLERS='$fillers' \
-	 EXT4_FAULT_TRACE_BUFFER_KB=32768 \
+	 NATURAL_RENAME_TRACE_BUFFER_KB='$trace_buffer_kb' \
 	 sh /tmp/guest-natural-rename-stress.sh \
 	 --mount-options '$mount_options' --fixture /tmp/natural-rename-stress \
-	 --evidence-dir /tmp/fault-formula" > "$run/guest.txt" 2>&1
+	 --evidence-dir '$guest_evidence'" > "$run/guest.txt" 2>&1
 guest_rc=$?
 set -e
-scp -qr "${scp_opts[@]}" root@127.0.0.1:/tmp/fault-formula "$run/" || \
+scp -qr "${scp_opts[@]}" "root@127.0.0.1:$guest_evidence" "$run/evidence" || \
 	echo 'guest evidence fetch failed' > "$run/fetch-error.txt"
 ssh "${ssh_opts[@]}" root@127.0.0.1 'systemctl poweroff' >/dev/null 2>&1 || true
 for _ in $(seq 1 60); do
@@ -133,18 +137,44 @@ import pathlib
 import sys
 
 run = pathlib.Path(sys.argv[1])
-raw = run / "fault-formula" / "workload-result.json"
+raw = run / "evidence" / "workload-result.json"
 result = json.loads(raw.read_text()) if raw.exists() else {}
 grep = (run / "jbd2-enospc-grep.txt").read_text(errors="replace")
+status = dict(line.split("=", 1) for line in
+              (run / "run-status.txt").read_text().splitlines() if "=" in line)
+guest_status_path = run / "evidence" / "run-status.txt"
+guest_status = dict(line.split("=", 1) for line in
+                    guest_status_path.read_text().splitlines() if "=" in line) \
+    if guest_status_path.is_file() else {}
+checks = ("workload_rc", "after_snapshot_rc", "unmount_rc", "remount_rc",
+          "remount_umount_rc", "trace_loss")
+snapshot_valid = {}
+for name in ("stable-before", "stable-oracle", "stable-after", "remount"):
+    path = run / "evidence" / (name + ".json")
+    snapshot = json.loads(path.read_text()) if path.is_file() else {}
+    snapshot_valid[name] = (
+        all(snapshot.get(key) is True for key in
+            ("valid", "namespace_valid", "relations_valid"))
+        and all(snapshot.get(key) == 0 for key in
+                ("observed_mismatches", "namespace_mismatched", "relations_mismatches")))
+passed = (result.get("completed") is True
+          and all(status.get(key) == "0" for key in
+                  ("guest_rc", "fsck_before_rc", "fsck_rc", "disk_before_rc", "disk_rc"))
+          and all(guest_status.get(key) == "0" for key in checks)
+          and all(snapshot_valid.values())
+          and not any((run / name).exists() for name in
+                      ("fetch-error.txt", "poweroff-error.txt")))
 summary = {
+    "passed": passed,
     "workload": result,
     "jbd2_enospc_log_lines": len([line for line in grep.splitlines() if line.strip()]),
-    "run_status": dict(line.split("=", 1) for line in
-                        (run / "run-status.txt").read_text().splitlines()
-                        if "=" in line),
+    "run_status": status,
+    "guest_status": guest_status,
+    "snapshot_valid": snapshot_valid,
 }
 (run / "natural-summary.json").write_text(
     json.dumps(summary, indent=2, ensure_ascii=False) + "\n")
 print(json.dumps(summary, indent=2, ensure_ascii=False))
+sys.exit(0 if passed else 1)
 PY
 printf 'natural_rename_stress_complete\nrun_dir=%s\n' "$run"

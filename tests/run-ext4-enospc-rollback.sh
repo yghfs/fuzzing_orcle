@@ -2,8 +2,9 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
-base_image="${EXT4_BASE_IMAGE:-${work_dir}/debian-clean-smalljournal.img}"
+base_image="${EXT4_BASE_IMAGE:-${ext4_normal_guest_image}}"
 test_base_image="${EXT4_TEST_BASE_IMAGE:-${work_dir}/ext4-runtime-clean.img}"
 port="${EXT4_ENOSPC_PORT:-11370}"
 checker_device="${EXT4_CHECKER_DEVICE:-vdb}"
@@ -17,12 +18,13 @@ program="${run_dir}/ext4-enospc-rollback"
 ssh_opts=(-i "${ssh_key}" -p "${port}" -o BatchMode=yes -o ConnectTimeout=4
   -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR)
 
+ext4_require_normal_kernel "${FUZZING_ORCLE_BZIMAGE}"
 mkdir -p "${run_dir}"
 gcc -O2 -Wall -Wextra -static -o "${program}" \
   "${root_dir}/tests/ext4-enospc-rollback.c"
 if [[ ! -e "${test_base_image}" ]]; then
   qemu-img create -f raw "${test_base_image}" 2G >/dev/null
-  mke2fs -q -F -t ext4 "${test_base_image}"
+  mke2fs -q -F -t ext4 -O ^orphan_file "${test_base_image}"
 fi
 e2fsck -fn "${test_base_image}" > "${run_dir}/baseline-fsck.txt" 2>&1 || true
 qemu-img create -f qcow2 -F raw -b "${base_image}" "${overlay}" >/dev/null
@@ -35,7 +37,7 @@ cleanup() {
 trap cleanup EXIT
 
 qemu-system-x86_64 -machine q35,accel=tcg -cpu max -m 1024 -smp 2 \
-  -kernel "${root_dir}/kernel/linux-6.12.1/arch/x86/boot/bzImage" \
+  -kernel "${FUZZING_ORCLE_BZIMAGE}" \
   -drive "file=${overlay},format=qcow2,if=virtio" \
   -drive "file=${test_overlay},format=qcow2,if=virtio" \
   -netdev "user,id=n0,hostfwd=tcp:127.0.0.1:${port}-:22" \

@@ -18,7 +18,6 @@ COMMON_LIMITS = (
     'batch_timeout', 'workers', 'memory_mb', 'guest_memory_mb', 'cpus',
     'qemu_cpu', 'buffer_kb', 'max_trace_mb', 'max_run_mb', 'min_free_mb',
     'strict_kcov_feedback', 'effect_aware_admission', 'require_target_success',
-    'random_fault_injection',
 )
 
 
@@ -76,7 +75,6 @@ def arm_summary(mode: str, run: pathlib.Path, expected_seed: int,
         'feedback_target_scope': feedback.get('target_scope'),
         'feedback_edge_scope': feedback.get('feedback_edge_scope'),
         'feedback_mode': limits.get('feedback_mode'),
-        'random_fault_injection': bool(limits.get('random_fault_injection', False)),
         'generated_syscalls': int(report.get('generated_syscalls', 0) or 0),
         'native_verified': int(report.get('native_verified', 0) or 0),
         'native_success': int(report.get('native_success', 0) or 0),
@@ -132,8 +130,6 @@ def arm_summary(mode: str, run: pathlib.Path, expected_seed: int,
     if result['feedback_target_scope'] != expected_scope or \
             result['feedback_edge_scope'] != expected_scope:
         warnings.append(f'{mode}_feedback_scope_mismatch')
-    if result['random_fault_injection']:
-        warnings.append(f'{mode}_fault_injection_was_enabled')
     samples = result['kcov_samples']
     if (samples['expected'] <= 0 or samples['complete'] != samples['expected'] or
             samples['missing'] or samples['invalid'] or samples['saturated']):
@@ -202,7 +198,6 @@ def build_report(arms: dict[str, pathlib.Path], seed: int,
         'seed': seed,
         'duration_seconds': duration_seconds,
         'target_scope': target_scope,
-        'fault_injection': False,
         'modes': list(MODES),
         'measurement_complete': not warnings,
         'arms': results,
@@ -214,7 +209,7 @@ def build_report(arms: dict[str, pathlib.Path], seed: int,
 
 def render(report: dict[str, Any]) -> str:
     lines = [f"# Four-arm feedback ablation: seed {report['seed']}", '',
-             f"Duration: {report['duration_seconds']} s per arm; target: `{report['target_scope']}`; fault injection: **off**.",
+             f"Duration: {report['duration_seconds']} s per arm; target: `{report['target_scope']}`.",
              f"Measurement complete: **{str(report['measurement_complete']).lower()}**.", '',
              '| Arm | Passed | Verified calls | Effect target PC | Corpus target PC | Target edges | Semantic | Formula transitions | Verified calls/s |',
              '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']

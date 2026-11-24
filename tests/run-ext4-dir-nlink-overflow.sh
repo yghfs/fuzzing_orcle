@@ -2,25 +2,18 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
-kernel="${EXT4_DIR_NLINK_KERNEL:-${work_dir}/kernels/ext4-count-normal-new/bzImage}"
-kernel_config="${EXT4_DIR_NLINK_CONFIG:-$(dirname "${kernel}")/config}"
-root_base="${EXT4_BASE_IMAGE:-${work_dir}/debian-clean-smalljournal.img}"
+kernel="${EXT4_DIR_NLINK_KERNEL:-${FUZZING_ORCLE_BZIMAGE}}"
+root_base="${EXT4_BASE_IMAGE:-${ext4_normal_guest_image}}"
 test_base="${EXT4_DIR_NLINK_BASE:-${work_dir}/ext4-dir-nlink-1g.raw}"
 port="${EXT4_DIR_NLINK_PORT:-11761}"
 children="${EXT4_DIR_NLINK_CHILDREN:-65520}"
 run_dir="${EXT4_DIR_NLINK_RUN_DIR:-${work_dir}/ext4-dir-nlink-overflow-$(date +%Y%m%d%H%M%S)-$$}"
 ssh_key="${work_dir}/debian.id_rsa"
 
-if ! grep -q '^CONFIG_EXT4_INVARIANT_CHECKER=y$' "${kernel_config}" ||
-	grep -Eq '^CONFIG_EXT4_FAULT_INJECTION=(y|m)$' "${kernel_config}"; then
-	echo "kernel config must enable the checker and disable fault injection" >&2
-	exit 2
-fi
-if [[ ! -r "${kernel}" || ! -r "${root_base}" ]]; then
-	echo "missing kernel or root image" >&2
-	exit 2
-fi
+ext4_require_normal_kernel "${kernel}" "${EXT4_DIR_NLINK_CONFIG:-}"
+test -r "${root_base}" || { echo "missing base image: ${root_base}" >&2; exit 2; }
 mkdir -p "${run_dir}"
 program="${run_dir}/ext4-dir-nlink-overflow"
 gcc -O2 -Wall -Wextra -Werror -static -o "${program}" \
@@ -60,7 +53,7 @@ for _ in $(seq 1 120); do
 	sleep 1
 done
 ssh "${ssh_opts[@]}" root@127.0.0.1 \
-	'test ! -e /sys/module/ext4/parameters/ext4_fault_mode; mount -o remount,commit=1 /mnt/dir-nlink; printf 1 > /sys/kernel/debug/ext4/vdb/invariant_reset'
+	'mount -o remount,commit=1 /mnt/dir-nlink; printf 1 > /sys/kernel/debug/ext4/vdb/invariant_reset'
 scp -q -i "${ssh_key}" -P "${port}" -o StrictHostKeyChecking=no \
 	-o UserKnownHostsFile=/dev/null "${program}" root@127.0.0.1:/tmp/ext4-dir-nlink-overflow
 set +e

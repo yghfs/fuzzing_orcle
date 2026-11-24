@@ -128,87 +128,6 @@ static void write_bytes(int fd, const char *bytes, size_t length)
   }
 }
 
-static void write_text_file(const char *path, const char *text)
-{
-  int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
-  if (fd < 0) die("open fault evidence");
-  size_t length = strlen(text);
-  while (length) {
-    ssize_t written = write(fd, text, length);
-    if (written < 0 && errno == EINTR) continue;
-    if (written <= 0) die("write fault evidence");
-    text += written;
-    length -= (size_t)written;
-  }
-  if (close(fd) < 0) die("close fault evidence");
-}
-
-static void capture_fault_status(const char *source, const char *destination)
-{
-  int input = open(source, O_RDONLY | O_CLOEXEC);
-  if (input < 0) die("open fault status");
-  int output = open(destination, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
-  if (output < 0) die("create fault status evidence");
-  char buffer[1024];
-  ssize_t count;
-  while ((count = read(input, buffer, sizeof(buffer))) != 0) {
-    if (count < 0) {
-      if (errno == EINTR) continue;
-      die("read fault status");
-    }
-    write_bytes(output, buffer, (size_t)count);
-  }
-  if (close(input) < 0 || close(output) < 0) die("close fault status evidence");
-}
-
-static void arm_runtime_fault(int shared)
-{
-  const char *config = getenv("CT_FAULT_CONFIG");
-  if (!config || !*config) return;
-  const char *inject_path = getenv("CT_FAULT_PATH");
-  const char *status_path = getenv("CT_FAULT_STATUS_PATH");
-  const char *arm_path = getenv("CT_FAULT_ARM_EVIDENCE");
-  const char *policy_path = getenv("CT_FAULT_POLICY_EVIDENCE");
-  if (!inject_path || !status_path || !arm_path || !policy_path)
-    die("incomplete fault injection configuration");
-
-  long page_size = sysconf(_SC_PAGESIZE);
-  /* A private worker arms after seed setup, targeting only its own PID.
-   * Shared workers need one parent arm targeting their inherited process
-   * group, so concurrent children cannot race the mount-level controller. */
-  char target[80];
-  if (shared)
-    snprintf(target, sizeof(target), "pid=0 pgid=%ld", (long)getpgrp());
-  else
-    snprintf(target, sizeof(target), "pid=%ld", (long)getpid());
-  int length = snprintf(NULL, 0, "%s %s\n", config, target);
-  if (page_size <= 0 || length < 0 || (long)length >= page_size)
-    die("fault injection configuration too long");
-  char *actual_config = malloc((size_t)length + 1);
-  if (!actual_config) die("allocate fault injection configuration");
-  if (snprintf(actual_config, (size_t)length + 1, "%s %s\n",
-               config, target) != length) {
-    free(actual_config);
-    die("format fault injection configuration");
-  }
-  int fd = open(inject_path, O_WRONLY | O_CLOEXEC);
-  if (fd < 0) {
-    free(actual_config);
-    die("open fault injection control");
-  }
-  if (write(fd, actual_config, (size_t)length) != length) {
-    free(actual_config);
-    die("arm fault injection");
-  }
-  if (close(fd) < 0) {
-    free(actual_config);
-    die("close fault injection control");
-  }
-  write_text_file(policy_path, actual_config);
-  capture_fault_status(status_path, arm_path);
-  free(actual_config);
-}
-
 static void read_bytes(int fd, char *bytes, size_t length)
 {
   while (length) {
@@ -333,7 +252,6 @@ int main(int argc, char **argv)
       if (snprintf(ident,sizeof(ident),"b%s-w%d",batch,i)>=(int)sizeof(ident) ||
           snprintf(binary,sizeof(binary),"%s/%s/workload",programs,ident)>=(int)sizeof(binary)) _exit(90);
       if (setenv("CT_PROGRAM_ID",ident,1)) _exit(90);
-      if (!shared) arm_runtime_fault(0);
       progress("START",ident,getpid(),-1,0);
       /* The generated program should inherit its usual descriptor layout. */
       const char *progress_fd=getenv("CT_PROGRESS_FD");
@@ -348,15 +266,13 @@ int main(int argc, char **argv)
   }
   filter(pids,workers);
   if (shared) {
-    /* Shared workers are held at start_gate. Arm the mount only once; private
-     * workers instead arm their own PID after preparing their seed tree. */
+    /* Confirm all workers remain in the filtered process group before release. */
     pid_t worker_pgid = getpgrp();
     for (int i=0; i<workers; i++)
       if (getpgid(pids[i]) != worker_pgid) {
         errno = ESRCH;
         die("worker process group");
       }
-    arm_runtime_fault(1);
   }
   for (int i=0; i<workers; i++) write_bytes(start_gate[1], "x", 1);
   close(start_gate[1]);

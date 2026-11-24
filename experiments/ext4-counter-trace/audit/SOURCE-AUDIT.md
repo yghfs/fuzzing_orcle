@@ -1,8 +1,8 @@
 # Ext4 authoritative write audit
 
 `source-inventory.json` is the reviewed lexical inventory for the Linux 6.12.1
-tree used by this project. It hashes every `fs/ext4/*.c` and `*.h` file plus
-the counter trace header and records candidate writes to descriptor fields,
+tree used by this project. It hashes the ext4 source and build files, trace
+event headers, and the changed JBD2 source and header. It records candidate writes to descriptor fields,
 per-cpu summaries, bitmap bits, group flags, namespace links, directory
 entries, and superblock summaries.
 
@@ -18,31 +18,21 @@ are recorded as non-formula layout or representation writes; they do not alter
 the active counter formulas. Fast-commit replay, resize, corruption exclusion,
 lazy materialization, and internal/EA inode link updates are separate domains.
 
-The approved enabled kernel, its configuration, and replay-verified patch are
-bound in `build-binding.json`. The no-trace configuration is compiled as a
-separate compatibility check; long campaigns always use the bound enabled
-artifact.
+After a successful build from the reviewed source, the build script records
+the inventory, kernel, configuration, and exported patch hashes in the local
+build directory's `build-binding.json`. From the repository root, check the
+normal build with:
 
-## 2026-11-03 source revalidation
+```sh
+python3 experiments/ext4-counter-trace/scripts/source_audit.py --require-build \
+  --kernel-obj experiments/ext4-counter-trace/build/linux-counter-trace-normal
+```
 
-The source drift found on 2026-11-03 is confined to the current exported
-counter-trace patch in `ialloc.c`, `inline.c`, `migrate.c`, `namei.c`, and
-`resize.c`. The patch manifest covers all five files, and the complete patch
-replayed against the verified Linux 6.12.1 source with zero fuzz. Review found
-the changes add counter/namespace observations and caller-scoped fault hooks;
-fault state initializes to `EXT4_FAULT_OFF`, and the disabled configuration
-returns zero from every injection check. Counter setter wrappers retain the
-underlying setter, resize-end returns the same overhead-update result as
-before, and the inline-data length change widens the parameter from
-`unsigned int` to `loff_t`.
+Without `--kernel-obj`, verification checks the unified output under
+`build/linux-counter-trace-normal/`. The binding checks the identity of the
+reviewed inventory, exported patch, build configuration, and kernel image.
+VM regressions are run separately.
 
-The refreshed lexical inventory still contains 149 candidate sites. Its 58
-added and 58 removed records reflect changed line locations and the new
-instrumented setter/nlink call sites in those reviewed files. At that review the previous
-kernel image predated the final source, patch, and compiler-config updates.
-That rebuild requirement was historical: `python3 -B scripts/source_audit.py
---require-build` was rerun on 2026-11-11 and returned `passed=true, issues=[]`.
-The current source inventory, kernel, config and exported patch match their
-binding. This hash check does not rerun the build or prove campaign validity.
-The host-side offline bigalloc parser correction does not change the bound
-kernel artifacts.
+The 2026-11-24 patch replay applied the current ext4/JBD2 changes to the
+verified Linux 6.12.1 source with zero fuzz. The unified build passed the
+binding check against the refreshed source inventory.

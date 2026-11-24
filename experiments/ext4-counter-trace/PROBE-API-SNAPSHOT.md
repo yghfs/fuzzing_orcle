@@ -127,10 +127,11 @@ bitmap 转换与 global 发布增量及稳定快照之间的实际总量差；�
 - 逐点 independent/descriptor/global 和 group/namespace 差值、外层操作出口、稳定态分类：implemented，
   见 [FIRST-CHAIN.md](FIRST-CHAIN.md)。有限负载的准确原生 syscall enter/exit 与 ret/errno 已关联；
   通用跨线程 parent/后台因果传播仍未实现，明确 `concurrent_or_ambiguous`。
-- resize/corruption/FC replay 的独立 adjustment expected：implemented，并由 special analyzer
-  强制检查全部点位；普通增量分析仍将这些事件分类隔离。
+- resize 和 FC replay 的独立 adjustment expected：implemented，由 special analyzer
+  检查点位；普通增量分析将这些事件分类隔离。corruption exclusion 继续记录为特殊调整域，
+  其错误路径尚无当前定向运行证据。
 - 错误/恢复镜像、online resize 和 bigalloc rereserve 专用定向验证：implemented；special
-  runner 保留双启动 FC replay、resize、corruption 和 bigalloc trace/snapshot 证据。
+  runner 保存双启动 FC replay、resize 和 bigalloc trace/snapshot 证据。
 - `P-DISK` 自定义离线解析器：implemented；`BLOCK_UNINIT` 通过 metadata 布局、flex placement、
   短末组和 metadata 共用 cluster 独立重算，不直接统计未初始化磁盘位。`META_BG`
   descriptor placement 明确拒绝。2026-11-11 修正 BIGALLOC 的 ro-compat 字段识别；

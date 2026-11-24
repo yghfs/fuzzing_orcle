@@ -2,26 +2,22 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
-kernel="${EXT4_ORPHAN_RECOVERY_KERNEL:-${work_dir}/kernels/ext4-count-normal-new/bzImage}"
-kernel_config="${EXT4_ORPHAN_RECOVERY_CONFIG:-$(dirname "${kernel}")/config}"
-root_base="${EXT4_BASE_IMAGE:-${work_dir}/debian-clean-smalljournal.img}"
-test_base="${EXT4_ORPHAN_RECOVERY_BASE:-${work_dir}/ext4-orphan-recovery-256m.raw}"
+kernel="${EXT4_ORPHAN_RECOVERY_KERNEL:-${FUZZING_ORCLE_BZIMAGE}}"
+root_base="${EXT4_BASE_IMAGE:-${ext4_normal_guest_image}}"
 port="${EXT4_ORPHAN_RECOVERY_PORT:-11574}"
 run_dir="${EXT4_ORPHAN_RECOVERY_RUN_DIR:-${work_dir}/ext4-orphan-recovery-natural-$(date +%Y%m%d%H%M%S)-$$}"
+test_base="${EXT4_ORPHAN_RECOVERY_BASE:-${run_dir}/test.raw}"
 ssh_key="${work_dir}/debian.id_rsa"
 ssh_opts=(-i "${ssh_key}" -p "${port}" -o BatchMode=yes
 	-o ConnectTimeout=4 -o StrictHostKeyChecking=no
 	-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR)
 active_pid=""
 
-if [[ ! -r "${kernel}" || ! -r "${kernel_config}" || ! -r "${root_base}" ]]; then
-	echo "missing kernel, config, or root image" >&2
-	exit 2
-fi
-if ! grep -qx 'CONFIG_EXT4_INVARIANT_CHECKER=y' "${kernel_config}" ||
-	grep -Eq '^CONFIG_EXT4_FAULT_INJECTION=(y|m)$' "${kernel_config}"; then
-	echo "test requires the checker enabled and fault injection disabled" >&2
+ext4_require_normal_kernel "${kernel}" "${EXT4_ORPHAN_RECOVERY_CONFIG:-}"
+if [[ ! -r "${root_base}" ]]; then
+	echo "missing root image: ${root_base}" >&2
 	exit 2
 fi
 

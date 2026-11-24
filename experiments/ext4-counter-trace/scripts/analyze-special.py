@@ -24,8 +24,6 @@ REQUIRED = {
     "FAST_COMMIT.BLOCK.REPLAY": "R-BDELTA",
     "FAST_COMMIT.INODE.REPLAY.GLOBAL": "R-IDELTA",
     "FAST_COMMIT.INODE.REPLAY.DESCRIPTOR": "R-IDELTA",
-    "BITMAP.CORRUPT.EXCLUDE.BLOCK": "M-B",
-    "BITMAP.CORRUPT.EXCLUDE.INODE": "M-I",
 }
 
 
@@ -89,7 +87,7 @@ def parse(directory: pathlib.Path):
     events, evidence = [], {}
     roots = (directory / 'first-boot/guest-evidence/stages',
              directory / 'ext4-counter-trace/stages')
-    expected = ({'bigalloc','resize'}, {'replay','corrupt'})
+    expected = ({'bigalloc','resize'}, {'replay'})
     for root, names in zip(roots, expected):
         if {p.name for p in root.iterdir() if p.is_dir()} != names:
             raise ValueError(f'missing or unexpected stage evidence: {root}')
@@ -146,13 +144,6 @@ def main(directory: pathlib.Path):
         for event in points.get(point, []):
             if event["actual"] != event["expected"]:
                 failures.append(f"{point}: replay published to global counter")
-    # corruption exclusion must subtract the group's free counts
-    for point in ("BITMAP.CORRUPT.EXCLUDE.BLOCK", "BITMAP.CORRUPT.EXCLUDE.INODE"):
-        for event in points.get(point, []):
-            if event["update_delta"] >= 0:
-                failures.append(f"{point}: exclusion did not subtract")
-            if event["actual"] != event["expected"]:
-                failures.append(f"{point}: exclusion mismatch")
     bitmap = points.get('FAST_COMMIT.INODE.REPLAY.BITMAP', [])
     branches = {e['update_delta'] for e in bitmap}
     if not {-1, 0} <= branches:

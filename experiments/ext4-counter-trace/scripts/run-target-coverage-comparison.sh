@@ -6,21 +6,22 @@ set -uo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
 ROOT_DIR=$(cd -- "$PROJECT_DIR/../.." && pwd)
+source "$ROOT_DIR/tools/kernel-paths.sh"
 RUNS_ROOT="$PROJECT_DIR/results"
 CUSTOM_RUNNER=${FEEDBACK_COMPARISON_CUSTOM_RUNNER:-"$SCRIPT_DIR/run-campaign.sh"}
 UPSTREAM_RUNNER=${FEEDBACK_COMPARISON_UPSTREAM_RUNNER:-"$SCRIPT_DIR/run-upstream-syzkaller-baseline.sh"}
 UPSTREAM_MANAGER=${UPSTREAM_SYZ_MANAGER:-"$ROOT_DIR/tools/src/syzkaller-master/bin/syz-manager"}
 UPSTREAM_SYZKALLER=${UPSTREAM_SYZKALLER:-"$ROOT_DIR/tools/src/syzkaller-master"}
-KERNEL_OBJ=${EXT4_CT_KERNEL_OBJ:-"$PROJECT_DIR/build/linux-counter-trace"}
+KERNEL_OBJ=${EXT4_CT_KERNEL_OBJ:-"$FUZZING_ORCLE_KERNEL_OBJ"}
 KERNEL=${EXT4_CT_KERNEL:-"$KERNEL_OBJ/arch/x86/boot/bzImage"}
 VMLINUX=${EXT4_CT_VMLINUX:-"$KERNEL_OBJ/vmlinux"}
-KERNEL_SRC=${EXT4_CT_KERNEL_SRC:-"$PROJECT_DIR/dev/linux-6.12.1"}
+KERNEL_SRC=${EXT4_CT_KERNEL_SRC:-"$FUZZING_ORCLE_KERNEL"}
 SSHKEY=${EXT4_CT_SSHKEY:-"$ROOT_DIR/work/debian.id_rsa"}
 DURATION_SECONDS=3600
 TARGET_SYSCALLS=0
 SEED=20261024
 OUTPUT_DIR=""
-ROOTFS="$ROOT_DIR/work/debian-clean-smalljournal.img"
+ROOTFS="$FUZZING_ORCLE_ROOTFS"
 FEEDBACK_MODE=pc_edge_semantic
 TARGET_SCOPE=ext4_jbd2
 SCHEDULER_POLICY=rarity_fair
@@ -32,7 +33,6 @@ RESOURCE_VALID_EVERY=4
 FRESH_GENERATE_EVERY=7
 STOP_GRACE_SECONDS=120
 UPSTREAM_SEED_PROGRAM="$PROJECT_DIR/syzgen/seeds/upstream-ext4.syz"
-RANDOM_FAULT_PROBABILITY_PPM=1000
 
 usage() {
     cat <<'EOF'
@@ -56,7 +56,6 @@ Options:
   --pc-only-port N                 PC-only custom VM SSH port (default: 12884)
   --upstream-http-port N           Upstream manager HTTP port (default: 12900)
   --upstream-seed-program PATH     Upstream .syz seed (default: syzgen/seeds/upstream-ext4.syz)
-  --random-fault-probability-ppm N Per eligible ext4 hook call, shared by both custom arms (default: 1000)
 EOF
 }
 
@@ -64,7 +63,6 @@ is_uint() { [[ "$1" =~ ^[0-9]+$ ]]; }
 while (($#)); do
     case "$1" in
         --duration-seconds|--target-syscalls|--seed|--output|--rootfs|--feedback-mode|--target-scope|\
-        --random-fault-probability-ppm|\
         --scheduler-policy|--mutation-budget-policy|--custom-port|--pc-only-port|--upstream-http-port|--upstream-seed-program)
             (($# >= 2)) || { usage >&2; exit 2; }
             key=$1; value=$2
@@ -76,7 +74,6 @@ while (($#)); do
                 --rootfs) ROOTFS=$value;;
                 --feedback-mode) FEEDBACK_MODE=$value;;
                 --target-scope) TARGET_SCOPE=$value;;
-                --random-fault-probability-ppm) RANDOM_FAULT_PROBABILITY_PPM=$value;;
                 --scheduler-policy) SCHEDULER_POLICY=$value;;
                 --mutation-budget-policy) MUTATION_BUDGET_POLICY=$value;;
                 --custom-port) CUSTOM_PORT=$value;;
@@ -93,8 +90,7 @@ done
 for spec in "duration:$DURATION_SECONDS:1:43200" "target_syscalls:$TARGET_SYSCALLS:0:10000000" \
             "seed:$SEED:1:2147483647" "custom_port:$CUSTOM_PORT:1024:65535" \
             "pc_only_port:$PC_ONLY_PORT:1024:65535" \
-            "upstream_http_port:$UPSTREAM_HTTP_PORT:1024:65535" \
-            "random_fault_probability_ppm:$RANDOM_FAULT_PROBABILITY_PPM:1:1000000"; do
+            "upstream_http_port:$UPSTREAM_HTTP_PORT:1024:65535"; do
     IFS=: read -r name value minimum maximum <<< "$spec"
     is_uint "$value" && ((value >= minimum && value <= maximum)) || {
         echo "$name must be an integer in [$minimum,$maximum]" >&2; exit 2;
@@ -193,9 +189,9 @@ python3 "$PROJECT_DIR/scripts/prepare-comparison-ext4-seed.py" \
 START_NS=$(date +%s%N)
 printf 'comparison_start_ns=%s\nduration_seconds=%s\nseed=%s\nrootfs=%s\ntarget_ext4_image=%s\n' \
     "$START_NS" "$DURATION_SECONDS" "$SEED" "$ROOTFS_ABS" "$SEED_IMAGE" > "$OUTPUT_DIR/launch-metadata.txt"
-printf 'pc_only_feedback_mode=pc\nfull_feedback_mode=%s\ntarget_scope=%s\ntarget_kind=regular\nscheduler_policy=%s\nmutation_budget_policy=%s\nrandom_fault_injection=true\nrandom_fault_probability_ppm=%s\nfault_isolation=true\npc_only_port=%s\nfull_feedback_port=%s\nupstream_http_port=%s\npc_only_vcpu=1\npc_only_memory_mb=1024\nfull_feedback_vcpu=1\nfull_feedback_memory_mb=1024\nupstream_vcpu=1\nupstream_memory_mb=1024\nqemu_accelerator=tcg,thread=multi\nqemu_cpu=qemu64\nparallel_arms=3\n' \
+printf 'pc_only_feedback_mode=pc\nfull_feedback_mode=%s\ntarget_scope=%s\ntarget_kind=regular\nscheduler_policy=%s\nmutation_budget_policy=%s\npc_only_port=%s\nfull_feedback_port=%s\nupstream_http_port=%s\npc_only_vcpu=1\npc_only_memory_mb=1024\nfull_feedback_vcpu=1\nfull_feedback_memory_mb=1024\nupstream_vcpu=1\nupstream_memory_mb=1024\nqemu_accelerator=tcg,thread=multi\nqemu_cpu=qemu64\nparallel_arms=3\n' \
     "$FEEDBACK_MODE" "$TARGET_SCOPE" "$SCHEDULER_POLICY" "$MUTATION_BUDGET_POLICY" \
-    "$RANDOM_FAULT_PROBABILITY_PPM" "$PC_ONLY_PORT" "$CUSTOM_PORT" "$UPSTREAM_HTTP_PORT" >> "$OUTPUT_DIR/launch-metadata.txt"
+    "$PC_ONLY_PORT" "$CUSTOM_PORT" "$UPSTREAM_HTTP_PORT" >> "$OUTPUT_DIR/launch-metadata.txt"
 
 setsid env EXT4_CT_IMAGE="$ROOTFS_ABS" bash "$UPSTREAM_RUNNER" --mode fuzzing --duration-seconds "$DURATION_SECONDS" \
     --seed "$SEED" --http-port "$UPSTREAM_HTTP_PORT" --output "$OUTPUT_DIR/upstream" \
@@ -212,7 +208,6 @@ setsid bash "$CUSTOM_RUNNER" --rootfs-backing "$ROOTFS_ABS" --mode single \
     --resource-valid-every "$RESOURCE_VALID_EVERY" --fresh-generate-every "$FRESH_GENERATE_EVERY" \
     --scheduler-policy "$SCHEDULER_POLICY" --feedback-mode pc \
     --strict-kcov-feedback --mutation-budget-policy "$MUTATION_BUDGET_POLICY" \
-    --random-fault-injection --random-fault-probability-ppm "$RANDOM_FAULT_PROBABILITY_PPM" --fault-isolation \
     --target-scope "$TARGET_SCOPE" --effect-aware-admission --target-kind regular --comparison-seed-image "$SEED_IMAGE" \
     --scenario baseline >"$PC_LOG" 2>&1 &
 PC_PID=$!
@@ -225,7 +220,6 @@ setsid bash "$CUSTOM_RUNNER" --rootfs-backing "$ROOTFS_ABS" --mode single \
     --resource-valid-every "$RESOURCE_VALID_EVERY" --fresh-generate-every "$FRESH_GENERATE_EVERY" \
     --scheduler-policy "$SCHEDULER_POLICY" --feedback-mode "$FEEDBACK_MODE" \
     --strict-kcov-feedback --mutation-budget-policy "$MUTATION_BUDGET_POLICY" \
-    --random-fault-injection --random-fault-probability-ppm "$RANDOM_FAULT_PROBABILITY_PPM" --fault-isolation \
     --target-scope "$TARGET_SCOPE" --effect-aware-admission --target-kind regular --comparison-seed-image "$SEED_IMAGE" \
     --scenario baseline >"$FULL_LOG" 2>&1 &
 FULL_PID=$!

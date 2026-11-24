@@ -2,8 +2,7 @@
 
 # Source this file from the repository root or from any subdirectory.
 _fuzzing_orcle_tools_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export FUZZING_ORCLE_ROOT="$(cd "${_fuzzing_orcle_tools_dir}/.." && pwd)"
-export FUZZING_ORCLE_KERNEL="${FUZZING_ORCLE_ROOT}/kernel/linux-6.12.1"
+. "${_fuzzing_orcle_tools_dir}/kernel-paths.sh"
 export FUZZING_ORCLE_SYZKALLER="${FUZZING_ORCLE_ROOT}/tools/syzkaller"
 export FUZZING_ORCLE_WORKDIR="${FUZZING_ORCLE_ROOT}/work"
 

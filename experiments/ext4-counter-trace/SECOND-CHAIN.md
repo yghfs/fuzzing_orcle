@@ -1,6 +1,6 @@
 # 第二条链：长时采集、分段分析与资源治理
 
-> 状态同步（2026-11-17）：`results/` 历史结果已全部清理。当前实现与证据边界见 [实现状态](IMPLEMENTATION-STATUS.md)，本次未重跑长实验。
+> 状态同步（2026-11-24）：`results/` 历史结果已全部清理。当前实现与证据边界见 [实现状态](IMPLEMENTATION-STATUS.md)，本次未重跑长实验。
 
 普通活动期的第一条链保持不变，第二条链把有限观测窗口连接成受控长时实验。
 内核不需要再次改动，开发/官方树和主线项目保持独立。
@@ -108,7 +108,7 @@ bash experiments/ext4-counter-trace/scripts/run-campaign.sh \
 
 这些场景与 resource-valid 生成策略正交；`program.syz` 仍保存每个实际执行的
 syzkaller 操作序列，场景初始化和清理证据保存在 `*-scenario.txt`。fast-commit、
-resize、corruption 和 legacy orphan 路径继续由 `run-special.sh`/`run-relations.sh`
+resize、fast-commit replay 和 legacy orphan 路径继续由 `run-special.sh`/`run-relations.sh`
 独立重放，不混入普通活动期端点。
 
 停止条件是运行时长、段数或资源边界中先到者。时长在批次/分析边界检查，

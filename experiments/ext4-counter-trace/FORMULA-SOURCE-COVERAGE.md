@@ -1,6 +1,6 @@
 # ext4 公式—源码覆盖矩阵
 
-> 2026-11-11 核对：下方早期设计表的 pending 不作为当前未实现清单；已有 `BLOCK_UNINIT` 布局重算与准确原生 syscall 关联。历史 VM 摘要未在本次重跑，最新证据与限制见 [实现状态](IMPLEMENTATION-STATUS.md)。
+> 2026-11-24 核对：下方早期设计表的 pending 不作为当前未实现清单；已有 `BLOCK_UNINIT` 布局重算与准确原生 syscall 关联。历史 VM 摘要未在本次重跑，最新证据与限制见 [实现状态](IMPLEMENTATION-STATUS.md)。
 
 日期：2026-10-09  
 检查对象：`kernel/linux-6.12.1/`，官方 Linux 6.12.1 原始源码  
@@ -8,7 +8,7 @@
 
 本文件以干净上游行号记录初版设计，供 review 与插桩定位。初版表中的 pending 是设计时状态；当前实现状态以文末“第一版实现状态”及 `PROBE-API-SNAPSHOT.md` 为准。development 源码与上游参照分开保存。
 
-当前状态以 `IMPLEMENTATION-STATUS.md` 和根目录 `IMPLEMENTATION-STATUS.md` 为准；本表用于逐公式实现定位。下方源码点位矩阵描述写入路径/锁边界及定向验证范围；其中保留的 `pending` 表示该源码路径没有独立 fault/layout fixture 或细粒度阶段证明，不表示该写入点未被 runtime trace 覆盖。未验证布局必须返回 `unverified`，不能按一致计入。
+下方源码点位矩阵描述写入路径、锁边界及定向验证范围。`pending` 表示该路径缺少独立的场景验证或细粒度阶段证据。未验证布局记为 `unverified`。当前状态见 [实现状态](IMPLEMENTATION-STATUS.md)。
 
 ## 结论与插桩规则
 
@@ -30,7 +30,7 @@
 | `R-BSUM` | `R_B`，cluster | 纳入健康计数域的 `sum(C_g)` | global 发布点仅记录；稳定内存快照判等 | implemented；稳定窗口与 corrupt-group 域匹配时判定 |
 | `R-IG` | `I_g`，inode | 有效 inode bitmap 的逻辑空闲 bit 数 `L_g^I`；处理 reserved inode、padding、`INODE_UNINIT` | 组局部更新事件；可靠稳定快照 | implemented；运行时逻辑位图重算；未支持布局返回 `unverified` |
 | `R-IH` | inode table 已初始化前缀长度 `H_g = inodes_per_group - bg_itable_unused` | 已初始化 inode bitmap 中最高的 allocated bit；只要求所有 set bit 都小于 `H_g`，不要求高水位等于当前最高 bit | 稳定 bitmap/descriptor 快照或离线恢复后镜像；跳过 `INODE_UNINIT` 及无 descriptor checksum 的文件系统 | implemented（runtime + offline）；普通/bigalloc 定向 VM 命中，旧格式/未初始化组为 unverified |
-| `R-IEVICT` | 最终 eviction 后目标 inode bitmap bit | eviction 前目标 bit 与退出后 bit 的独立读取 | 最后引用释放、没有并发 inode 转换的操作出口 | implemented（runtime）；错误出口已有历史 fixture，final-dirty 失败保留 bitmap 不直接确认 bug |
+| `R-IEVICT` | 最终 eviction 后目标 inode bitmap bit | eviction 前目标 bit 与退出后 bit 的独立读取 | 最后引用释放、没有并发 inode 转换的操作出口 | implemented（runtime），定向负载覆盖正常 eviction |
 | `R-IDELTA-EVICT` | eviction 对应 group/global free-inode 增量 | 同一目标 inode 的 bitmap 释放与 descriptor/global 差值 | 稳定、独占的 eviction 后置窗口 | implemented（runtime）；并发或异步更新为 unverified |
 | `O-LIFE` / `O-LIFE-DELTA` | orphan slot owner 与删除后空槽/计数增量 | slot 内容、inode orphan owner、`ob_free_entries` | orphan-file 启用且 block 可读；旧 orphan 链表不适用 | implemented（runtime）；regular/bigalloc/inline 定向 VM 命中 |
 | `XATTR-REF` / `XATTR-REF-DELTA` | xattr header 引用数与独立 inode `i_file_acl` 集合 | live/raw inode table 扫描、header 读取、detach 后实际释放结果 | 稳定内存快照；零引用泄漏和持久化需离线 bitmap/recovery | implemented（runtime）；共享/分离 xattr 定向 VM 命中 |
@@ -130,7 +130,8 @@ operation ID 不能仅用 PID、inode 或 JBD2 tid。至少保留独立 event se
 | `P-DISK` | implemented | 离线 `scripts/check-disk.py` 独立解析 superblock、descriptor、bitmap、inode table、extent directory；smoke 四种镜像通过，负向篡改测试通过 |
 | block/inode 普通转换与发布 | implemented | 外层 begin/end 覆盖 bitmap 到 global 的窗口；真实 bit 转换独立记录，上游请求长度与 changed 均未改变 |
 | bigalloc rereserve | implemented，独立 expected，已命中 | `ext4_rereserve_cluster()` 记录 free cluster +1 与 dirtyclusters +1；special analyzer 检查两次事件及 delta |
-| corrupt exclusion/resize/FC replay | implemented，独立 expected，已命中 | corruption 扣减 group `bb_free`/inode 计数；resize 发布 clusters/inodes/groups；FC block replay 与 inode replay（global/descriptor 不变）分别断言；special analyzer 强制检查全部点位 |
+| resize/FC replay | implemented，独立 expected | resize 发布 clusters/inodes/groups；FC block replay 与 inode replay（global/descriptor 不变）分别断言；special analyzer 检查对应点位 |
+| corrupt exclusion | implemented，待验证 | corruption 扣减 group `bb_free`/inode 计数；仅记录原生错误路径，尚无当前定向运行证据 |
 | lazy init | implemented coverage；细粒度阶段 pending | 计数写入由 allocator/replay 活动窗口覆盖；snapshot 使用上游逻辑 bitmap 初始化，不直接数未初始化磁盘位 |
 | namespace create/link/unlink/mkdir/rmdir/rename 等 | implemented，含子步骤 | VFS inode-op wrapper、唯一嵌套 operation ID；dirent add/delete 与 nlink inc/dec/clear/rollback 均单独成事件 |
 | trace loss detection | implemented | mount epoch/序号及端点、BEGIN/END、per-CPU dropped/overrun；缺证据则失败 |

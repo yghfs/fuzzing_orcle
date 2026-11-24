@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# Four custom feedback modes, shared initial ext4 image, no fault injection.
+# Four custom feedback modes with a shared initial ext4 image.
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
 ROOT_DIR=$(cd -- "$PROJECT_DIR/../.." && pwd)
+source "$ROOT_DIR/tools/kernel-paths.sh"
 RUNNER=${FEEDBACK_ABLATION_RUNNER:-"$SCRIPT_DIR/run-campaign.sh"}
 ARM_RUNNER="$SCRIPT_DIR/run-feedback-ablation-arm.sh"
 SEED_PREPARER="$SCRIPT_DIR/prepare-comparison-ext4-seed.py"
 SUMMARIZER="$SCRIPT_DIR/summarize-feedback-ablation.py"
-ROOTFS="$ROOT_DIR/work/debian-clean-smalljournal.img"
+ROOTFS="$FUZZING_ORCLE_ROOTFS"
 DURATION_SECONDS=7200
 SEED=20261120
 OUTPUT_DIR=""
@@ -27,7 +28,7 @@ Usage: run-feedback-ablation.sh [options]
 
 Run four custom arms concurrently: pc, pc_edge, pc_semantic, pc_edge_semantic.
 All arms share seed, rootfs, kernel, regular ext4 starting image and workload
-settings. Random fault injection is disabled (its enabling flag is not passed).
+settings.
 
 Options:
   --duration-seconds N  Collection time per arm (default: 7200)
@@ -90,10 +91,10 @@ done
     echo "target-scope must be all or ext4_jbd2" >&2; exit 2;
 }
 
-KERNEL_OBJ=${EXT4_CT_KERNEL_OBJ:-"$PROJECT_DIR/build/linux-counter-trace"}
+KERNEL_OBJ=${EXT4_CT_KERNEL_OBJ:-"$FUZZING_ORCLE_KERNEL_OBJ"}
 KERNEL=${EXT4_CT_KERNEL:-"$KERNEL_OBJ/arch/x86/boot/bzImage"}
 VMLINUX=${EXT4_CT_VMLINUX:-"$KERNEL_OBJ/vmlinux"}
-KERNEL_SRC=${EXT4_CT_KERNEL_SRC:-"$PROJECT_DIR/dev/linux-6.12.1"}
+KERNEL_SRC=${EXT4_CT_KERNEL_SRC:-"$FUZZING_ORCLE_KERNEL"}
 SSHKEY=${EXT4_CT_SSHKEY:-"$ROOT_DIR/work/debian.id_rsa"}
 SEED_TEMPLATE="$PROJECT_DIR/syzgen/seeds/upstream-ext4.syz"
 [[ -r "$RUNNER" && -x "$ARM_RUNNER" && -r "$SUMMARIZER" && -r "$SEED_PREPARER" ]] || {
@@ -145,7 +146,7 @@ python3 "$SEED_PREPARER" --seed "$SEED" --image "$SEED_IMAGE" \
         echo "failed to prepare seed; see $SEED_DIR/prepare.stderr" >&2; exit 1;
     }
 SEED_IMAGE_SHA256=$(sha256sum "$SEED_IMAGE" | awk '{print $1}')
-printf 'seed=%s\nduration_seconds=%s\nsegments_cap=%s\nbatch_timeout_seconds=%s\nfail_fast=%s\nrootfs=%s\nrootfs_sha256=%s\nkernel=%s\nkernel_sha256=%s\nregular_seed_image=%s\nregular_seed_image_sha256=%s\nrandom_fault_injection=false\ntarget_scope=%s\nfeedback_modes=%s\n' \
+printf 'seed=%s\nduration_seconds=%s\nsegments_cap=%s\nbatch_timeout_seconds=%s\nfail_fast=%s\nrootfs=%s\nrootfs_sha256=%s\nkernel=%s\nkernel_sha256=%s\nregular_seed_image=%s\nregular_seed_image_sha256=%s\ntarget_scope=%s\nfeedback_modes=%s\n' \
     "$SEED" "$DURATION_SECONDS" "$SEGMENTS" "$BATCH_TIMEOUT" "$FAIL_FAST" "$ROOTFS" "$ROOTFS_SHA256" \
     "$KERNEL" "$KERNEL_SHA256" "$SEED_IMAGE" "$SEED_IMAGE_SHA256" \
     "$TARGET_SCOPE" "${MODES[*]}" > "$OUTPUT_DIR/launch-metadata.txt"
@@ -177,7 +178,7 @@ for i in "${!MODES[@]}"; do
         "$SEED" "$DURATION_SECONDS" "$log" "$RUNNER" "$TARGET_SCOPE" \
         "$SEGMENTS" "$TARGET_SYSCALLS" "$BATCH_TIMEOUT" &
     ACTIVE_PIDS[$mode]=$!
-    echo "[$mode] started pid=${ACTIVE_PIDS[$mode]} port=${PORTS[$i]} fault_injection=off log=$log"
+    echo "[$mode] started pid=${ACTIVE_PIDS[$mode]} port=${PORTS[$i]} log=$log"
 done
 echo "[supervisor] four arms running for ${DURATION_SECONDS}s; Ctrl-C requests graceful shutdown"
 echo "[supervisor] live logs are also at $OUTPUT_DIR/{pc,pc_edge,pc_semantic,pc_edge_semantic}.log"

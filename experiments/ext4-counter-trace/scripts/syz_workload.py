@@ -8,7 +8,7 @@ from campaign import atomic_json, digest
 PROJECT = pathlib.Path(__file__).resolve().parents[1]
 
 
-def execution_issues(programs, calls, segment, batches, workers, fault_stop=None):
+def execution_issues(programs, calls, segment, batches, workers):
     """Require every expected generated call exactly once, including failed syscalls."""
     issues = []
     expected_programs = {f'b{batch}-w{worker}' for batch in range(1, batches+1) for worker in range(workers)}
@@ -28,17 +28,6 @@ def execution_issues(programs, calls, segment, batches, workers, fault_stop=None
                     index = None
                 observed.setdefault(index, []).append(call)
             allowed_count = len(meta['calls'])
-            if fault_stop and fault_stop.get('program') == ident:
-                try:
-                    stop_index = int(fault_stop['call_index'])
-                except (KeyError, TypeError, ValueError):
-                    stop_index = -1
-                if stop_index < 0 or stop_index >= len(meta['calls']):
-                    issues.append(ident + ':invalid_fault_stop_marker')
-                else:
-                    allowed_count = stop_index + 1
-                    if any(index is None or index > stop_index for index in observed):
-                        issues.append(ident + ':calls_after_fault_stop')
             expected_indices = set(range(allowed_count))
             if set(observed) != expected_indices:
                 issues.append(ident + ':missing_or_extra_call_indices')

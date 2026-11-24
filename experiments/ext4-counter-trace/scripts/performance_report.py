@@ -5,7 +5,7 @@ import argparse, datetime, gzip, json, pathlib, re, statistics
 
 STAGES = ('generation', 'compilation', 'upload', 'guest_execution', 'workload',
           'snapshot_one', 'fetch', 'feedback', 'trace_wait', 'analysis',
-          'fault_reset', 'quota_reconciliation', 'finish_disk', 'disk_fsck',
+          'quota_reconciliation', 'finish_disk', 'disk_fsck',
           'disk_checker', 'aggregate')
 
 ANALYSIS_EVENT = re.compile(

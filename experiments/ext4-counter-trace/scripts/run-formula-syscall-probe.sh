@@ -3,12 +3,14 @@ set -euo pipefail
 
 project=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 root=$(cd "$project/../.." && pwd)
+. "$root/tools/kernel-paths.sh"
+mkdir -p "$project/results"
 run=${EXT4_FORMULA_RUN_DIR:-$(mktemp -d "$project/results/formula-syscall-XXXXXXXX")}
 port=${EXT4_FORMULA_PORT:-11902}
 qemu_memory_mb=${EXT4_FORMULA_QEMU_MEMORY_MB:-1536}
 trace_buffer_kb=${EXT4_FORMULA_TRACE_BUFFER_KB:-262144}
 key="$root/work/debian.id_rsa"
-kernel="$project/build/linux-counter-trace/arch/x86/boot/bzImage"
+kernel="$FUZZING_ORCLE_BZIMAGE"
 test_image="$run/test.raw"
 mkdir -p "$run"
 test -s "$kernel"
@@ -24,10 +26,10 @@ fi
 mke2fs -q -F -t ext4 -O "$features" -b 4096 -N 16384 \
 	-E lazy_itable_init=0 "$test_image" 40000
 e2fsck -fn "$test_image" > "$run/baseline-fsck.txt" 2>&1
-qemu-img create -q -f qcow2 -F raw -b "$root/work/debian-clean-smalljournal.img" \
+qemu-img create -q -f qcow2 -F raw -b "$FUZZING_ORCLE_ROOTFS" \
 	"$run/root.qcow2"
 
-qemu-system-x86_64 -machine q35,accel=tcg -cpu max -m "$qemu_memory_mb" -smp 2 \
+qemu-system-x86_64 -machine q35,accel=tcg -cpu qemu64 -m "$qemu_memory_mb" -smp 2 \
 	-kernel "$kernel" \
 	-drive "file=$run/root.qcow2,format=qcow2,if=virtio" \
 	-drive "file=$test_image,format=raw,if=virtio" \

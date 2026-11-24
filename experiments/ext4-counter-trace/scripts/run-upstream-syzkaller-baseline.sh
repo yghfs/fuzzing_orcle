@@ -6,13 +6,14 @@ set -uo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
 ROOT_DIR=$(cd -- "$PROJECT_DIR/../.." && pwd)
+. "$ROOT_DIR/tools/kernel-paths.sh"
 MANAGER=${UPSTREAM_SYZ_MANAGER:-"$ROOT_DIR/tools/src/syzkaller-master/bin/syz-manager"}
 SYZKALLER=${UPSTREAM_SYZKALLER:-"$ROOT_DIR/tools/src/syzkaller-master"}
-KERNEL_OBJ=${EXT4_CT_KERNEL_OBJ:-"$PROJECT_DIR/build/linux-counter-trace"}
-KERNEL_SRC=${EXT4_CT_KERNEL_SRC:-"$PROJECT_DIR/dev/linux-6.12.1"}
+KERNEL_OBJ=${EXT4_CT_KERNEL_OBJ:-"$FUZZING_ORCLE_KERNEL_OBJ"}
+KERNEL_SRC=${EXT4_CT_KERNEL_SRC:-"$FUZZING_ORCLE_KERNEL"}
 KERNEL=${EXT4_CT_KERNEL:-"$KERNEL_OBJ/arch/x86/boot/bzImage"}
 VMLINUX=${EXT4_CT_VMLINUX:-"$KERNEL_OBJ/vmlinux"}
-IMAGE=${EXT4_CT_IMAGE:-"$ROOT_DIR/work/debian-clean-smalljournal.img"}
+IMAGE=${EXT4_CT_IMAGE:-"$FUZZING_ORCLE_ROOTFS"}
 SSHKEY=${EXT4_CT_SSHKEY:-"$ROOT_DIR/work/debian.id_rsa"}
 DURATION_SECONDS=3600
 WORKDIR=""

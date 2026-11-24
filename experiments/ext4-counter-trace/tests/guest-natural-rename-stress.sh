@@ -2,7 +2,7 @@
 set -u
 
 fixture=/tmp/natural-rename-stress
-out=/tmp/fault-formula
+out=/tmp/natural-rename-evidence
 mount_options=
 while [ "$#" -gt 0 ]; do
 	case "$1" in
@@ -14,13 +14,14 @@ while [ "$#" -gt 0 ]; do
 done
 
 trace=/sys/kernel/tracing
-mnt=/mnt/fault
+mnt=/mnt/natural-rename
+export NATURAL_RENAME_SNAPSHOT=/sys/fs/ext4/vdb/counter_snapshot
 mkdir -p "$trace" "$out" "$mnt"
 mount -t tracefs tracefs "$trace" 2>/dev/null || true
 mount -t debugfs debugfs /sys/kernel/debug 2>/dev/null || true
 echo 0 > "$trace/tracing_on"
 echo global > "$trace/trace_clock"
-echo "${EXT4_FAULT_TRACE_BUFFER_KB:-32768}" > "$trace/buffer_size_kb"
+echo "${NATURAL_RENAME_TRACE_BUFFER_KB:-32768}" > "$trace/buffer_size_kb"
 echo > "$trace/trace"
 for event in jbd2_handle_start jbd2_handle_stats jbd2_handle_extend jbd2_handle_restart; do
 	if [ -e "$trace/events/jbd2/$event/enable" ]; then
@@ -37,7 +38,7 @@ sync
 echo 1 > "$trace/tracing_on"
 
 set +e
-CT_FAULT_RESULT="$out/workload-result.json" \
+NATURAL_RENAME_RESULT="$out/workload-result.json" \
 CT_TRACE_MARKER="$trace/trace_marker" \
 CT_FIXTURE_READY="$out/prepared" \
 CT_FIXTURE_PROCEED="$out/proceed" \
@@ -46,7 +47,7 @@ CT_STABLE_ORACLE="$out/stable-oracle.json" \
 	NATURAL_RENAME_SECONDS="${NATURAL_RENAME_SECONDS:-20}" \
 	NATURAL_RENAME_WORKERS="${NATURAL_RENAME_WORKERS:-4}" \
 	NATURAL_RENAME_FILLERS="${NATURAL_RENAME_FILLERS:-640}" \
-	"$fixture" natural-rename-stress natural_rename_stress natural "$mnt" \
+	"$fixture" "$mnt" \
 	> "$out/workload.txt" 2>&1 &
 fixture_pid=$!
 set -e
@@ -71,10 +72,7 @@ set -e
 
 snapshot()
 {
-	path=$1
-	if "$fixture" --stable-snapshot "$path" 0; then return 0; fi
-	echo '{"valid":false,"relations_valid":false,"namespace_valid":false,"observation_stable":false,"trace_loss":1,"workers":4}' > "$path"
-	return 1
+	"$fixture" --stable-snapshot "$1" 0
 }
 
 after_rc=0
@@ -97,12 +95,10 @@ if [ "$unmount_rc" -eq 0 ]; then
 	else
 		remount_rc=1
 		remount_umount_rc=1
-		echo '{"valid":false,"relations_valid":false,"namespace_valid":false,"observation_stable":false,"trace_loss":1,"workers":4}' > "$out/remount.json"
 	fi
 else
 	remount_rc=1
 	remount_umount_rc=1
-	echo '{"valid":false,"relations_valid":false,"namespace_valid":false,"observation_stable":false,"trace_loss":1,"workers":4}' > "$out/remount.json"
 fi
 
 echo 0 > "$trace/tracing_on"

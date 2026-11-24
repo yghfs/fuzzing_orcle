@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
-kernel="${EXT4_ORPHAN_KERNEL:-${root_dir}/kernel/linux-6.12.1/arch/x86/boot/bzImage}"
-kernel_config="${EXT4_ORPHAN_CONFIG:-}"
-root_base="${EXT4_BASE_IMAGE:-${work_dir}/debian-clean-smalljournal.img}"
+kernel="${EXT4_ORPHAN_KERNEL:-${FUZZING_ORCLE_BZIMAGE}}"
+root_base="${EXT4_BASE_IMAGE:-${ext4_normal_guest_image}}"
 test_base="${EXT4_ORPHAN_BASE:-${work_dir}/ext4-orphan-file-natural-1g-65536.raw}"
 port="${EXT4_ORPHAN_PORT:-11691}"
 workers="${EXT4_ORPHAN_WORKERS:-8}"
@@ -13,26 +13,7 @@ mode="${EXT4_ORPHAN_MODE:-churn}"
 hold_seconds="${EXT4_ORPHAN_HOLD_SECONDS:-30}"
 run_dir="${EXT4_ORPHAN_RUN_DIR:-${work_dir}/ext4-orphan-file-natural-$(date +%Y%m%d%H%M%S)-$$}"
 ssh_key="${work_dir}/debian.id_rsa"
-if [[ -z "${kernel_config}" && "${kernel}" == */arch/x86/boot/bzImage ]]; then
-	kernel_config="${kernel%/arch/x86/boot/bzImage}/.config"
-fi
-if [[ -r "${kernel_config}" ]]; then
-	config_text="$(<"${kernel_config}")"
-elif config_text="$("${root_dir}/kernel/linux-6.12.1/scripts/extract-ikconfig" \
-	"${kernel}" 2>/dev/null)"; then
-	:
-else
-	config_text=""
-fi
-if [[ -n "${config_text}" ]] && {
-	! grep -qx 'CONFIG_EXT4_INVARIANT_CHECKER=y' <<<"${config_text}" ||
-	! grep -Eq '^# CONFIG_EXT4_FAULT_INJECTION is not set$' <<<"${config_text}";
-}; then
-	echo "selected kernel config must enable the checker and disable fault injection" >&2
-	exit 2
-elif [[ -z "${config_text}" ]]; then
-	echo "selected kernel config unavailable; guest runtime checks will verify checker/fault controls" >&2
-fi
+ext4_require_normal_kernel "${kernel}" "${EXT4_ORPHAN_CONFIG:-}"
 if [[ ! "${workers}" =~ ^[0-9]+$ || ! "${iterations}" =~ ^[0-9]+$ ||
 	! "${hold_seconds}" =~ ^[0-9]+$ ||
 	"${hold_seconds}" -gt 300 ||
@@ -75,7 +56,7 @@ for _ in $(seq 1 120); do
 	if ssh "${opts[@]}" root@127.0.0.1 'mkdir -p /mnt/ext4-orphan; mountpoint -q /mnt/ext4-orphan || mount /dev/vdb /mnt/ext4-orphan; test -r /sys/kernel/debug/ext4/vdb/invariant_summary' >/dev/null 2>&1; then break; fi
 	sleep 1
 done
-ssh "${opts[@]}" root@127.0.0.1 'test ! -e /sys/module/ext4/parameters/ext4_fault_mode && mount -o remount,commit=1 /mnt/ext4-orphan'
+ssh "${opts[@]}" root@127.0.0.1 'mount -o remount,commit=1 /mnt/ext4-orphan'
 program="${run_dir}/ext4-orphan-file-count-stress"
 scp -q -i "${ssh_key}" -P "${port}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${program}" root@127.0.0.1:/tmp/ext4-orphan-file-count-stress
 ssh "${opts[@]}" root@127.0.0.1 "rm -f /tmp/ext4-orphan-hold-ready; printf 1 > /sys/kernel/debug/ext4/vdb/invariant_reset; nohup /tmp/ext4-orphan-file-count-stress /mnt/ext4-orphan/workload ${workers} ${iterations} ${mode} ${hold_seconds} >/tmp/ext4-orphan-file-count-stress.log 2>&1 </dev/null & echo \$! >/tmp/ext4-orphan-file-count-stress.pid"

@@ -13,7 +13,6 @@ echo 1 > "$trace/events/ext4_counter/ext4_counter_event/enable"
 # tracing multiplies the volume without adding formula evidence.
 echo 0 > "$trace/events/raw_syscalls/sys_enter/enable" 2>/dev/null || true
 echo 0 > "$trace/events/raw_syscalls/sys_exit/enable" 2>/dev/null || true
-test ! -e /sys/module/ext4/parameters/ext4_fault_mode
 mount -o noatime /dev/vdb /mnt/formula
 for attempt in $(seq 1 100); do
 	cat /sys/fs/ext4/vdb/counter_snapshot > "$out/before.json"

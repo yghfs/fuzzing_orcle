@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
-kernel="${EXT4_DIRLINK_KERNEL:-${work_dir}/kernels/ext4-count-normal-new/bzImage}"
-kernel_config="${EXT4_DIRLINK_KERNEL_CONFIG:-$(dirname "${kernel}")/config}"
-root_base="${EXT4_BASE_IMAGE:-${work_dir}/debian-clean-smalljournal.img}"
+kernel="${EXT4_DIRLINK_KERNEL:-${FUZZING_ORCLE_BZIMAGE}}"
+root_base="${EXT4_BASE_IMAGE:-${ext4_normal_guest_image}}"
 test_base="${EXT4_DIRLINK_BASE:-${work_dir}/ext4-dir-link-count-natural-1g.raw}"
 port="${EXT4_DIRLINK_PORT:-11692}"
 workers="${EXT4_DIRLINK_WORKERS:-8}"
@@ -12,11 +12,7 @@ rounds="${EXT4_DIRLINK_ROUNDS:-20}"
 iterations="${EXT4_DIRLINK_ITERATIONS:-500}"
 run_dir="${EXT4_DIRLINK_RUN_DIR:-${work_dir}/ext4-dir-link-count-natural-$(date +%Y%m%d%H%M%S)-$$}"
 ssh_key="${work_dir}/debian.id_rsa"
-if ! grep -q '^CONFIG_EXT4_INVARIANT_CHECKER=y$' "${kernel_config}" ||
-	grep -Eq '^CONFIG_EXT4_FAULT_INJECTION=(y|m)$' "${kernel_config}"; then
-	echo "kernel config must enable the checker and disable fault injection" >&2
-	exit 2
-fi
+ext4_require_normal_kernel "${kernel}" "${EXT4_DIRLINK_KERNEL_CONFIG:-}"
 mkdir -p "${run_dir}"
 program="${run_dir}/ext4-dir-link-count-stress"
 gcc -O2 -Wall -Wextra -Werror -static -o "${program}" "${root_dir}/tests/ext4-dir-link-count-stress.c"
@@ -40,7 +36,6 @@ for _ in $(seq 1 120); do
 	if ssh "${opts[@]}" root@127.0.0.1 'mkdir -p /mnt/ext4-dirlink; mountpoint -q /mnt/ext4-dirlink || mount /dev/vdb /mnt/ext4-dirlink; test -r /sys/kernel/debug/ext4/vdb/invariant_summary' >/dev/null 2>&1; then break; fi
 	sleep 1
 done
-ssh "${opts[@]}" root@127.0.0.1 'test ! -e /sys/module/ext4/parameters/ext4_fault_mode'
 scp -q -i "${ssh_key}" -P "${port}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${program}" root@127.0.0.1:/tmp/ext4-dir-link-count-stress
 ssh "${opts[@]}" root@127.0.0.1 "printf 1 > /sys/kernel/debug/ext4/vdb/invariant_reset; timeout --foreground 900s /tmp/ext4-dir-link-count-stress /mnt/ext4-dirlink/tree ${workers} ${rounds} ${iterations} > /tmp/ext4-dir-link-count-stress.log 2>&1 & workload_pid=\$!; poll_snapshots=0; while kill -0 \$workload_pid 2>/dev/null; do cat /sys/kernel/debug/ext4/vdb/invariant_summary > /tmp/ext4-dir-link-checker-during.txt; poll_snapshots=\$((poll_snapshots + 1)); sleep 0.05; done; set +e; wait \$workload_pid; workload_rc=\$?; set -e; echo workload_rc=\$workload_rc poll_snapshots=\$poll_snapshots; cat /tmp/ext4-dir-link-count-stress.log; sync; test \$workload_rc -eq 0" >"${run_dir}/workload.txt"
 if ! rg -q 'poll_snapshots=[1-9][0-9]*' "${run_dir}/workload.txt"; then

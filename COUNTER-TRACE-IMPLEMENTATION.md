@@ -1,6 +1,9 @@
 # ext4 公式检查与密集运行时追踪实施文档
 
-设计起始：2026-10-09；状态核对：2026-11-11（Asia/Shanghai）
+设计起始：2026-10-09；状态核对：2026-11-24（Asia/Shanghai）
+
+本文记录最初的独立设计。当前实现已统一为一个 checker，并纳入旧版独有的模型；
+最新入口和验证状态以[实现状态](experiments/ext4-counter-trace/IMPLEMENTATION-STATUS.md)为准。
 
 ## 目标与实施依据
 
@@ -49,11 +52,10 @@ experiments/ext4-counter-trace/
   config/                     # 配置副本，不能覆盖旧配置
   scripts/                    # 基线保存、源码准备及后续构建/运行工具
   tests/
-  traces/
   results/
 ```
 
-主线项目的 `kernel/`、`tests/`、`tools/` 和 `work/` 不删除、不移动、不覆盖。早期准备阶段没有可用 Git 元数据，因此使用 manifest、逐文件 SHA256 和独立归档；当前项目已有 Git，源码/补丁/配置同时由版本控制管理，镜像与原始实验结果仍需独立保存。大镜像必须归档/复制或明确记录独立保存位置，不能只记录一个日后会被覆盖的原路径。
+官方源码、开发源码和构建输出分别位于 `experiments/ext4-counter-trace/` 下。当前回归使用 `tools/kernel-paths.sh` 配置路径和 `work/` 中的本地 guest 镜像；根目录 `tests/` 保留定向回归入口。早期主线项目归档只用于追溯和恢复。
 
 主线项目继续独立维护；快照只固定某个时间点的参照状态，不表示主线项目停用或被新子项目替代。本次已保存的完整范围归档保留一份，后续无需在每轮实验重复归档整个主线项目。
 
@@ -68,7 +70,7 @@ experiments/ext4-counter-trace/
 3. 盘点旧实现供选择性复用参考；如果比较旧与官方源码，应包含 ext4、JBD2、头文件和构建环境改动，不能假定只改过 checker.c。
 4. 完成公式覆盖矩阵后，在干净源码上开发新 checker。建议按 `0001-formula-checker-core.patch`、`0002-write-and-boundary-probes.patch`、`0003-snapshot-and-summary-checks.patch` 等功能层拆分；实际拆分由实现决定。
 5. 每份补丁审查上下文、锁序及 ext4 原有语义，并验证在官方源码上的可应用性。不要求生成 `0001-replay-current-checker.patch`。
-6. 配置可以从主线项目已有的可工作配置作为参考起点，但重新核对选项与工具链；发现负载禁止编译 ext4 fault injection。独立构建目录和 config 不污染原始源码或主线项目内核。
+6. 配置可以从主线项目已有的可工作配置作为参考起点，重新核对选项与工具链。使用独立构建目录和配置，保持原始源码可校验。
 
 官方 SHA256 列表通过 HTTPS 下载比对属于来源与传输完整性校验；如果另做 PGP 验签，要记录可信公钥来源与验签结果，不能把“下载了签名文件”写成“已验签”。
 
@@ -118,7 +120,7 @@ unverified_reason snapshot_validity
 
 使用普通 `open/create/unlink`、`mkdir/rmdir/link/rename`、`write/pwrite`、`fallocate`、hole punch、`truncate/ftruncate`、`fsync/syncfs`，覆盖新版 Runtime 公式的 cluster、inode、目录与引用变化。普通与 bigalloc 分开运行。EA feature 镜像仅按是否帮助覆盖本阶段公式决定，不为旧 EA 模型验收而强制加入。
 
-先单 worker 验证点位与阶段，再多 worker 和持续压力。自然 ENOSPC/EDQUOT/ENOMEM 是普通错误路径覆盖；ext4 fault injection 和 dm-error 属于独立错误验证，不混入健康存储发现统计。
+先单 worker 验证点位与阶段，再测试多 worker 和持续压力。自然出现的 ENOSPC、EDQUOT 和 ENOMEM 分别覆盖空间、配额和内存不足的错误路径。
 
 每轮保存配置、源码/补丁 hash、syscall 返回、trace、kernel log、原始镜像及 baseline。停止相关更新后采集稳定内存快照，再持久化、卸载或可靠冻结；离线检查采用镜像副本，需 replay 时保存前后证据。一次 sync/fsync 返回不单独证明全部 home blocks 与内存同一状态；fsck 同时检查诊断文本与退出码。
 
@@ -146,7 +148,7 @@ unverified_reason snapshot_validity
 
 实现公式计算、点位、begin/end、稳定快照、superblock 发布与可审计导出；保存分层补丁。构建并先验证小负载、解码及 loss detection。
 
-第一版核心、普通 block/inode 更新窗口、namespace 外层边界、五条稳定内存总量公式、M-* 来源比较和 P-SB 已实现。独立开发树位于 `experiments/ext4-counter-trace/dev/linux-6.12.1/`，第一版补丁保存在 `patches/0001-counter-trace-core-and-probes.patch`，已在隔离目录重放并逐文件校验。开启配置的完整 GCC 14 构建和关闭配置的 ext4 构建均通过；GCC 15 对上游 ACPI 的新字符串诊断记录在失败日志中。
+第一版核心、普通 block/inode 更新窗口、namespace 外层边界、五条稳定内存总量公式、M-* 来源比较和 P-SB 已实现。独立开发树位于 `experiments/ext4-counter-trace/dev/linux-6.12.1/`，补丁保存在 `experiments/ext4-counter-trace/patches/0001-counter-trace-core-and-probes.patch`，已在隔离目录重放并逐文件校验。当前统一 normal 构建使用 GCC 14，并通过构建绑定、源码审计和内核产物校验。
 
 ### Phase 4：运行、分析与磁盘对照
 
@@ -162,16 +164,16 @@ VM 验证已覆盖普通、bigalloc、无 journal、lazy init、四 worker、并
 4. expected 来源独立，单位正确，观测有效性、操作边界、异步关联与丢失可审计。
 5. 一致、不一致、未验证样本均保存；普通 syscall 真实命中点位并生成序列分析。
 6. 中间态、出口和静止态分开判读；磁盘比较满足同一持久状态要求。
-7. 发现关闭 fault injection；不以“旧 checker 完整复现”或“输出相同”作为验收条件。
+7. 使用普通 syscall 负载和新版公式验收 checker。
 
 ## 本次准备结果
 
-本轮主线项目快照保存在 `experiments/ext4-counter-trace/baselines/20261009-130905+0800/`，归档全部条目和文件内容已校验。`work/debian/` 的 root 所有 staging tree 未完整归档，作为原位置外部依赖记录；可启动 rootfs 镜像已包含在归档。官方来源、SHA256、源码验证记录、恢复命令与当前未实施事项见 `experiments/ext4-counter-trace/README.md`。
+早期主线项目快照保存在本机 `experiments/ext4-counter-trace/baselines/20261009-130905+0800/`，归档全部条目和文件内容已校验。恢复说明随该归档保存。归档包含当时的 `work/` 结果和可启动 rootfs 镜像，未包含 `work/debian/` staging 目录。活动 `work/` 目录仅保留运行所需的镜像和 SSH key。官方源码及校验方法见[实验 README](experiments/ext4-counter-trace/README.md)。
 
-主线项目 build #179 的 ordinary/bigalloc/EA count workload 适用模型零违例、fsck 干净，但旧事件 ring 有覆盖；只作为历史回归参考。自然内存压力 extent/EA 候选证据仍保存在主线项目 `work/` 与快照，不作为新版公式 checker 必须复现的验收项。
+主线项目 build #179 的 ordinary/bigalloc/EA count workload 适用模型零违例、fsck 干净，但旧事件 ring 有覆盖；只作为历史回归参考。自然内存压力的旧候选结论只保留在历史快照和汇总文档中，原主线 `work/` 运行目录已清理，不作为新版公式 checker 必须复现的验收项。
 
 ## 后续任务说明
 
 ```text
-先阅读新版公式.md 与本实施文档。确认主线项目快照和官方源码校验结果已保存，在独立实验目录继续工作，不覆盖主线项目。新 checker 按新版公式及六类检查阶段设计；旧 checker 仅选择性复用，不要求完整移植。先完成公式—变量—独立 expected—写入点—锁/事务—返回边界覆盖矩阵，再添加密集 probe。记录一致、不一致、未验证事件，明确 global 并发、bigalloc 延迟发布与后台路径，禁止死锁、改变 ext4 语义或静默丢 trace。使用关闭 fault injection 的普通 syscall，完成构建、运行、时间序列与持久化对照，并按中间态/出口/静止态分类。
+先阅读新版公式.md 与本实施文档。确认主线项目快照和官方源码校验结果已保存，在独立实验目录继续工作。新 checker 按新版公式及六类检查阶段设计，按需复用旧 checker。先完成公式—变量—独立 expected—写入点—锁/事务—返回边界覆盖矩阵，再添加 probe。记录一致、不一致和未验证事件，明确 global 并发、bigalloc 延迟发布与后台路径，确保插桩符合锁和事务约束。使用普通 syscall 完成构建、运行、时间序列与持久化对照，分别验证中间态、操作出口和静止态。
 ```

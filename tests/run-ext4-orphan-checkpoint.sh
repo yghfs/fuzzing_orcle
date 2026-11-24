@@ -2,15 +2,12 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
-base_image="${EXT4_BASE_IMAGE:-${work_dir}/debian-clean-smalljournal.img}"
+base_image="${EXT4_BASE_IMAGE:-${ext4_normal_guest_image}}"
 test_base_image="${EXT4_TEST_BASE_IMAGE:-${work_dir}/ext4-runtime-journal4m.img}"
 port="${EXT4_ORPHAN_PORT:-11410}"
 checker_device="${EXT4_CHECKER_DEVICE:-vdb}"
-if [[ "${EXT4_CHECKER_FAULT:-0}" != 0 || "${EXT4_FAULT_MODE:-0}" != 0 ]]; then
-  echo "This runtime checker workload does not support fault injection." >&2
-  exit 2
-fi
 cycles="${EXT4_ORPHAN_CYCLES:-32}"
 run_dir="${work_dir}/ext4-orphan-checkpoint-$(date +%Y%m%d%H%M%S)-$$"
 overlay="${run_dir}/disk.qcow2"
@@ -22,6 +19,7 @@ program="${run_dir}/ext4-orphan-checkpoint"
 ssh_opts=(-i "${ssh_key}" -p "${port}" -o BatchMode=yes -o ConnectTimeout=4
   -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR)
 
+ext4_require_normal_kernel "${FUZZING_ORCLE_BZIMAGE}"
 mkdir -p "${run_dir}"
 gcc -O2 -Wall -Wextra -Werror -static -o "${program}" \
   "${root_dir}/tests/ext4-orphan-checkpoint.c"
@@ -41,7 +39,7 @@ cleanup() {
 trap cleanup EXIT
 
 qemu-system-x86_64 -machine q35,accel=tcg -cpu max -m 1024 -smp 2 \
-  -kernel "${root_dir}/kernel/linux-6.12.1/arch/x86/boot/bzImage" \
+  -kernel "${FUZZING_ORCLE_BZIMAGE}" \
   -drive "file=${overlay},format=qcow2,if=virtio" \
   -drive "file=${test_overlay},format=qcow2,if=virtio" \
   -netdev "user,id=n0,hostfwd=tcp:127.0.0.1:${port}-:22" \

@@ -1,13 +1,12 @@
 #!/bin/sh
 # Targeted verification for the special counter paths that the ordinary smoke
-# does not reach: bigalloc rereserve, online resize, fast-commit replay and
-# bitmap-corruption exclusion.
+# does not reach: bigalloc rereserve, online resize and fast-commit replay.
 #
 # The runner invokes this script twice.  "first" runs the workloads that need
 # a mounted filesystem and leaves the fast-commit image dirty, then exits
 # without unmounting it; the host cuts power there.  "second" runs with the
 # fast-commit journal already unclean, so mounting vdd performs the replay
-# while tracing is enabled, and then exercises the corrupted bitmaps.
+# while tracing is enabled.
 set -eu
 trace=/sys/kernel/tracing
 result=/var/lib/ext4-counter-trace
@@ -176,15 +175,6 @@ second)
 	stable vdd special-replay-after
 	end_stage
 	umount /mnt/spec
-
-	############################ corruption exclusion #######################
-	start_stage corrupt vde
-	mount -t ext4 -o errors=continue /dev/vde /mnt/spec 2> "$result/corrupt-mount.err" || true
-	mkdir -p /mnt/spec/force-read 2>/dev/null || true
-	fallocate -l 8M /mnt/spec/force-read/x 2>/dev/null || true
-	cat /sys/fs/ext4/vde/counter_trace_state > "$result/corrupt-before.json" 2>/dev/null || true
-	end_stage
-	umount /mnt/spec 2>/dev/null || true
 
 	for cpu in "$trace"/per_cpu/cpu*; do
 		cat "$cpu/stats" > "$result/$(basename "$cpu")-stats.txt"

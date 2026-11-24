@@ -83,11 +83,6 @@ def custom_result(run: pathlib.Path, target_scope: str) -> dict[str, Any]:
         "max_batches": limits.get("max_batches"),
         "batch_timeout": limits.get("batch_timeout"),
         "workers": limits.get("workers"),
-        "random_fault_injection": bool(limits.get("random_fault_injection")),
-        "random_fault_probability_ppm": limits.get("random_fault_probability_ppm"),
-        "random_fault_operations": limits.get("random_fault_operations"),
-        "random_fault_errnos": limits.get("random_fault_errnos"),
-        "fault_isolation": limits.get("fault_isolation"),
         "memory_mb": limits.get("memory_mb"),
         "guest_memory_mb": limits.get("guest_memory_mb"),
         "cpus": limits.get("cpus"),
@@ -388,9 +383,7 @@ def build_three_arm_report(native: pathlib.Path, pc_only: pathlib.Path,
                        "segment_seconds", "max_batches", "batch_timeout", "workers",
                        "memory_mb", "guest_memory_mb", "cpus", "buffer_kb",
                        "max_trace_mb", "max_run_mb", "min_free_mb", "strict_kcov_feedback",
-                       "effect_aware_admission", "require_target_success",
-                       "random_fault_injection", "random_fault_probability_ppm",
-                       "random_fault_operations", "random_fault_errnos", "fault_isolation")
+                       "effect_aware_admission", "require_target_success")
     custom_settings_aligned = all(pc_data.get(key) == full_data.get(key)
                                   for key in custom_controls)
     if not custom_settings_aligned:

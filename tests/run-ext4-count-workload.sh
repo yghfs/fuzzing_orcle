@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
 run_dir="${work_dir}/ext4-count-workload-$(date +%Y%m%d%H%M%S)-$$"
-kernel="${root_dir}/kernel/linux-6.12.1/arch/x86/boot/bzImage"
+kernel="${FUZZING_ORCLE_BZIMAGE}"
 port="${EXT4_COUNT_PORT:-11740}"
+ext4_require_normal_kernel "${kernel}"
 mkdir -p "${run_dir}"
 gcc -O2 -Wall -Wextra -Werror -static -o "${run_dir}/ext4-count-workload" \
   "${root_dir}/tests/ext4-count-workload.c"
 qemu-img create -q -f qcow2 -F raw \
-  -b "${EXT4_BASE_IMAGE:-${work_dir}/debian-clean-smalljournal.img}" "${run_dir}/root.qcow2"
+  -b "${EXT4_BASE_IMAGE:-${ext4_normal_guest_image}}" "${run_dir}/root.qcow2"
 for kind in regular bigalloc; do
   qemu-img create -q -f raw "${run_dir}/${kind}.raw" 128M
   options=(-O ^orphan_file -b 4096 -N 4096 -J size=4 -E lazy_itable_init=0)
@@ -36,7 +38,6 @@ for _ in $(seq 1 120); do
     'test -r /sys/kernel/debug/ext4/vda/invariant_summary' >/dev/null 2>&1; then break; fi
   sleep 1
 done
-ssh "${ssh_opts[@]}" root@127.0.0.1 'test ! -e /sys/module/ext4/parameters/ext4_fault_mode'
 scp -q -i "${work_dir}/debian.id_rsa" -P "${port}" -o StrictHostKeyChecking=no \
   -o UserKnownHostsFile=/dev/null "${run_dir}/ext4-count-workload" root@127.0.0.1:/tmp/
 for pair in regular:vdb bigalloc:vdc; do
@@ -75,4 +76,4 @@ fi
 for kind in regular bigalloc; do
   e2fsck -fn "${run_dir}/${kind}.raw" > "${run_dir}/${kind}-fsck.txt" 2>&1
 done
-printf 'normal count workloads: passed (fault injection disabled)\nrun_dir=%s\n' "${run_dir}"
+printf 'normal count workloads: passed\nrun_dir=%s\n' "${run_dir}"

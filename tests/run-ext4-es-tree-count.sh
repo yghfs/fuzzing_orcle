@@ -2,17 +2,18 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
 run_dir="${ES_TREE_RUN_DIR:-${work_dir}/ext4-es-tree-$(date +%Y%m%d%H%M%S)-$$}"
-kernel="${ES_TREE_KERNEL:-${root_dir}/kernel/linux-6.12.1/arch/x86/boot/bzImage}"
-base_image="${ES_TREE_BASE_IMAGE:-${work_dir}/debian-clean-smalljournal.img}"
+kernel="${ES_TREE_KERNEL:-${FUZZING_ORCLE_BZIMAGE}}"
+base_image="${ES_TREE_BASE_IMAGE:-${ext4_normal_guest_image}}"
 data_size="${ES_TREE_DISK_SIZE:-384M}"
 port="${ES_TREE_PORT:-12165}"
 event_cap="${ES_TREE_EVENT_CAP:-65536}"
 
-mkdir -p "${run_dir}"
-test -r "${kernel}" || { echo "missing kernel: ${kernel}" >&2; exit 2; }
+ext4_require_normal_kernel "${kernel}"
 test -r "${base_image}" || { echo "missing base image: ${base_image}" >&2; exit 2; }
+mkdir -p "${run_dir}"
 gcc -O2 -Wall -Wextra -Werror -static \
 	-o "${run_dir}/es-tree-count-workload" \
 	"${root_dir}/tests/ext4-es-tree-count-workload.c"
@@ -45,7 +46,7 @@ for _ in $(seq 1 120); do
 	sleep 1
 done
 ssh "${ssh_opts[@]}" root@127.0.0.1 \
-	'test -r /sys/kernel/debug/ext4/vdb/invariant_summary && test ! -e /sys/module/ext4/parameters/ext4_fault_mode'
+	'test -r /sys/kernel/debug/ext4/vdb/invariant_summary'
 scp -q -i "${work_dir}/debian.id_rsa" -P "${port}" \
 	-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
 	"${run_dir}/es-tree-count-workload" root@127.0.0.1:/tmp/

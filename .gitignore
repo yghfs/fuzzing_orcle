@@ -12,7 +12,8 @@
 /experiments/*/kernel/
 /experiments/*/dev/
 /experiments/*/build/
-/experiments/*/kernel/
+/experiments/*/direct-return/linux-*/
+/experiments/*/direct-return/build/
 /experiments/*/source/*.tar.xz
 /experiments/*/source/*.tar.xz.*
 /experiments/*/source/pristine-files.sha256
@@ -31,11 +32,9 @@
 
 # Campaign output, per-run evidence, VM images, and generated initramfs binaries.
 /experiments/*/results/
+/experiments/*/direct-return/corpus/
+/experiments/*/direct-return/results/
 /experiments/*/baselines/
-/experiments/*/research/2026-10-31-single-random-fault/**/*.csv
-/experiments/*/research/2026-10-31-single-random-fault/**/*.jsonl
-/experiments/*/research/2026-10-31-single-random-fault/**/*.raw
-/experiments/*/research/2026-10-31-single-random-fault/**/*.tsv
 /experiments/*/initramfs/bin/
 /work/syzkaller/
 *.img

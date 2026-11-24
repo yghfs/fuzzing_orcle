@@ -193,7 +193,7 @@ def correlate_syscalls(lines):
 
 
 PHASE_SOURCES = {'seed_setup', 'runtime_init', 'runtime_adaptation', 'cleanup',
-                 'stable_snapshot', 'fault_reset'}
+                 'stable_snapshot'}
 
 
 def attribute_sources(events, lines, calls):

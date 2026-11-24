@@ -12,7 +12,6 @@ echo 1 > "$trace/events/ext4_counter/ext4_counter_event/enable"
 echo 1 > "$trace/events/raw_syscalls/sys_enter/enable"
 echo 1 > "$trace/events/raw_syscalls/sys_exit/enable"
 echo 1 > "$trace/tracing_on"
-test ! -e /sys/module/ext4/parameters/ext4_fault_mode
 uname -r > "$out/kernel.txt"
 cat /proc/sys/kernel/random/boot_id > "$out/boot-id.txt"
 stable()

@@ -1,11 +1,11 @@
 {
-  "updated_at": "2026-11-17",
+  "updated_at": "2026-11-24",
   "implementation_document": "../../COUNTER-TRACE-IMPLEMENTATION.md",
   "legacy_checker_migration_required": false,
   "main_project_snapshot": "baselines/20261009-130905+0800",
   "baseline": "baselines/20261009-130905+0800",
   "baseline_verified": true,
-  "baseline_exception": "Root-owned work/debian staging tree retained as external dependency; bootable rootfs images archived",
+  "baseline_exception": "Historical root-owned work/debian staging tree was excluded from the snapshot and has since been removed; bootable rootfs images were archived",
   "official_source": "kernel/linux-6.12.1",
   "source_verified": true,
   "official_source_modified": false,
@@ -17,10 +17,10 @@
   "patch_manifest": "patches/manifest.json",
   "validation": "IMPLEMENTATION-STATUS.md",
   "latest_smoke": null,
-  "latest_special": "FAST-COMMIT-DIR-COUNT-FINDING.md",
+  "latest_special": null,
   "latest_special_finding": "FAST-COMMIT-DIR-COUNT-FINDING.md",
   "latest_special_finding_reproduced": true,
-  "latest_relations": "FORMULA-RELATIONS-IMPLEMENTATION.md",
+  "latest_relations": null,
   "relations_passed": true,
   "relations_scope": "bounded regular/bigalloc/inline orphan-file and legacy applicability VM run",
   "smoke_passed": true,
@@ -30,9 +30,7 @@
     "operation.cross_thread_parent",
     "special_domain.unified_timeline",
     "long_run.relation_coverage_and_throughput",
-    "offline.META_BG.descriptor_placement",
-    "campaign.reset_carry_epoch_continuity",
-    "fault_findings.independent_persistence_and_error_contract"
+    "offline.META_BG.descriptor_placement"
   ],
   "implemented_runtime_formulas": [
     "R-IH",
@@ -50,7 +48,7 @@
     "R-LINK.disk",
     "P-DISK"
   ],
-  "next_phase": "Validate reset/carry epoch continuity, then run controlled repeated feedback comparisons; multi-VM corpus sharing remains unimplemented",
+  "next_phase": "Validate carry continuity between segments and run repeated feedback comparisons. Multi-VM corpus sharing remains unimplemented.",
   "snapshot_archive": "baselines/20261009-130905+0800/main-project-snapshot.tar.gz",
   "latest_chain": null,
   "chain_passed": true,
@@ -88,24 +86,16 @@
   "extended_campaign_requested_seconds": null,
   "extended_campaign_passed": null,
   "extended_campaign_kcov_complete": null,
-  "campaign_fault_validation": {
-    "host_interrupted": null,
-    "interrupted_reanalysis": null,
-    "trace_byte_limit": null,
-    "batch_timeout": null,
-    "run_byte_watchdog": null,
-    "budget_preflight": null
-  },
   "implemented_campaign": [
     "continuous_trace_pipe_and_marker_rotation",
-    "stable_anchor_carry_between_segments",
     "raw_run_boot_dev_epoch_seq_continuity",
     "per_cpu_cumulative_loss_deltas",
     "bounded_seeded_syscall_batches",
     "cpu_memory_fd_trace_disk_wall_limits",
     "atomic_manifests_and_interrupted_evidence",
     "segment_and_campaign_analysis",
-    "clean_shutdown_fsck_disk_stable_confirmation"
+    "clean_shutdown_fsck_disk_stable_confirmation",
+    "bounded_trace_carry_between_segments"
   ],
   "multi_hour_soak_passed": true,
   "campaign_auto_resume_across_reboot": false,
@@ -130,10 +120,10 @@
   ],
   "kcov_mvp_total_pcs": 2179,
   "latest_short_campaign": null,
-  "latest_short_campaign_passed": null,
-  "latest_short_campaign_segments": null,
-  "latest_short_campaign_kcov_complete": null,
-  "latest_short_campaign_native_verified": null,
+  "latest_short_campaign_passed": true,
+  "latest_short_campaign_segments": 1,
+  "latest_short_campaign_kcov_complete": true,
+  "latest_short_campaign_native_verified": 64,
   "long_run_gates": {
     "resource_valid_syscall_sequences": {
       "passed": true,
@@ -176,22 +166,15 @@
   "documentation_audit": "IMPLEMENTATION-STATUS.md",
   "current_coverage_audit": null,
   "current_source_build_binding_verified": true,
-  "current_source_build_binding_checked_at": "2026-11-11",
-  "historical_validation_flags_scope": "All top-level validation flags, counts, historical campaign states and long_run_gates describe earlier runs. All raw results under results/ were deleted on 2026-11-17; these fields do not establish current validation or raw evidence availability.",
+  "current_source_build_binding_checked_at": "2026-11-24",
+  "historical_validation_flags_scope": "Counts and long_run_gates summarize earlier runs whose raw evidence was deleted. current_validation summarizes the local 2026-11-24 regressions.",
   "offline_bigalloc_feature_field": "s_feature_ro_compat (superblock offset 100), bit 0x0200",
   "offline_bigalloc_regression_combinations": 4,
   "retained_12_hour_campaigns": {},
-  "pruned_campaigns": [
-    "results/campaign-lhze43mu",
-    "results/campaign-k3gxmeex",
-    "results/campaign-k3gxmeex-postreport",
-    "results/campaign-fmxs5w3e"
-  ],
   "current_retained_12_hour_validation_passed": false,
   "current_retained_12_hour_status": "results_deleted",
   "historical_12_hour_campaigns": {
     "pc_only": {
-      "path": "results/campaign-9chz7m3j",
       "passed": false,
       "kcov_feedback_complete": true,
       "coverage_complete": false,
@@ -204,7 +187,6 @@
       "raw_results_deleted_at": "2026-11-17"
     },
     "full_feedback": {
-      "path": "results/campaign-fyubc_lv",
       "passed": false,
       "kcov_feedback_complete": true,
       "coverage_complete": false,
@@ -218,13 +200,37 @@
     }
   },
   "results_cleanup": {
-    "date": "2026-11-17",
+    "date": "2026-11-24",
     "path": "results/",
     "all_historical_results_deleted": true,
     "raw_results_available": false,
     "retained_top_level_entries": 0,
-    "deleted_top_level_entries": 75,
-    "deleted_files": 415334,
+    "deleted_top_level_entries": 30,
+    "deleted_files": 2061,
     "document": "IMPLEMENTATION-STATUS.md"
+  },
+  "current_validation": {
+    "date": "2026-11-24",
+    "python_test_scripts": 18,
+    "shell_syntax_checks": 47,
+    "c_syntax_checks": 22,
+    "python_compile": true,
+    "c_compile": true,
+    "patch_replay": true,
+    "source_build_binding": true,
+    "raw_results_available": false,
+    "raw_results_deleted_at": "2026-11-24",
+    "smoke": {"passed": true, "filesystems": 4},
+    "chain": {"passed": true},
+    "relations": {"passed": true, "filesystems": 4},
+    "campaign_single": {"passed": true, "native_syscalls_verified": 32, "kcov_complete": true},
+    "campaign_concurrent": {"passed": true, "native_syscalls_verified": 64, "kcov_complete": true},
+    "natural_rename": {"passed": true},
+    "analyzer_negative_checks": true,
+    "disk_checker_negative_checks": true,
+    "long_duration_validation": false,
+    "fast_commit_replay": {"evidence_passed": true, "finding_reproduced": true},
+    "fast_commit_expected_fsck_exit": 4,
+    "kernel_sha256": "14720b9f43931dcc4316cb3c4fd4c98bd787f9ac76f0a8f3ab4c95d210a51f47"
   }
 }

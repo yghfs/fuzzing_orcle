@@ -1,13 +1,13 @@
 # ext4 filesystem fuzzing and consistency experiments
 
 Linux x86-64 project for building instrumented Linux 6.12.1 kernels and running
-repeatable ext4 accounting and fault-injection experiments under QEMU.
+repeatable ext4 accounting and consistency experiments under QEMU.
 Source, patches, configurations and final reports are versioned; kernels, guest images and raw results are local.
 
 Current implementation and evidence availability are indexed in
 [implementation status](experiments/ext4-counter-trace/IMPLEMENTATION-STATUS.md).
 Final findings are indexed in [BUG-INVENTORY.md](BUG-INVENTORY.md), including the
-[recognized and fixed __ext4_unlink() bug](experiments/ext4-source-fault-study/UNLINK-FINAL.md).
+[recognized and fixed `__ext4_unlink()` bug](BUG-INVENTORY.md).
 
 ## Build a Debian or Ubuntu host
 
@@ -26,11 +26,13 @@ EXT4_CT_JOBS=4 tools/bootstrap.sh
 
 `tools/bootstrap.sh` installs host packages with `sudo`, installs Go 1.26.0,
 fetches the pinned syzkaller revision, verifies the official Linux 6.12.1
-source, and builds the invariant-checker and counter-trace kernels. It then
-builds the syzkaller tools and creates a local Debian guest image and SSH key
-under `work/`. Set `EXT4_CT_JOBS` to limit build parallelism. The separate
-source-fault kernel is built when requested below. Images, build trees, and
-private keys stay on the host and are excluded from Git.
+source, and builds the normal kernel with the unified ext4 consistency
+checker (`CONFIG_EXT4_COUNTER_TRACE`). Bootstrap also
+builds the syzkaller tools and prepares `work/debian-normal.img` and a local
+SSH key. The normal guest is a verified copy of the base Debian image with
+the ext4 `orphan_file` feature disabled. The base image stays intact. Set
+`EXT4_CT_JOBS` to limit build parallelism. Images, build trees, and private
+keys stay on the host and are excluded from Git.
 
 Each step can also be run individually:
 
@@ -39,16 +41,16 @@ tools/install-deps.sh
 tools/install-go.sh
 tools/install-syzkaller.sh
 bash experiments/ext4-counter-trace/scripts/prepare-dev-source.sh
-bash experiments/ext4-counter-trace/scripts/build.sh
-bash experiments/ext4-source-fault-study/scripts/build-local-kernel.sh
+bash experiments/ext4-counter-trace/scripts/build.sh --normal
+tools/build-syzkaller.sh
 tools/create-vm-image.sh
 ```
 
 ## Run a smoke test
 
-The counter-trace smoke run boots a disposable QEMU guest and four ext4
-filesystem variants, checks the recorded events and stable snapshots, and
-validates each disk after guest shutdown:
+The smoke run boots a disposable QEMU guest, checks counters across four
+ext4 filesystem variants and verifies the model summary on the regular
+filesystem. It validates each disk after guest shutdown:
 
 ```sh
 bash experiments/ext4-counter-trace/scripts/run-smoke.sh
@@ -60,40 +62,33 @@ Run the longer formula-chain validation with:
 bash experiments/ext4-counter-trace/scripts/run-chain.sh
 ```
 
-The original invariant-checker kernel and its reproducible patch are kept in
-`experiments/ext4-invariant-checker/`. Generate a manager config for this
-checkout with `python3 tools/configure-syzkaller.py tools/ext4-manager.cfg`,
-then run `tools/syzkaller/bin/syz-manager -config=tools/ext4-manager.local.cfg
--mode=smoke-test`.
+Both use `experiments/ext4-counter-trace/build/linux-counter-trace-normal/`
+and default to `work/debian-normal.img`. The manager config generator also
+selects this build and guest image:
+
+```sh
+python3 tools/configure-syzkaller.py tools/ext4-manager.cfg
+tools/syzkaller/bin/syz-manager -config=tools/ext4-manager.local.cfg -mode=smoke-test
+```
+
+See [tests/README.md](tests/README.md) for the ordinary invariant checker
+regressions and [tools/README.md](tools/README.md) for local paths.
 
 Run outputs are written under the ignored
 `experiments/ext4-counter-trace/results/` directory. Override `EXT4_CT_JOBS`
 to control compilation parallelism and `EXT4_CT_PORT` or
 `EXT4_CT_CHAIN_PORT` if a local QEMU SSH-forwarding port is occupied.
 
-## Run the source fault-injection study
+## Research builds
 
-After the bootstrap has prepared Linux 6.12.1 and installed the build
-dependencies, build and run the separate fault-injection kernel:
-
-```sh
-bash experiments/ext4-source-fault-study/scripts/build-local-kernel.sh
-KERNEL=experiments/ext4-source-fault-study/build/linux-source-fault/arch/x86/boot/bzImage \
-  bash experiments/ext4-source-fault-study/scripts/run-qemu-cases.sh
-```
-
-Choose one test case by setting `CASE_FILTER` (for example,
-`CASE_FILTER=unlink-parent`). The test builds a temporary guest initramfs,
-creates test filesystems, injects the selected fault in QEMU, and runs offline
-filesystem checks. It does not use a host disk device. Read
-[`experiments/ext4-source-fault-study/README.md`](experiments/ext4-source-fault-study/README.md)
-for the interpretation and boundaries of each finding.
+The [checker documentation](experiments/ext4-counter-trace/README.md) describes
+the unified checker and its research build.
 
 ## Repository scope
 
 Linux source is downloaded from kernel.org and verified against the checked-in
-official SHA-256 list. The counter-trace and source-fault study patches are
-kept separately under `experiments/`. The exact syzkaller revision used to
+official SHA-256 list. The counter-trace patch is kept under `experiments/`.
+The exact syzkaller revision used to
 build the program generator is recorded in `tools/syzkaller-revision.txt` and
 the Go module pins the same revision.
 

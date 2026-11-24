@@ -14,10 +14,10 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from syz_workload import instrument, execution_issues
 
 
-class LauncherFaultTests(unittest.TestCase):
-    def run_launcher(self, shared, exercise_cleanup=False):
-        """Run the real launcher against a checked, file-backed injector."""
-        with tempfile.TemporaryDirectory(prefix='ct-launcher-fault-test-') as temp:
+class LauncherTests(unittest.TestCase):
+    @unittest.skipIf(os.geteuid() == 0, 'cleanup failure requires an unprivileged user')
+    def test_failed_cleanup_closes_phase(self):
+        with tempfile.TemporaryDirectory(prefix='ct-launcher-cleanup-') as temp:
             temp = pathlib.Path(temp)
             trace = temp / 'tracing'
             trace.mkdir()
@@ -33,129 +33,24 @@ class LauncherFaultTests(unittest.TestCase):
             source = source.replace('trace_marker", O_WRONLY | O_CLOEXEC',
                                     'trace_marker", O_WRONLY | O_APPEND | O_CLOEXEC')
             (temp / 'launcher.c').write_text(source)
-            # Check the seed tree at the actual control write, not after the
-            # worker has run. This catches arming before private seed setup.
-            (temp / 'injector.c').write_text(r'''
-#define _GNU_SOURCE
-#include <assert.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-ssize_t __real_write(int fd, const void *data, size_t length);
-ssize_t __wrap_write(int fd, const void *data, size_t length)
-{
-  char link[64], path[PATH_MAX], seed[PATH_MAX];
-  snprintf(link, sizeof(link), "/proc/self/fd/%d", fd);
-  ssize_t count = readlink(link, path, sizeof(path) - 1);
-  if (count > 0) {
-    path[count] = 0;
-    if (!strcmp(path, getenv("CT_FAULT_PATH"))) {
-      const char *root = getenv("CT_ROOT");
-      int shared = atoi(getenv("CT_TEST_SHARED"));
-      snprintf(seed, sizeof(seed), "%s%s/source", root, shared ? "/shared" : "");
-      assert(access(seed, F_OK) == 0);
-      char policy[4096];
-      assert(length < sizeof(policy));
-      memcpy(policy, data, length); policy[length] = 0;
-      char *pid = strstr(policy, " pid="), *pgid = strstr(policy, " pgid=");
-      assert(pid && (shared ? pgid != NULL : pgid == NULL));
-      assert(strtol(pid + 5, NULL, 10) == (shared ? 0 : getpid()));
-      if (shared) assert(strtol(pgid + 6, NULL, 10) == getpgrp());
-      int audit = open(getenv("CT_TEST_ARM_LOG"), O_WRONLY | O_CREAT | O_APPEND, 0600);
-      assert(audit >= 0);
-      assert(__real_write(audit, "armed_after_setup\n", 18) == 18);
-      close(audit);
-    }
-  }
-  return __real_write(fd, data, length);
-}
-''')
             launcher = temp / 'launcher'
-            subprocess.run(['gcc', '-O2', '-o', str(launcher), str(temp / 'launcher.c'),
-                            str(temp / 'injector.c'), '-Wl,--wrap=write'], check=True)
-            (temp / 'worker.c').write_text(r'''
-#define _GNU_SOURCE
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <limits.h>
-#include <unistd.h>
-int main(void)
-{
-  char cwd[PATH_MAX];
-  assert(getcwd(cwd, sizeof(cwd)));
-  assert(!strcmp(cwd, getenv("CT_ROOT")));
-  assert(access("./file0/file0", F_OK) == 0);
-  char policy[4096];
-  FILE *file = fopen(getenv("CT_FAULT_POLICY_EVIDENCE"), "r");
-  assert(file && fgets(policy, sizeof(policy), file)); fclose(file);
-  char *pid = strstr(policy, " pid="), *pgid = strstr(policy, " pgid=");
-  int shared = atoi(getenv("CT_TEST_SHARED"));
-  assert(pid && (shared ? pgid != NULL : pgid == NULL));
-  assert(strtol(pid + 5, NULL, 10) == (shared ? 0 : getpid()));
-  if (shared) assert(strtol(pgid + 6, NULL, 10) == getpgrp());
-  if (shared) {
-    char release;
-    assert(write(atoi(getenv("CT_READY_FD")), "x", 1) == 1);
-    assert(read(atoi(getenv("CT_RUN_FD")), &release, 1) == 1);
-  }
-  printf("worker_verified=%s\n", getenv("CT_PROGRAM_ID"));
-  return 0;
-}
-''')
-            worker = temp / 'worker'
-            subprocess.run(['gcc', '-O2', '-o', str(worker), str(temp / 'worker.c')],
+            subprocess.run(['gcc', '-O2', '-o', str(launcher), str(temp / 'launcher.c')],
                            check=True)
-            programs = temp / 'programs'
-            workers = 2 if shared else 1
-            for index in range(workers):
-                folder = programs / f'b1-w{index}'
-                folder.mkdir(parents=True)
-                (folder / 'workload').symlink_to(worker)
             root = temp / 'root'
-            root.mkdir()
-            control = temp / 'control'
-            control.touch()
-            status = temp / 'status'
-            status.write_text('{}\n')
-            env = dict(os.environ, CT_FAULT_CONFIG='random operations=mballoc_mark',
-                       CT_FAULT_PATH=str(control), CT_FAULT_STATUS_PATH=str(status),
-                       CT_FAULT_ARM_EVIDENCE=str(temp / 'arm.json'),
-                       CT_FAULT_POLICY_EVIDENCE=str(temp / 'policy.txt'),
-                       CT_TEST_SHARED=str(int(shared)), CT_TEST_ARM_LOG=str(temp / 'arms.log'))
-            env.pop('CT_PROGRESS_FD', None)
-            result = subprocess.run([str(launcher), str(root), str(programs), '1',
-                                     str(workers), '0', 'shared' if shared else 'private'],
-                                    env=env, cwd=temp, capture_output=True, text=True, timeout=15)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout.count('worker_verified='), workers)
-
-            self.assertEqual((temp / 'arms.log').read_text().splitlines(),
-                             ['armed_after_setup'])
-            if exercise_cleanup:
-                # Force remove_tree() to report an error after it has entered
-                # the cleanup phase. The END marker must still be emitted so
-                # lifecycle attribution cannot leave an open cleanup scope.
-                markers_before = (trace / 'trace_marker').read_text()
-                shared_root = root / 'syz-work' / 'shared'
-                shared_root.mkdir(parents=True, exist_ok=True)
-                (shared_root / 'locked-entry').write_text('keep')
-                os.chmod(shared_root, 0o500)
-                try:
-                    cleanup = subprocess.run(
-                        [str(launcher), '--cleanup', str(root)],
-                        cwd=temp, env=env, capture_output=True, text=True, timeout=15)
-                    self.assertEqual(cleanup.returncode, 90, cleanup.stderr)
-                    markers = (trace / 'trace_marker').read_text()
-                    delta = markers[len(markers_before):]
-                    self.assertEqual(delta.count('CT_PHASE phase=BEGIN source=cleanup'), 1)
-                    self.assertEqual(delta.count('CT_PHASE phase=END source=cleanup'), 1)
-                finally:
-                    os.chmod(shared_root, 0o700)
+            shared_root = root / 'syz-work' / 'shared'
+            shared_root.mkdir(parents=True)
+            (shared_root / 'locked-entry').write_text('keep')
+            shared_root.chmod(0o500)
+            try:
+                cleanup = subprocess.run(
+                    [str(launcher), '--cleanup', str(root)],
+                    cwd=temp, capture_output=True, text=True, timeout=15)
+                self.assertEqual(cleanup.returncode, 90, cleanup.stderr)
+                markers = (trace / 'trace_marker').read_text()
+                self.assertEqual(markers.count('CT_PHASE phase=BEGIN source=cleanup'), 1)
+                self.assertEqual(markers.count('CT_PHASE phase=END source=cleanup'), 1)
+            finally:
+                shared_root.chmod(0o700)
 
     def test_namespace_call_identity_uses_relative_parent_directory_device(self):
         runtime = (ROOT / 'tests/syz-runtime.h').read_text()
@@ -248,12 +143,6 @@ int main(void)
 ''')
             subprocess.run(['gcc', '-O0', '-o', str(binary), str(source)], check=True)
             subprocess.run([str(binary)], check=True, timeout=10)
-
-    def test_single_fault_arms_worker_pid_after_seed_setup(self):
-        self.run_launcher(shared=False, exercise_cleanup=True)
-
-    def test_concurrent_fault_arms_group_once(self):
-        self.run_launcher(shared=True)
 
 
 class SyzkallerTests(unittest.TestCase):
@@ -484,14 +373,6 @@ int main(void)
         self.assertLessEqual(maximum, parser_maximum + 1)
         self.assertIn('CT_FALLOCATE_MAX_BYTES', guest)
         self.assertIn('CT_IO_MAX_BYTES', guest)
-
-    def test_fault_isolation_restores_counter_event_for_following_segments(self):
-        guest = (ROOT / 'tests/guest-campaign.sh').read_text()
-        offline_end = guest.index('phase=FAULT_OFFLINE_CHECK_END')
-        restore = guest.index('echo 1 > "$fault_counter_event"', offline_end)
-        segment_end = guest.index('phase=SEGMENT_END', restore)
-        self.assertLess(restore, segment_end)
-        self.assertIn('FAULT_COUNTER_EVENT_REENABLED', guest[restore:segment_end])
 
     def test_runtime_bounds_pathological_fallocate_length(self):
         runtime = (ROOT / 'tests/syz-runtime.h').read_text()

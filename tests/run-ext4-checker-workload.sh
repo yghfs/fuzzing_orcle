@@ -2,9 +2,11 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
-kernel_image="${root_dir}/kernel/linux-6.12.1/arch/x86/boot/bzImage"
-base_image="${SYZ_BASE_IMAGE:-${work_dir}/debian.img}"
+kernel_image="${FUZZING_ORCLE_BZIMAGE}"
+base_image="${SYZ_BASE_IMAGE:-${ext4_normal_guest_image}}"
+syz_bin="${FUZZING_ORCLE_SYZKALLER:-${root_dir}/tools/syzkaller}/bin/linux_amd64"
 workload="${1:-${SYZ_WORKLOAD:-${root_dir}/tests/ext4-workload.syz}}"
 name="$(basename "${workload}" .syz)"
 port="${SYZ_PORT:-10100}"
@@ -19,6 +21,12 @@ timeout_s="${SYZ_TIMEOUT:-60}"
 event_cap="${CHECKER_EVENT_CAP:-16384}"
 vm_wait="${SYZ_VM_WAIT:-90}"
 
+ext4_require_normal_kernel "${kernel_image}"
+test -r "${workload}" || { echo "missing workload: ${workload}" >&2; exit 2; }
+test -x "${syz_bin}/syz-execprog" && test -x "${syz_bin}/syz-executor" || {
+	echo "missing syzkaller replay tools in ${syz_bin}; run tools/build-syzkaller.sh" >&2
+	exit 2
+}
 mkdir -p "${run_dir}"
 qemu-img create -f qcow2 -F raw -b "${base_image}" "${overlay}" >/dev/null
 cleanup() {
@@ -39,12 +47,7 @@ for _ in $(seq 1 "${vm_wait}"); do
 	sleep 1
 done
 ssh "${ssh_opts[@]}" root@127.0.0.1 'test -r /sys/kernel/debug/ext4/vda/invariant_check'
-ssh "${ssh_opts[@]}" root@127.0.0.1 \
-	'test ! -e /sys/module/ext4/parameters/ext4_fault_mode' || {
-	echo "Runtime checking requires a kernel with CONFIG_EXT4_FAULT_INJECTION disabled." >&2
-	exit 2
-}
-printf 'experiment=runtime-checker\nfault_injection=disabled\n' > "${run_dir}/experiment.txt"
+printf 'experiment=runtime-checker\n' > "${run_dir}/experiment.txt"
 ssh "${ssh_opts[@]}" root@127.0.0.1 \
 	"cat /sys/kernel/debug/ext4/vda/invariant_check | sed -n '1,5p'" \
 	| tee "${run_dir}/before.txt"
@@ -52,8 +55,7 @@ ssh "${ssh_opts[@]}" root@127.0.0.1 \
 	"printf 1 > /sys/kernel/debug/ext4/vda/invariant_reset"
 
 scp -q -i "${work_dir}/debian.id_rsa" -P "${port}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-	"${workload}" "${root_dir}/tools/syzkaller/bin/linux_amd64/syz-execprog" \
-	"${root_dir}/tools/syzkaller/bin/linux_amd64/syz-executor" root@127.0.0.1:/tmp/
+	"${workload}" "${syz_bin}/syz-execprog" "${syz_bin}/syz-executor" root@127.0.0.1:/tmp/
 remote_name="$(basename "${workload}")"
 ssh "${ssh_opts[@]}" root@127.0.0.1 "
 set -eu
@@ -69,6 +71,9 @@ rc=\${rc:-0}
 cat /tmp/ext4-checker-run.log
 echo syz_execprog_exit=\$rc
 cat /sys/kernel/debug/ext4/vda/invariant_check
+exit \$rc
 " | tee "${run_dir}/report.txt"
 
+rg -qx 'violations_total=0' "${run_dir}/report.txt"
+rg -q '^tx_underflows=0$' "${run_dir}/report.txt"
 echo "checker workload complete: ${run_dir}"

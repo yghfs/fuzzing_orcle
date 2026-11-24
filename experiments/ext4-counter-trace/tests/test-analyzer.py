@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Negative checks against a real smoke trace, kept intact in results/."""
+"""Negative checks against a supplied smoke trace; the source is unchanged."""
 import importlib.util
 import json
 import pathlib

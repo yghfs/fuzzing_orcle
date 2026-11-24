@@ -25,26 +25,11 @@ from campaign import KINDS, LOSS_KEYS, aggregate, atomic_json, compress, digest,
 from trace_lifecycle import parse_trace
 from syz_workload import generate_program, execution_issues
 from kcov_feedback import FeedbackCorpus, parse_symbol_ranges
-from fault_errno_catalog import (errno_choices, errno_codes, generated_header_matches,
-                                 load_catalog, normalize_errno_choices,
-                                 normalize_errno_selection, random_admission_hooks,
-                                 render_errno_selection, validate_selection)
 
 PROJECT = pathlib.Path(__file__).resolve().parents[1]
 BASE = '/var/lib/ext4-counter-campaign'
 DISPLAY_TZ = timezone(timedelta(hours=8))
 MIN_FINALIZATION_RESERVE = 8 * 1024**2
-RANDOM_FAULT_OPERATIONS = tuple(
-    name for name, definition in load_catalog()['hooks'].items()
-    if definition.get('runtime_random'))
-RANDOM_FAULT_ADMITTED_OPERATIONS = tuple(random_admission_hooks())
-
-# A mount-scoped random hook can fire while the launcher is preparing its
-# private worker tree.  In that narrow case there is a real, timestamped hook
-# event and a clean counter trace, but no generated syscall envelope exists to
-# attribute it to.  Only this exact class of evidence loss may be quarantined
-# and carried forward; trace/lifecycle loss remains fail-closed.
-HOOK_ONLY_WORKLOAD_EXIT_CODES = frozenset((90, 91))
 
 
 class CampaignError(RuntimeError):
@@ -109,217 +94,6 @@ def validate_guest_trace_cpus(requested, cpu_stats):
     return actual
 
 
-def random_fault_policy(args, segment_seed, segment_id):
-    operation_option = args.random_fault_operations.strip()
-    if operation_option == 'all':
-        operations = list(RANDOM_FAULT_OPERATIONS)
-    else:
-        operations = [name.strip() for name in operation_option.split(',') if name.strip()]
-    if not operations or len(set(operations)) != len(operations):
-        raise CampaignError('invalid_random_fault_operations')
-    unknown = sorted(set(operations) - set(RANDOM_FAULT_OPERATIONS))
-    if unknown:
-        raise CampaignError('unsupported_random_fault_operations:' + ','.join(unknown))
-    seed = (segment_seed * 0x9E3779B97F4A7C15 + segment_id + 1) & ((1 << 63) - 1)
-    seed = seed or 1
-    probability = args.random_fault_probability_ppm
-    try:
-        errno_option = getattr(args, 'random_fault_errnos', 'native')
-        selected_errnos = normalize_errno_choices(errno_option) \
-            if '=' not in errno_option else ['per_hook']
-        errno_by_operation = normalize_errno_selection(errno_option, operations)
-        if selected_errnos != ['per_hook']:
-            validate_selection(operations, selected_errnos)
-        else:
-            for operation, choices in errno_by_operation.items():
-                if choices == ['native']:
-                    continue
-                validate_selection([operation], choices)
-    except ValueError as error:
-        raise CampaignError(str(error)) from error
-    errno_config = (render_errno_selection(errno_by_operation)
-                    if selected_errnos == ['per_hook'] else
-                    ('native' if selected_errnos == ['native'] else ','.join(selected_errnos)))
-    admission = {name: ('reviewed' if name in RANDOM_FAULT_ADMITTED_OPERATIONS
-                        else 'experimental') for name in operations}
-    isolation = bool(getattr(args, 'fault_isolation', True))
-    config = (f'mode=random seed={seed} probability_ppm={probability} max_hits=1 '
-              f'operations={",".join(operations)} errnos={errno_config}')
-    return dict(mode='seeded_random', seed=seed, probability_ppm=probability,
-                max_hits=1, operations=operations, errnos=selected_errnos,
-                errno_by_operation=errno_by_operation,
-                isolate_after_hit=isolation,
-                admission=admission,
-                supported_errnos={name: errno_choices(name) for name in operations},
-                supported_errno_codes={name: errno_codes(name) for name in operations},
-                config=config)
-
-
-def validate_random_fault_mode(args):
-    """Validate campaign shapes supported by the mount-scoped injector."""
-    if not getattr(args, 'random_fault_injection', False):
-        return
-    if args.mode not in ('single', 'concurrent'):
-        raise CampaignError('--random-fault-injection requires --mode single or --mode concurrent')
-    if args.mode == 'concurrent' and args.workers < 2:
-        raise CampaignError('--random-fault-injection concurrent mode requires --workers >= 2')
-    if args.max_batches != 1:
-        raise CampaignError('--random-fault-injection requires --max-batches 1 so each segment has one reproducible workload window')
-
-
-def stable_snapshot_health(path):
-    path = pathlib.Path(path)
-    if not path.is_file():
-        return dict(status='missing', path=path.name)
-    try:
-        snapshot = read_json(path)
-    except (ValueError, OSError, EOFError):
-        return dict(status='invalid_evidence', path=path.name)
-    counts = {key: int(snapshot.get(key, 0) or 0) for key in
-              ('observed_mismatches', 'namespace_mismatched', 'relations_mismatches')}
-    observation = dict(path=path.name, snapshot_id=snapshot.get('snapshot_id'),
-                       reason=snapshot.get('reason'), valid=snapshot.get('valid'),
-                       namespace_valid=snapshot.get('namespace_valid'),
-                       namespace_reason=snapshot.get('namespace_reason'),
-                       relations_valid=snapshot.get('relations_valid'),
-                       relations_reason=snapshot.get('relations_reason'),
-                       observation_stable=snapshot.get('observation_stable'),
-                       quiescent=snapshot.get('quiescent'), **counts)
-    # Preserve formula/object labels when a snapshot carries them.  They are
-    # needed later to merge a stable finding with lifecycle and fsck evidence.
-    for key in ('formula', 'point', 'operation', 'postcondition', 'category',
-                'finding_category', 'ino', 'group', 'block', 'slot', 'object_ino'):
-        if key in snapshot:
-            observation[key] = snapshot[key]
-    checks = ('valid', 'namespace_valid', 'relations_valid')
-    reason = str(snapshot.get('reason') or '')
-    # A namespace scan is part of the oracle envelope.  If it is absent or
-    # false, counter disagreement cannot be promoted to a finding.
-    if snapshot.get('namespace_valid') is not True:
-        observation['status'] = 'unverified'
-        return observation
-    if (snapshot.get('relations_valid') is None or
-            (snapshot.get('relations_valid') is not True and
-             not int(snapshot.get('relations_mismatches', 0) or 0))):
-        observation['status'] = 'unverified'
-        return observation
-    if snapshot.get('observation_stable') is False or snapshot.get('quiescent') is False:
-        observation['status'] = 'unverified'
-        return observation
-    # A false validity bit can mean either a measured formula mismatch or an
-    # interrupted/unsupported observation.  Only the former is a candidate.
-    reason = ' '.join(str(snapshot.get(key) or '') for key in
-                      ('reason', 'namespace_reason', 'relations_reason'))
-    observation_failure = any(token in reason.lower()
-                              for token in ('unverified', 'interrupted', 'timeout',
-                                            'missing', 'read_failed', 'unsupported',
-                                            'busy', 'unstable',
-                                            'concurrent_or_unhealthy',
-                                            'namespace_scan_invalid'))
-    measured_mismatch = (any(counts.values()) or
-                         (any(snapshot.get(key) is False for key in checks) and
-                          not observation_failure) or
-                         any(token in reason.lower()
-                             for token in ('mismatch', 'disagree', 'violation')))
-    if measured_mismatch:
-        observation['status'] = 'candidate'
-    elif not all(snapshot.get(key) is True for key in checks):
-        observation['status'] = 'unverified'
-    else:
-        observation['status'] = 'clear'
-    return observation
-
-
-def fault_status_matches_arm(status, arm, policy):
-    """Accept an injection only when its status belongs to this segment arm."""
-    if not isinstance(status, dict) or not isinstance(arm, dict):
-        return False
-    arm_target_pid = int(arm.get('target_pid', 0) or 0)
-    arm_target_pgid = int(arm.get('target_pgid', 0) or 0)
-    if int(arm.get('generation', 0) or 0) <= 0 or (arm_target_pid <= 0 and arm_target_pgid <= 0):
-        return False
-    if status.get('enabled') is not True or status.get('mode') != 'random':
-        return False
-    if status.get('operation') != 'random' or int(status.get('injected', 0) or 0) <= 0:
-        return False
-    if int(status.get('random_seed', 0) or 0) != int(policy.get('seed', 0) or 0):
-        return False
-    if int(status.get('probability_ppm', 0) or 0) != int(policy.get('probability_ppm', 0) or 0):
-        return False
-    if int(status.get('max_hits', 0) or 0) != int(policy.get('max_hits', 0) or 0):
-        return False
-    for key in ('enabled', 'mode', 'operation', 'generation', 'target_pid', 'target_pgid',
-                'random_seed', 'probability_ppm', 'max_hits'):
-        if status.get(key) != arm.get(key):
-            return False
-    if (int(status.get('target_pid', 0) or 0) <= 0 and
-            int(status.get('target_pgid', 0) or 0) <= 0):
-        return False
-    return status.get('errno_operation') in policy.get('operations', [])
-
-
-def random_fault_trace_event(path, target_pid, target_pgid=0):
-    path = pathlib.Path(path)
-    if not path.is_file():
-        return None
-    pattern = re.compile(r'ext4_fault_inject:.*?operation=(\S+).*?injection=1\b')
-    with path.open(errors='replace') as stream:
-        for number, line in enumerate(stream, 1):
-            match = pattern.search(line)
-            if not match:
-                continue
-            fields = dict(re.findall(r'\b([a-z_]+)=([^\s]+)', line))
-            event_pid = int(fields.get('pid', 0) or 0)
-            event_target_pid = int(fields.get('target_pid', 0) or 0)
-            event_target_pgid = int(fields.get('target_pgid', 0) or 0)
-            if target_pid and (event_pid != target_pid or event_target_pid != target_pid):
-                continue
-            if target_pgid and event_target_pgid != target_pgid:
-                continue
-            if not target_pid and not target_pgid:
-                continue
-            stamp = re.search(r'\s(\d+)\.(\d+):\s+ext4_fault_inject:', line)
-            timestamp_ns = (int(stamp.group(1)) * 10**9 +
-                            int(stamp.group(2).ljust(9, '0'))) if stamp else None
-            return dict(trace_line=number, operation=fields.get('operation'), pid=event_pid,
-                        target_pid=event_target_pid, target_pgid=event_target_pgid,
-                        timestamp_ns=timestamp_ns,
-                        errno=int(fields['errno']),
-                        errno_choice_index=int(fields.get('errno_choice_index', -1)),
-                        errno_choice_draw=int(fields.get('errno_choice_draw', -1)),
-                        random_draw=int(fields.get('random_draw', -1)), fields=fields)
-    return None
-
-
-def verify_random_fault_errno_choice(event, status, policy):
-    if not event or event.get('operation') not in policy.get('operations', []):
-        return False, []
-    operation = event['operation']
-    operation_policy = policy.get('errno_by_operation', {}).get(operation)
-    if operation_policy == ['native'] or (operation_policy is None and
-                                          policy.get('errnos') == ['native']):
-        choices = errno_codes(operation)
-        expected_status_choices = 'native'
-    else:
-        code_by_name = dict(zip(policy['supported_errnos'][operation],
-                                policy['supported_errno_codes'][operation]))
-        names = operation_policy or policy['errnos']
-        choices = [code_by_name[name] for name in names]
-        expected_status_choices = ','.join(str(-code) for code in choices)
-    index = event.get('errno_choice_index', -1)
-    draw = event.get('errno_choice_draw', -1)
-    verified = (
-        0 <= index < len(choices) and
-        event.get('errno') == -choices[index] and
-        isinstance(draw, int) and draw >= 0 and draw % len(choices) == index and
-        event.get('fields', {}).get('randomized') == '1' and
-        int(status.get('errno', 0)) == event.get('errno') and
-        int(status.get('errno_choice_index', -1)) == index and
-        status.get('errno_operation', operation) == operation and
-        status.get('errno_choices') == expected_status_choices)
-    return verified, [-code for code in choices]
-
-
 def carry_start_line(trace_path, starts):
     """Include a stable-snapshot phase BEGIN with the bounded event carry.
 
@@ -349,7 +123,7 @@ def carry_start_line(trace_path, starts):
 
 
 def snapshot_event_identity(event):
-    """Keep the counter identity needed to disambiguate reset epochs."""
+    """Record a stable snapshot anchor in the trace."""
     return {key: event.get(key) for key in
             ('epoch', 'seq', 'op', 'dev', 'pid', 'line')}
 
@@ -357,11 +131,8 @@ def snapshot_event_identity(event):
 def select_snapshot_event(events, snapshot, dev, identity=None):
     """Select one snapshot BEGIN from a possibly carried trace.
 
-    Snapshot operation ids are local to a counter epoch and are reused after
-    a filesystem reset.  A carried trace can therefore contain several
-    BEGIN events with the same operation id.  Prefer the persisted epoch/seq
-    identity; for legacy manifests, the latest matching event is the current
-    segment boundary and is the least surprising fallback.
+    Prefer the persisted epoch and sequence; older manifests may only
+    have the snapshot operation ID.
     """
     try:
         snapshot_id = int(snapshot.get('snapshot_id'))
@@ -384,71 +155,12 @@ def select_snapshot_event(events, snapshot, dev, identity=None):
     return max(candidates, key=lambda event: event.get('line', -1))
 
 
-def reset_boundary_evidence(folder, manifest, kind, dev, start, end, previous_epoch=None):
-    """Authorize a new counter epoch using the completed guest reset evidence.
-
-    A reset applies only to its selected device.  Other devices retain their
-    old anchors and sequence checks.  Legacy reset records did not capture
-    counter states, so their epoch change is checked against the carried
-    anchor and the immutable segment endpoints instead.
-    """
-    if manifest.get('kind') != kind:
-        return None
-    requested = bool(manifest.get('filesystem_reset_before'))
-    completed = bool(manifest.get('filesystem_reset_completed'))
-    if requested != completed:
-        raise CampaignError('incomplete_reset_boundary')
-    if not requested:
-        return None
-    evidence_name = manifest.get('filesystem_reset_evidence')
-    if evidence_name != 'fault-reset.json':
-        raise CampaignError('missing_reset_boundary_evidence')
-    try:
-        evidence = read_json(pathlib.Path(folder) / evidence_name)
-    except (OSError, ValueError, EOFError) as error:
-        raise CampaignError('unreadable_reset_boundary_evidence') from error
-    expected_block = dict(regular='vdb', bigalloc='vdc', inline='vdd')[kind]
-    if (evidence.get('reset') is not True or evidence.get('kind') != kind or
-            evidence.get('dev') != expected_block):
-        raise CampaignError('reset_boundary_device_mismatch')
-    if (not all(type(state.get(key)) is int for state in (start, end)
-                for key in ('epoch', 'seq', 'active')) or
-            start.get('epoch') != end.get('epoch') or
-            start.get('active') != 0 or end.get('active') != 0 or
-            start.get('seq', -1) < 0 or end.get('seq', -1) < start.get('seq', 0)):
-        raise CampaignError('invalid_reset_boundary_endpoints')
-    new_epoch = start['epoch']
-    if previous_epoch is not None and previous_epoch == new_epoch:
-        raise CampaignError('reset_boundary_epoch_unchanged')
-    schema = evidence.get('schema')
-    if schema == 2:
-        before, after = evidence.get('before', {}), evidence.get('after', {})
-        if (not isinstance(before, dict) or not isinstance(after, dict) or
-                evidence.get('counter_dev') != dev or
-                type(before.get('epoch')) is not int or
-                after.get('epoch') != new_epoch or before['epoch'] == new_epoch or
-                after.get('active') != 0 or
-                type(after.get('seq')) is not int or
-                not 0 <= after['seq'] <= start['seq']):
-            raise CampaignError('reset_boundary_state_mismatch')
-    elif schema != 1 or previous_epoch is None:
-        raise CampaignError('unverified_reset_boundary_epoch')
-    return dict(kind=kind, dev=dev, previous_epoch=previous_epoch,
-                epoch=new_epoch, evidence=evidence_name, evidence_schema=schema,
-                verification=('guest_counter_states' if schema == 2 else
-                              'legacy_evidence_and_segment_endpoints'))
-
-
 def lifecycle_intervals(folder, manifest, events, devices, carry_folder=None, checkpoint_folder=None):
-    """Build per-device intervals; verified resets start a new target chain only."""
+    """Build per-device intervals with the previous stable snapshot as an anchor."""
     analysis = folder / 'analysis'
     analysis.mkdir(exist_ok=True)
     carry_available = bool(carry_folder and
                            (carry_folder / 'analysis/carry-out.txt.gz').is_file())
-    # Record the current segment's stable snapshot identities before
-    # adding it to the carry chain.  The operation id alone is not
-    # sufficient because mkfs/reset starts a new counter epoch and can
-    # reuse the same id.
     snapshot_events = {}
     for kind in KINDS:
         state_path = folder / f'{kind}-start.json'
@@ -464,29 +176,19 @@ def lifecycle_intervals(folder, manifest, events, devices, carry_folder=None, ch
                 {'epoch': current_epoch})
             if sample_event is not None:
                 snapshot_events[f'{kind}-{suffix}'] = snapshot_event_identity(sample_event)
-    intervals, reset_boundaries = [], []
+    intervals = []
     for kind in KINDS:
         required = [folder / (kind+'-'+s+'.json') for s in ('start', 'end', 'before', 'after')]
         if not all(p.exists() for p in required):
             manifest['issues'].append(kind+':missing_interval_files'); continue
         for path in required:
             shutil.copy2(path, analysis / path.name)
-        start_state, end_state = read_json(required[0]), read_json(required[1])
         snapshots = [kind+'-before.json', kind+'-after.json']
         post_cleanup = folder / (kind+'-post-cleanup.json')
         if post_cleanup.exists():
             shutil.copy2(post_cleanup, analysis / post_cleanup.name)
             snapshots.append(post_cleanup.name)
-        previous_epoch = None
         if carry_available:
-            previous_end = carry_folder / (kind+'-end.json')
-            if previous_end.is_file():
-                previous_epoch = read_json(previous_end).get('epoch')
-        boundary = reset_boundary_evidence(
-            folder, manifest, kind, devices.get(kind), start_state, end_state, previous_epoch)
-        if boundary:
-            reset_boundaries.append(boundary)
-        if carry_available and not boundary:
             previous_anchor = (kind+'-post-cleanup.json'
                                if (carry_folder / (kind+'-post-cleanup.json')).exists()
                                else kind+'-after.json')
@@ -514,7 +216,7 @@ def lifecycle_intervals(folder, manifest, events, devices, carry_folder=None, ch
             snapshots.append(kind+'-final.json')
         intervals.append(dict(name=kind+'-'+manifest['mode'], mode=manifest['mode'], dev=devices.get(kind),
                               start=kind+'-start.json', end=kind+'-end.json', snapshots=snapshots))
-    return intervals, snapshot_events, reset_boundaries
+    return intervals, snapshot_events
 
 
 def timed_stage(name):
@@ -658,10 +360,6 @@ class Runner:
         self.verified_syscalls = 0
         self.pending_segment = None
         self.discard_segment = None
-        # A fault may leave the mounted filesystem in a state that is useful
-        # for diagnosis but unsafe for another independent workload.  Keep
-        # the evidence and quarantine that filesystem for the rest of the VM.
-        self.tainted_kinds = set()
         # Once collection has stopped, checkpointing and offline evidence
         # retrieval may legitimately take longer than the collection wall
         # budget.  Keep the watchdog active during workload collection, but
@@ -681,7 +379,6 @@ class Runner:
         self.meta = dict(schema=1, run_id=self.run.name, status='preparing', boot_id=None,
                          segments_started=0, devices={}, initial_states={}, final_states={},
                          limits=vars(args).copy(), clean_shutdown=False, disk={},
-                         fault_tainted_kinds=[],
                          started_wall_ns=time.time_ns(), predecessor=args.predecessor)
         self.save()
         print(f'run_dir={self.run}', flush=True)
@@ -771,7 +468,6 @@ class Runner:
             text = serial.read_text(errors='replace')
         except OSError:
             return None
-        text = self._filter_expected_fault_warnings(text)
         patterns = (
             ('kernel_bug', r'kernel BUG at |BUG: unable to handle|BUG: KASAN'),
             ('kernel_oops', r'\bOops:|general protection fault|invalid opcode'),
@@ -789,37 +485,6 @@ class Runner:
             re.search(pattern, line) for _, pattern in patterns)]
         return {'kind': matches[0], 'kinds': matches, 'evidence': evidence[-20:]}
 
-    def _filter_expected_fault_warnings(self, text):
-        """Remove only the ext4 warning emitted by an observed injected return.
-
-        ``ext4_handle_dirty_metadata_error()`` deliberately emits a warning
-        when the injected helper error aborts a journal handle.  That warning
-        is evidence of the selected error path, not a kernel BUG/Oops.  Keep
-        every other warning and all BUG/Oops/panic text fail-closed.
-        """
-        if not getattr(getattr(self, 'args', None), 'random_fault_injection', False):
-            return text
-        hit = False
-        for manifest_path in sorted((self.run / 'segments').glob('segment-*/manifest.json')):
-            try:
-                manifest = read_json(manifest_path)
-            except (OSError, ValueError, EOFError):
-                continue
-            if (manifest.get('fault_injection') or {}).get('hit'):
-                hit = True
-                break
-        if not hit:
-            return text
-        kept = []
-        expected = []
-        for line in text.splitlines(keepends=True):
-            if re.search(r'WARNING:.*ext4_handle_dirty_metadata_error', line):
-                expected.append(line.rstrip('\n'))
-            else:
-                kept.append(line)
-        if expected:
-            self.meta.setdefault('expected_fault_warnings', []).extend(expected[-20:])
-        return ''.join(kept)
 
     def check(self, ignore_cancel=False):
         if not ignore_cancel and self.cancelled:
@@ -979,22 +644,20 @@ class Runner:
     @timed_stage('prepare')
     def prepare(self):
         self.progress('PREFLIGHT START verifying reviewed probes and kernel binding')
-        from source_audit import verify
-        problems = verify(PROJECT, require_build=True)
-        if not generated_header_matches():
-            problems.append('fault_errno_catalog_header_out_of_date')
+        from source_audit import DEFAULT_OBJ, verify
+        kernel_obj = PROJECT / DEFAULT_OBJ
+        kernel = kernel_obj / 'arch/x86/boot/bzImage'
+        problems = verify(PROJECT, require_build=True, kernel_obj=kernel_obj)
         if problems:
             raise CampaignError('probe_source_preflight_failed:' + ','.join(problems))
         self.progress('PREFLIGHT END reviewed source and kernel binding verified')
         self.progress('PREPARE START building launcher/generator and preparing VM images')
-        minimum = 3*132*1024**2 + (PROJECT / 'build/linux-counter-trace/arch/x86/boot/bzImage').stat().st_size + 16*1024**2
+        minimum = 3*132*1024**2 + kernel.stat().st_size + 16*1024**2
         if minimum > self.args.max_run_mb*1024**2:
             raise CampaignError('insufficient_budget_for_images')
         evidence = self.run / 'evidence'
         for sub in ('scripts', 'tests'):
             (evidence / sub).mkdir(parents=True)
-        shutil.copy2(PROJECT / 'fault-errno-catalog.json',
-                     evidence / 'fault-errno-catalog.json')
         for file in ('campaign.py', 'campaign_runner.py', 'analyze-campaign.py', 'run-campaign.sh',
                      'trace_lifecycle.py', 'formula_relations.py', 'point_report.py', 'analyze-lifecycle.py', 'check-disk.py',
                      'syz_workload.py', 'kcov_feedback.py', 'quota_ledger.py', 'source_audit.py',
@@ -1014,18 +677,17 @@ class Runner:
             module_text = module_text.replace(old_reference, str(self.root / 'tools/src/syzkaller-master'))
         (self.run / 'syzgen-build.mod').write_text(module_text)
         shutil.copy2(evidence / 'syzgen/go.sum', self.run / 'syzgen-build.sum')
-        shutil.copy2(PROJECT / 'build/linux-counter-trace/arch/x86/boot/bzImage', self.run / 'kernel.bzImage')
-        shutil.copy2(PROJECT / 'build/linux-counter-trace/.config', evidence / 'kernel.config')
+        shutil.copy2(kernel, self.run / 'kernel.bzImage')
+        shutil.copy2(kernel_obj / '.config', evidence / 'kernel.config')
+        shutil.copy2(kernel_obj / 'build-binding.json', evidence / 'audit/build-binding.json')
         for file in ('0001-counter-trace-core-and-probes.patch', 'manifest.json'):
             shutil.copy2(PROJECT / 'patches' / file, evidence / file)
         for name, argv in [('gcc', ['gcc', '--version']), ('qemu', ['qemu-system-x86_64', '--version']),
                            ('e2fsck', ['e2fsck', '-V']), ('python', [sys.executable, '--version'])]:
             self.command(argv, log='evidence/' + name + '-version.txt')
-        rootfs_backing = getattr(self.args, 'rootfs_backing', None)
-        backing = pathlib.Path(rootfs_backing).resolve() if rootfs_backing else \
-            next((path for path in (self.root / 'work/debian-clean-smalljournal.img',
-                                    self.root / 'work/debian.img') if path.is_file()),
-                 self.root / 'work/debian.img')
+        rootfs_backing = getattr(self.args, 'rootfs_backing', None) or os.environ.get('FUZZING_ORCLE_ROOTFS')
+        backing = (pathlib.Path(rootfs_backing).resolve() if rootfs_backing else
+                   self.root / 'work/debian-normal.img')
         if not backing.is_file():
             raise CampaignError('rootfs_backing_missing:' + str(backing))
         self.meta['dependencies'] = {'rootfs_backing': str(backing), 'rootfs_sha256': digest(backing),
@@ -1171,7 +833,6 @@ class Runner:
             kind = KINDS[kind_index]
         else:
             kind = target_kind
-        tainted = set(getattr(self, 'tainted_kinds', set()))
         mode = ('single' if index % 2 == 0 else 'concurrent') if selection == 'matrix' else selection
         workers = 1 if mode == 'single' else self.args.workers
         object_sharing = 'shared' if mode == 'concurrent' and workers > 1 else 'private'
@@ -1180,12 +841,9 @@ class Runner:
                  seed=self.args.seed + index*100000, workers=workers,
                  object_sharing=object_sharing,
                  synchronized_worker_start=object_sharing == 'shared',
-                 filesystem_reset_before=kind in tainted,
                  guest_started=False,
                  memory_mb=self.args.memory_mb, scenario=getattr(self.args, 'scenario', 'baseline'),
                  source='syzkaller', start_wall_ns=time.time_ns(), trace_file='trace.txt')
-        if getattr(self.args, 'random_fault_injection', False):
-            m['fault_injection'] = random_fault_policy(self.args, m['seed'], index)
         atomic_json(folder / 'manifest.json', m)
         self.meta['segments_started'] = index+1
         self.save()
@@ -1339,8 +997,6 @@ class Runner:
         rc = self.guest('segment', folder.name, m['kind'], m['mode'], self.args.segment_seconds,
                         m['seed'], m['workers'], m['memory_mb'], self.args.batch_timeout,
                         self.args.max_batches, 'syzkaller', getattr(self.args, 'scenario', 'baseline'),
-                        m.get('fault_injection', {}).get('config', 'off'),
-                        int(bool(m.get('fault_injection', {}).get('isolate_after_hit', True))),
                         timeout=timeout,
                         # 90 is the launcher's aggregate worker-failure status.
                         # It is a valid remote result that still has snapshots,
@@ -1349,68 +1005,6 @@ class Runner:
                         log=folder.name+'-guest.txt', live=True, stage='guest_execution')
         self.progress(f'FETCH START segment={folder.name} guest_exit={rc}')
         self.fetch(BASE + '/' + folder.name + '/.', folder)
-        fault_policy = m.get('fault_injection')
-        if fault_policy:
-            arm_path = folder / 'fault-status-arm.json'
-            arm = read_json(arm_path) if arm_path.exists() else {}
-            status_candidates = []
-            for status_path in (folder / 'fault-status-hit.json',
-                                folder / 'fault-status-after.json'):
-                if not status_path.exists():
-                    continue
-                candidate = read_json(status_path)
-                if fault_status_matches_arm(candidate, arm, fault_policy):
-                    status_candidates.append(candidate)
-            status = status_candidates[0] if status_candidates else {}
-            fault_policy['status'] = status
-            fault_policy['hit'] = bool(status_candidates)
-            kind = m['kind']
-            fault_policy['stable_observation'] = dict(
-                before=stable_snapshot_health(folder / f'{kind}-before.json'),
-                after=stable_snapshot_health(folder / f'{kind}-after.json'))
-            if fault_policy['hit']:
-                fault_policy['event'] = random_fault_trace_event(
-                    folder / 'trace.txt', int(status.get('target_pid', 0)),
-                    int(status.get('target_pgid', 0)))
-                event = fault_policy['event']
-                choice_verified, allowed_errnos = verify_random_fault_errno_choice(
-                    event, status, fault_policy)
-                fault_policy['errno_choice_verified'] = choice_verified
-                fault_policy['errno_choice_allowed'] = allowed_errnos
-                if not choice_verified:
-                    m['issues'].append('fault_injection_errno_choice_unverified')
-                stop_marker = folder / 'fault-stop-after-call'
-                isolated = stop_marker.is_file() and m.get('mode') == 'single'
-                fault_policy['isolated_after_call'] = isolated
-                m['fault_stop_after_call'] = isolated
-                offline_status = folder / 'fault-offline-status.txt'
-                if offline_status.is_file():
-                    values = {}
-                    for line in offline_status.read_text(errors='replace').splitlines():
-                        key, separator, value = line.partition('=')
-                        if separator:
-                            values[key] = value
-                    fault_policy['offline_check'] = values
-                    try:
-                        offline_unmount = int(values.get('unmount_exit', '255'))
-                        offline_rc = int(values.get('fsck_exit', '0'))
-                    except ValueError:
-                        offline_unmount = -1
-                        offline_rc = -1
-                    if offline_unmount != 0:
-                        fault_policy['offline_check_unverified'] = True
-                    elif offline_rc != 0:
-                        fault_policy['offline_fsck_candidate'] = dict(
-                            source='fault_offline_fsck', status='candidate',
-                            fsck_exit=offline_rc,
-                            evidence=f'segments/{folder.name}/fault-fsck.txt')
-                fault_policy['filesystem_tainted'] = True
-                m['fault_tainted'] = True
-                self.tainted_kinds.add(kind)
-                self.meta['fault_tainted_kinds'] = sorted(self.tainted_kinds)
-                self.progress(f'FAULT FILESYSTEM TAINTED segment={folder.name} kind={kind} '
-                              'subsequent_workloads_quarantined=1')
-            m['fault_injection'] = fault_policy
         if m['segment_id'] == 0:
             self.establish_measurement_start(folder)
         scenario_evidence, scenario_issues = self.validate_scenario_evidence(
@@ -1472,34 +1066,8 @@ class Runner:
         m['kcov_feedback_errors'] = feedback['errors']
         m['scenario_evidence'] = scenario_evidence
         m['issues'].extend(scenario_issues)
-        fault_policy = m.get('fault_injection') or {}
-        if fault_policy.get('hit'):
-            if rc:
-                # A fault can make the launcher cleanup return the injected
-                # errno even though every generated call and its raw trace
-                # completed.  Preserve that exit as a candidate and let the
-                # next segment continue; genuine execution/trace issues are
-                # still rejected during lifecycle aggregation.
-                m['fault_expected_workload_exit'] = True
-            hit = dict(segment_id=folder.name, kind=m['kind'], seed=fault_policy['seed'],
-                       probability_ppm=fault_policy['probability_ppm'],
-                       event=fault_policy.get('event'),
-                       stable_observation=fault_policy.get('stable_observation'),
-                       workload_exit=rc)
-            self.meta.setdefault('fault_injection_hit', hit)
-            observations = fault_policy.get('stable_observation') or {}
-            stable_candidates = {phase: observation for phase, observation in observations.items()
-                                 if observation.get('status') == 'candidate'}
-            stable_unverified = {phase: observation for phase, observation in observations.items()
-                                 if observation.get('status') not in ('clear', 'candidate')}
-            if stable_candidates:
-                fault_policy['stable_candidate'] = dict(
-                    source='stable_snapshot', observations=stable_candidates)
-            elif stable_unverified:
-                fault_policy['stable_unverified'] = stable_unverified
-            m['fault_injection'] = fault_policy
         atomic_json(folder / 'manifest.json', m)
-        if rc and not (fault_policy.get('hit') and m.get('fault_expected_workload_exit')):
+        if rc:
             raise CampaignError(m['status'])
         return m
 
@@ -1681,14 +1249,13 @@ class Runner:
             (analysis / p.name).write_text(''.join(f'{key}: {value}\n' for key, value in delta.items()))
             self.previous_loss[p.name] = current
         events, _ = parse_trace(analysis / 'trace.txt')
-        intervals, snapshot_events, reset_boundaries = lifecycle_intervals(
+        intervals, snapshot_events = lifecycle_intervals(
             folder, m, events, self.meta['devices'], carry_folder if carry_available else None,
             self.run / 'checkpoint' if checkpoint else None)
-        m['reset_boundaries'] = reset_boundaries
         atomic_json(analysis / 'chain-manifest.json',
                     dict(schema=2, run_id=self.run.name, boot_id=self.meta['boot_id'],
                          require_native_syscalls=m['status']=='complete',
-                         carry_available=carry_available, reset_boundaries=reset_boundaries,
+                         carry_available=carry_available,
                          carry_source=(str(carry_folder.name) if carry_available else None),
                          intervals=intervals))
         # Last complete stable snapshot scopes become the next bounded carry anchor.
@@ -1716,24 +1283,9 @@ class Runner:
                      allowed=(0, 1), salvage=salvage, memory_limit=True)
         report = read_json(analysis / 'lifecycle/report.json')
         if m.get('source') == 'syzkaller':
-            fault_stop = None
-            stop_path = folder / 'fault-stop-after-call'
-            if stop_path.is_file():
-                fault_stop = {}
-                for line in stop_path.read_text(errors='replace').splitlines():
-                    key, separator, value = line.partition('=')
-                    if separator:
-                        fault_stop[key] = value
             m['syzkaller_execution_issues'] = execution_issues(folder / 'syz-programs',
-                    report['native_syscalls'], folder.name, m.get('batches', 0), m['workers'],
-                    fault_stop=fault_stop)
+                    report['native_syscalls'], folder.name, m.get('batches', 0), m['workers'])
             m['issues'].extend(m['syzkaller_execution_issues'])
-        # Persist fields created before lifecycle analysis before the
-        # attribution helper reads and rewrites the manifest.  Otherwise its
-        # stale on-disk copy can discard trace_bytes and other sealed fields.
-        atomic_json(folder / 'manifest.json', m)
-        self.record_fault_attribution(folder, report)
-        m = read_json(folder / 'manifest.json')
         native_execution_verified = not m.get('syzkaller_execution_issues')
         m['joint_feedback'] = self.feedback.augment(
             folder, report, native_execution_verified=native_execution_verified,
@@ -1782,152 +1334,6 @@ class Runner:
             self.guest('discard', folder.name)
         return passed
 
-    def record_lifecycle_fault_candidate(self, folder):
-        manifest = read_json(folder / 'manifest.json')
-        fault = manifest.get('fault_injection') or {}
-        if not fault.get('hit'):
-            return
-        report_path = folder / manifest.get('lifecycle_report',
-                                             'analysis/lifecycle/report.json.gz')
-        if not report_path.is_file():
-            return
-        report = read_json(report_path)
-        counts = report.get('classification_counts', {})
-        findings = {key: counts.get(key, 0)
-                    for key in ('operation_exit_mismatch', 'persistent_mismatch')
-                    if counts.get(key, 0)}
-        object_findings = []
-        for interval in report.get('runs', []):
-            object_findings.extend((interval.get('object_checks') or {}).get('findings', []))
-        if findings or object_findings:
-            fault['lifecycle_candidate'] = dict(
-                classification_counts=findings, object_findings=object_findings,
-                issues=report.get('issues', []))
-            manifest['fault_injection'] = fault
-            atomic_json(folder / 'manifest.json', manifest)
-
-    def record_fault_attribution(self, folder, report):
-        """Bind a hook event to at most one verified native syscall envelope."""
-        manifest_path = folder / 'manifest.json'
-        manifest = read_json(manifest_path)
-        fault = manifest.get('fault_injection') or {}
-        if not fault.get('hit'):
-            return
-        event = fault.get('event') or {}
-        calls = report.get('native_syscalls', []) if isinstance(report, dict) else []
-        line = event.get('trace_line')
-        pid = int(event.get('pid', 0) or 0)
-        event_ns = event.get('timestamp_ns')
-        enclosing = [call for call in calls
-                     if call.get('verified') and call.get('pid') == pid and
-                     ((isinstance(event_ns, int) and
-                       call.get('enter_ns', 0) < event_ns < call.get('exit_ns', 0)) or
-                      (event_ns is None and isinstance(line, int) and
-                       call.get('enter_line', 0) < line < call.get('exit_line', 0)))]
-        attribution = {
-            'schema': 1,
-            'hook': event.get('operation'),
-            'hook_errno': event.get('errno'),
-            'hook_trace_line': line,
-            'hook_timestamp_ns': event_ns,
-            'hook_pid': pid,
-            'target_pid': fault.get('status', {}).get('target_pid'),
-            'native_envelope_count': len(enclosing),
-            'native_envelope': (dict(id=enclosing[0].get('id'), name=enclosing[0].get('name'),
-                                     program=enclosing[0].get('program'),
-                                     call_index=enclosing[0].get('call_index'),
-                                     enter_line=enclosing[0].get('enter_line'),
-                                     exit_line=enclosing[0].get('exit_line'),
-                                     raw_result=enclosing[0].get('raw_result'),
-                                     errno=enclosing[0].get('errno'),
-                                     user_result=enclosing[0].get('user_result'),
-                                     user_errno=enclosing[0].get('user_errno'),
-                                     verified=enclosing[0].get('verified'))
-                               if len(enclosing) == 1 else None),
-            'hook_trace_verified': bool(event.get('operation') and event.get('errno') is not None),
-            'native_envelope_verified': len(enclosing) == 1,
-            'userspace_return_verified': bool(len(enclosing) == 1 and enclosing[0].get('verified')),
-            'status': ('verified' if len(enclosing) == 1 and enclosing[0].get('verified')
-                       else 'hook_only' if event.get('operation') else 'unverified'),
-        }
-        fault['attribution'] = attribution
-        manifest['fault_injection'] = fault
-        atomic_json(folder / 'fault-attribution.json', attribution)
-        atomic_json(manifest_path, manifest)
-
-    @staticmethod
-    def _is_syscall_evidence_gap(issue):
-        """Return true for the bounded gaps caused by a pre-syscall exit."""
-        if issue.endswith(':missing_or_extra_call_indices'):
-            return bool(re.fullmatch(r'b\d+-w\d+', issue.split(':', 1)[0]))
-        return bool(re.fullmatch(r'b\d+-w\d+:call_\d+_not_verified', issue))
-
-    def hook_only_workload_exit_allowed(self, folder, integrity_issues=None):
-        """Decide whether a hook-only startup failure may be quarantined.
-
-        The random controller is armed before the launcher creates its worker
-        root.  A hit during that setup can make the launcher exit before the
-        first generated syscall.  We retain that segment as incomplete and
-        continue only when the hook event, clean lifecycle report, and the
-        userspace error text all agree on that very specific failure shape.
-        Any raw trace/lifecycle/CPU-loss issue, verified native envelope, or
-        unrelated launcher error remains a hard stop.
-        """
-        try:
-            manifest = read_json(pathlib.Path(folder) / 'manifest.json')
-            fault = manifest.get('fault_injection') or {}
-            attribution = fault.get('attribution') or {}
-            event = fault.get('event') or {}
-            if not fault.get('hit') or attribution.get('status') != 'hook_only':
-                return False
-            if not attribution.get('hook_trace_verified') or attribution.get('native_envelope_count') != 0:
-                return False
-            if not manifest.get('fault_expected_workload_exit'):
-                return False
-            try:
-                exit_code = int(manifest.get('guest_exit'))
-            except (TypeError, ValueError):
-                return False
-            if exit_code not in HOOK_ONLY_WORKLOAD_EXIT_CODES:
-                return False
-            if int(manifest.get('batches', 0) or 0) < 1:
-                return False
-
-            report_path = pathlib.Path(folder) / manifest.get(
-                'lifecycle_report', 'analysis/lifecycle/report.json.gz')
-            report = read_json(report_path)
-            # A clean lifecycle report with no native calls is what proves
-            # this is a syscall attribution gap, rather than trace loss.
-            if report.get('passed') is not True or report.get('native_syscalls'):
-                return False
-
-            gaps = (list(integrity_issues) if integrity_issues is not None else
-                    self.segment_trace_integrity_issues(folder))
-            if not gaps or any(not self._is_syscall_evidence_gap(issue) for issue in gaps):
-                return False
-            execution_gaps = manifest.get('syzkaller_execution_issues') or []
-            if not execution_gaps or any(not self._is_syscall_evidence_gap(issue)
-                                         for issue in execution_gaps):
-                return False
-
-            # The launcher reports the injected errno through its normal
-            # strerror path (for example, ENOMEM -> "Cannot allocate memory").
-            # Requiring that text prevents an unrelated exit(90/91) after a
-            # coincidental hook hit from being treated as fault-caused.
-            workload_path = pathlib.Path(folder) / 'workload.txt'
-            if not workload_path.is_file():
-                return False
-            try:
-                injected_errno = abs(int(event.get('errno')))
-                error_text = os.strerror(injected_errno).casefold()
-            except (TypeError, ValueError, OverflowError):
-                return False
-            workload_text = workload_path.read_text(errors='replace').casefold()
-            if not error_text or error_text not in workload_text:
-                return False
-            return True
-        except (OSError, ValueError, EOFError, KeyError, TypeError):
-            return False
 
     def segment_trace_integrity_issues(self, folder):
         manifest = read_json(folder / 'manifest.json')
@@ -1971,29 +1377,6 @@ class Runner:
                 sha256=digest(self.run / (kind+'-disk.json')),
                 snapshot_sha256=digest(self.run / 'checkpoint' / (kind+'-final.json')),
                 fsck_sha256=digest(self.run / (kind+'-fsck.txt')))
-            if kind in getattr(self, 'tainted_kinds', set()):
-                self.meta['disk'][kind]['fault_tainted'] = True
-            disk_candidate_reasons = []
-            if not disk.get('valid'):
-                disk_candidate_reasons.append('disk_checker_invalid')
-            if rc != 0:
-                disk_candidate_reasons.append('fsck_not_clean')
-            if not self.meta['disk'][kind]['matches_final_stable_snapshot']:
-                disk_candidate_reasons.append('final_snapshot_disagrees')
-            if disk_candidate_reasons and kind not in getattr(self, 'tainted_kinds', set()):
-                hits = []
-                for manifest_path in sorted((self.run / 'segments').glob('segment-*/manifest.json')):
-                    segment = read_json(manifest_path)
-                    if segment.get('kind') == kind and (segment.get('fault_injection') or {}).get('hit'):
-                        hits.append(segment['segment_id'])
-                if hits:
-                    self.meta.setdefault('fault_injection_candidates', []).append(dict(
-                        source='offline_disk', kind=kind,
-                        segment_ids=hits,
-                        reasons=disk_candidate_reasons,
-                        disk_status=disk.get('status'), fsck_exit=rc,
-                        r_link_mismatches=disk.get('r_link', {}).get('mismatches', []),
-                        disk_evidence=kind+'-disk.json', fsck_evidence=kind+'-fsck.txt'))
         self.save()
 
     def execute(self):
@@ -2021,70 +1404,24 @@ class Runner:
                 self.guest('rotate', folder.name)
                 self.collector.wait(folder.name)
                 self.record_time('trace_wait', time.monotonic() - wait_start)
-                segment_manifest = read_json(folder / 'manifest.json')
-                if segment_manifest.get('filesystem_reset_before'):
-                    reset_start = time.monotonic()
-                    self.progress(f'FAULT RESET START segment={folder.name} kind={segment_manifest["kind"]}')
-                    self.guest('reset', segment_manifest['kind'], timeout=180,
-                               log=folder.name+'-fault-reset.txt', stage='fault_reset')
-                    self.fetch(BASE + '/fault-reset-' + segment_manifest['kind'] + '.json',
-                               folder / 'fault-reset.json')
-                    segment_manifest['filesystem_reset_completed'] = True
-                    segment_manifest['filesystem_reset_evidence'] = 'fault-reset.json'
-                    atomic_json(folder / 'manifest.json', segment_manifest)
-                    self.tainted_kinds.discard(segment_manifest['kind'])
-                    self.meta['fault_tainted_kinds'] = sorted(self.tainted_kinds)
-                    self.record_time('fault_reset', time.monotonic() - reset_start)
-                    self.progress(f'FAULT RESET END segment={folder.name} kind={segment_manifest["kind"]}')
                 if previous:
                     wait_start = time.monotonic()
                     self.collector.wait(previous.name, sealed=True)
                     elapsed = time.monotonic() - wait_start
                     self.record_time('trace_wait', elapsed, segment=False)
                     self.record_segment_time(previous, 'trace_wait', elapsed)
-                    passed = self.finalize(previous)
-                    self.record_lifecycle_fault_candidate(previous)
-                    if not passed:
+                    if not self.finalize(previous):
                         integrity_issues = self.segment_trace_integrity_issues(previous)
-                        hook_only_exit = (
-                            getattr(self.args, 'random_fault_injection', False) and
-                            self.hook_only_workload_exit_allowed(previous, integrity_issues))
-                        if hook_only_exit:
-                            recovered = read_json(previous / 'manifest.json')
-                            recovered['hook_only_workload_exit_recovered'] = True
-                            recovered['hook_only_workload_exit_issues'] = sorted(integrity_issues)
-                            recovered['issues'].append('hook_only_workload_exit_quarantined')
-                            atomic_json(previous / 'manifest.json', recovered)
-                            self.progress(f'FAULT WORKLOAD EXIT segment={previous.name} '
-                                          'attribution=hook_only syscall_evidence=absent '
-                                          'filesystem=quarantined continuing_to_next_workload')
-                        elif (not getattr(self.args, 'random_fault_injection', False) or
-                              integrity_issues):
-                            detail = ','.join(integrity_issues) if integrity_issues else 'lifecycle_validation_failed'
-                            raise CampaignError(detail)
-                        else:
-                            self.progress(f'FAULT CANDIDATE segment={previous.name} '
-                                          'lifecycle_mismatch=1 continuing_to_next_workload')
+                        detail = ','.join(integrity_issues) or 'lifecycle_validation_failed'
+                        raise CampaignError(detail)
                     self.record_finalized_syscalls(previous)
                     # If the quota is reached during analysis, this segment
                     # has already been rotated and is bounded by the reserved
                     # per-segment headroom. Complete it so the checkpoint
                     # still belongs to a fully captured segment.
-                segment_manifest = self.collect_segment(folder)
+                self.collect_segment(folder)
                 previous = folder
                 self.pending_segment = None
-                fault = (segment_manifest or {}).get('fault_injection', {}) or {}
-                if fault.get('hit'):
-                    event = fault.get('event') or {}
-                    self.progress(f'RANDOM FAULT OBSERVED segment={folder.name} '
-                                  f'operation={event.get("operation", "unresolved")} '
-                                  f'injected={fault["status"].get("injected")} '
-                                  f'seed={fault["seed"]}; workload_completed=1')
-                    if fault.get('stable_candidate'):
-                        phases = ','.join(fault['stable_candidate']['observations'])
-                        self.progress(f'FAULT CANDIDATE segment={folder.name} '
-                                      f'source=stable_snapshot phases={phases}; '
-                                      'continuing_to_next_workload')
                 target_syscalls = getattr(self.args, 'target_syscalls', 0)
                 if self.stop_requested:
                     self.meta['stop_reason'] = self.stop_requested
@@ -2119,12 +1456,10 @@ class Runner:
                 shutil.copy2(p, previous / p.name)
             self.meta['final_states'] = {k: read_json(self.run / 'checkpoint' / (k+'-final-state.json')) for k in KINDS}
             self.finalize(previous, checkpoint=True)
-            self.record_lifecycle_fault_candidate(previous)
             self.verified_syscalls = self.count_verified_syscalls_total(previous)
             self.meta['verified_syscalls'] = self.verified_syscalls
             dmesg = (self.run / 'checkpoint/dmesg.txt').read_text(errors='replace')
-            if re.search(r'BUG:|KASAN:|Oops:|possible circular locking|WARNING:',
-                         self._filter_expected_fault_warnings(dmesg)):
+            if re.search(r'BUG:|KASAN:|Oops:|possible circular locking|WARNING:', dmesg):
                 raise CampaignError('kernel_diagnostic')
             self.finish_disk()
             self.meta['status'] = 'complete'
@@ -2240,17 +1575,6 @@ def main():
     p.add_argument('--min-free-mb', type=int, default=1024)
     p.add_argument('--port', type=int, default=11883)
     p.add_argument('--seed', type=int, default=20261010)
-    p.add_argument('--random-fault-injection', action='store_true',
-                   help='inject seeded random errors at selected ext4 hooks; isolate private single-worker hits by default')
-    p.add_argument('--random-fault-probability-ppm', type=int, default=1000,
-                   help='per eligible hook-call probability in parts per million (default 1000 = 0.1 percent)')
-    p.add_argument('--random-fault-operations', default=','.join(RANDOM_FAULT_ADMITTED_OPERATIONS),
-                   help='comma-separated runtime hooks, or all for every runtime_random hook '
-                        '(default reviewed set: ' + ','.join(RANDOM_FAULT_ADMITTED_OPERATIONS) + ')')
-    p.add_argument('--random-fault-errnos', default='native',
-                   help='comma-separated errnos shared by selected hooks, native for the hit hook whitelist, or hook=errnos;hook=errnos for per-hook choices')
-    p.add_argument('--fault-isolation', action=argparse.BooleanOptionalAction, default=True,
-                   help='stop a private single-worker workload after its injected syscall and run an immediate offline fsck (default: enabled)')
     p.add_argument('--syzkaller-calls', dest='syz_calls', type=int, default=32,
                    help='generated calls per worker program')
     p.add_argument('--resource-valid-every', type=int, default=2,
@@ -2283,7 +1607,7 @@ def main():
                    default='baseline',
                    help='persistent resource profile for long-lived and pressure experiments')
     p.add_argument('--predecessor', help='previous interrupted run; evidence remains in its own directory')
-    p.add_argument('--rootfs-backing', help='raw root filesystem backing image (defaults to work/debian-clean-smalljournal.img, then work/debian.img)')
+    p.add_argument('--rootfs-backing', help='raw root filesystem backing image (defaults to FUZZING_ORCLE_ROOTFS or work/debian-normal.img)')
     p.add_argument('--target-kind', choices=('all', 'regular', 'bigalloc', 'inline'), default='all',
                    help='restrict segment scheduling to one filesystem kind; disk creation and validation remain unchanged')
     p.add_argument('--comparison-seed-image',
@@ -2295,8 +1619,7 @@ def main():
                   max_trace_mb=(1,256), max_run_mb=(32,102400), min_free_mb=(0,102400),
                   port=(1024,65535), seed=(1,2**31-1), syz_calls=(1,256), resource_valid_every=(0,1000),
                   fresh_generate_every=(0,1000), max_mutation_calls=(1,256),
-                  resource_seed_refresh_every=(0,1000),
-                  random_fault_probability_ppm=(1,1000000))
+                  resource_seed_refresh_every=(0,1000))
     for key, (lo, hi) in bounds.items():
         if not lo <= getattr(a, key) <= hi:
             p.error(f'{key} must be in [{lo}, {hi}]')
@@ -2311,14 +1634,6 @@ def main():
         p.error('--mutation-budget-policy dynamic requires --scheduler-policy rarity_fair')
     if a.comparison_seed_image and (a.target_kind != 'regular' or a.scenario != 'baseline'):
         p.error('--comparison-seed-image requires --target-kind regular and --scenario baseline')
-    try:
-        validate_random_fault_mode(a)
-    except CampaignError as error:
-        p.error(str(error))
-    try:
-        random_fault_policy(a, a.seed, 0)
-    except CampaignError as error:
-        p.error(str(error))
     runner = Runner(a)
     def interrupted(signum, _frame):
         reason = 'signal_' + signal.Signals(signum).name

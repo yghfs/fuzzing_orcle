@@ -153,87 +153,6 @@ static int verify_file(const char *dir)
 	return 0;
 }
 
-static int seed_inode_claim(const char *dir)
-{
-	char path[512];
-	char data[BLOCK_SIZE];
-	struct stat st;
-	int parent_fd, dir_fd, file_fd;
-
-	if (mkdir(dir, 0700) < 0)
-		return -1;
-	parent_fd = open("/mnt/fc", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-	if (parent_fd < 0)
-		return -1;
-	if (fsync(parent_fd) < 0 || syncfs(parent_fd) < 0) {
-		close(parent_fd);
-		return -1;
-	}
-	close(parent_fd);
-	dir_fd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-	if (dir_fd < 0)
-		return -1;
-	if (fsync(dir_fd) < 0 || syncfs(dir_fd) < 0) {
-		close(dir_fd);
-		return -1;
-	}
-	snprintf(path, sizeof(path), "%s/fresh", dir);
-	file_fd = open(path, O_CREAT | O_EXCL | O_RDWR | O_CLOEXEC, 0600);
-	if (file_fd < 0) {
-		close(dir_fd);
-		return -1;
-	}
-	memset(data, 'F', sizeof(data));
-	/*
-	 * Keep the post-baseline inode and directory entry in the fast-commit
-	 * transaction for the crash/replay fixture.  fsyncing the parent directory
-	 * here can force a full journal commit and remove the replay record we need
-	 * to exercise ext4_mark_inode_used().
-	 */
-	if (write(file_fd, data, sizeof(data)) != (ssize_t)sizeof(data) ||
-	    fsync(file_fd) < 0 || fstat(file_fd, &st) < 0) {
-		int saved = errno ? errno : EIO;
-
-		close(file_fd);
-		close(dir_fd);
-		errno = saved;
-		return -1;
-	}
-	close(file_fd);
-	close(dir_fd);
-	printf("fast_commit_inode_claim_ready fresh_ino=%lu size=%ld\n",
-	       (unsigned long)st.st_ino, (long)st.st_size);
-	fflush(stdout);
-	for (;;)
-		pause();
-}
-
-static int verify_inode_claim(const char *dir)
-{
-	char path[512], byte;
-	struct stat st;
-	int fd;
-
-	snprintf(path, sizeof(path), "%s/fresh", dir);
-	fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (fd < 0)
-		return -1;
-	if (read(fd, &byte, 1) != 1 || byte != 'F' || fstat(fd, &st) < 0) {
-		close(fd);
-		errno = EIO;
-		return -1;
-	}
-	close(fd);
-	if (st.st_nlink != 1 || st.st_size != BLOCK_SIZE) {
-		errno = EIO;
-		return -1;
-	}
-	printf("fast_commit_inode_claim_verify=ok fresh_ino=%lu nlink=%lu size=%ld\n",
-	       (unsigned long)st.st_ino, (unsigned long)st.st_nlink,
-	       (long)st.st_size);
-	return 0;
-}
-
 static int seed_rmdir(const char *dir)
 {
 	char child_path[512];
@@ -324,9 +243,11 @@ static int verify_rmdir(const char *dir)
 	return 0;
 }
 
-static int seed_link(const char *dir)
+static int seed_link_mode(const char *dir, int long_name)
 {
 	char path[512], alias[512];
+	const char *alias_name = long_name ?
+		"alias-name-longer-than-dname-inline-limit-0123456789" : "alias";
 	int fd, dirfd;
 
 	if (mkdir(dir, 0700) < 0)
@@ -348,7 +269,7 @@ static int seed_link(const char *dir)
 		return -1;
 	}
 	close(dirfd);
-	snprintf(alias, sizeof(alias), "%s/alias", dir);
+	snprintf(alias, sizeof(alias), "%s/%s", dir, alias_name);
 	if (link(path, alias) < 0)
 		return -1;
 	fd = open(path, O_RDONLY | O_CLOEXEC);
@@ -367,38 +288,42 @@ static int seed_link(const char *dir)
 		return -1;
 	}
 	close(dirfd);
-	puts("fast_commit_ready link=1");
+	printf("fast_commit_ready link=1 long_name=%d alias=%s\n",
+	       long_name, alias_name);
 	fflush(stdout);
 	for (;;)
 		pause();
 }
 
-static int verify_link(const char *dir)
+static int verify_link_mode(const char *dir, int long_name)
 {
 	char path[512], alias[512];
+	const char *alias_name = long_name ?
+		"alias-name-longer-than-dname-inline-limit-0123456789" : "alias";
 	struct stat st;
 
 	snprintf(path, sizeof(path), "%s/tracked", dir);
-	snprintf(alias, sizeof(alias), "%s/alias", dir);
+	snprintf(alias, sizeof(alias), "%s/%s", dir, alias_name);
 	if (stat(path, &st) < 0 || st.st_nlink != 2)
 		return -1;
 	if (stat(alias, &st) < 0 || st.st_nlink != 2)
 		return -1;
-	puts("fast_commit_link_verify=ok");
+	printf("fast_commit_link_verify=ok long_name=%d alias=%s\n",
+	       long_name, alias_name);
 	return 0;
 }
 
 int main(int argc, char **argv)
 {
 	if (argc != 3 || (strcmp(argv[1], "seed") &&
-			  strcmp(argv[1], "seed-inode-claim") &&
 			  strcmp(argv[1], "verify") &&
-			  strcmp(argv[1], "verify-inode-claim") &&
 			  strcmp(argv[1], "seed-rmdir") &&
 			  strcmp(argv[1], "verify-rmdir") &&
 			  strcmp(argv[1], "seed-link") &&
-			  strcmp(argv[1], "verify-link"))) {
-		fprintf(stderr, "usage: %s seed|verify|seed-inode-claim|verify-inode-claim|seed-rmdir|verify-rmdir|seed-link|verify-link DIR\n",
+			  strcmp(argv[1], "verify-link") &&
+			  strcmp(argv[1], "seed-link-long") &&
+			  strcmp(argv[1], "verify-link-long"))) {
+		fprintf(stderr, "usage: %s seed|verify|seed-rmdir|verify-rmdir|seed-link|verify-link|seed-link-long|verify-link-long DIR\n",
 				argv[0]);
 		return 2;
 	}
@@ -407,24 +332,19 @@ int main(int argc, char **argv)
 			perror("fast-commit seed");
 			return 1;
 		}
-	} else if (!strcmp(argv[1], "seed-inode-claim")) {
-		if (seed_inode_claim(argv[2]) < 0) {
-			perror("fast-commit inode-claim seed");
-			return 1;
-		}
-	} else if (!strcmp(argv[1], "verify-inode-claim")) {
-		if (verify_inode_claim(argv[2]) < 0) {
-			perror("fast-commit inode-claim verify");
-			return 1;
-		}
 	} else if (!strcmp(argv[1], "seed-rmdir")) {
 		if (seed_rmdir(argv[2]) < 0) {
 			perror("fast-commit rmdir seed");
 			return 1;
 		}
 	} else if (!strcmp(argv[1], "seed-link")) {
-		if (seed_link(argv[2]) < 0) {
+		if (seed_link_mode(argv[2], 0) < 0) {
 			perror("fast-commit link seed");
+			return 1;
+		}
+	} else if (!strcmp(argv[1], "seed-link-long")) {
+		if (seed_link_mode(argv[2], 1) < 0) {
+			perror("fast-commit long-link seed");
 			return 1;
 		}
 	} else if (!strcmp(argv[1], "verify-rmdir")) {
@@ -433,8 +353,13 @@ int main(int argc, char **argv)
 			return 1;
 		}
 	} else if (!strcmp(argv[1], "verify-link")) {
-		if (verify_link(argv[2]) < 0) {
+		if (verify_link_mode(argv[2], 0) < 0) {
 			perror("fast-commit link verify");
+			return 1;
+		}
+	} else if (!strcmp(argv[1], "verify-link-long")) {
+		if (verify_link_mode(argv[2], 1) < 0) {
+			perror("fast-commit long-link verify");
 			return 1;
 		}
 	} else if (verify_file(argv[2]) < 0) {

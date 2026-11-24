@@ -2,19 +2,19 @@
 set -euo pipefail
 project=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 root=$(cd "$project/../.." && pwd)
-run=$(mktemp -d "$project/results/smoke-XXXXXXXX")
+. "$root/tools/kernel-paths.sh"
 port=${EXT4_CT_PORT:-11862}
 key=${EXT4_CT_SSH_KEY:-"$root/work/debian.id_rsa"}
-rootfs=${EXT4_CT_ROOTFS:-}
-if [[ -z "$rootfs" ]]; then
-	for candidate in "$root/work/debian.img" "$root/work/debian-clean-smalljournal.img"; do
-		if [[ -s "$candidate" ]]; then rootfs=$candidate; break; fi
-	done
-fi
+rootfs=${EXT4_CT_ROOTFS:-"$FUZZING_ORCLE_ROOTFS"}
 test -s "$rootfs" || { echo "guest root image missing; run tools/create-vm-image.sh: $rootfs" >&2; exit 1; }
 test -r "$key" || { echo "guest SSH key missing; run tools/create-vm-image.sh: $key" >&2; exit 1; }
-kernel="$project/build/linux-counter-trace/arch/x86/boot/bzImage"
-test -s "$kernel"
+kernel="$FUZZING_ORCLE_BZIMAGE"
+test -s "$kernel" || { echo "normal regression kernel missing; run $project/scripts/build.sh --normal" >&2; exit 1; }
+mkdir -p "$project/results"
+run=$(mktemp -d "$project/results/smoke-XXXXXXXX")
+cp "$kernel" "$run/kernel.bzImage"
+cp "$FUZZING_ORCLE_KERNEL_OBJ/.config" "$run/kernel.config"
+kernel="$run/kernel.bzImage"
 gcc -O2 -Wall -Wextra -Werror -static -o "$run/ct-workload" "$root/tests/ext4-count-workload.c"
 gcc -O2 -Wall -Wextra -Werror -static -o "$run/buddy-stress" "$root/tests/ext4-mballoc-buddy-stress.c"
 qemu-img create -q -f qcow2 -F raw -b "$rootfs" "$run/root.qcow2"
@@ -28,7 +28,7 @@ for kind in regular bigalloc nojournal lazy; do
   [[ $kind != lazy ]] || args+=(-E lazy_itable_init=1)
   mke2fs -q -F -t ext4 "${args[@]}" "$run/$kind.raw"
 done
-qemu-system-x86_64 -machine q35,accel=tcg -cpu max -m 2048 -smp 2 \
+qemu-system-x86_64 -machine q35,accel=tcg -cpu qemu64 -m 2048 -smp 2 \
   -kernel "$kernel" -drive "file=$run/root.qcow2,format=qcow2,if=virtio" \
   -drive "file=$run/regular.raw,format=raw,if=virtio" \
   -drive "file=$run/bigalloc.raw,format=raw,if=virtio" \
@@ -79,5 +79,5 @@ for kind in regular bigalloc nojournal lazy; do
   cp "$run/$kind-disk.json" "$run/ct-results/$kind-disk.json"
 done
 python3 "$project/scripts/analyze-trace.py" "$run/ct-results" > "$run/analysis.json"
-sha256sum "$kernel" "$project/build/linux-counter-trace/.config" > "$run/build.sha256"
+sha256sum "$kernel" "$run/kernel.config" > "$run/build.sha256"
 printf 'counter_trace_smoke=passed\nrun_dir=%s\n' "$run"

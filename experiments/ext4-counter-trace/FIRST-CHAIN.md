@@ -72,8 +72,7 @@ writeback 等后台事件自行拥有 scope，`no_cross_thread_cause` 明示尚�
 ## 运行与产物
 
 ```sh
-bash experiments/ext4-counter-trace/scripts/build.sh
-python3 experiments/ext4-counter-trace/scripts/export-patch.py
+bash experiments/ext4-counter-trace/scripts/build.sh --normal
 bash experiments/ext4-counter-trace/scripts/run-chain.sh
 python3 experiments/ext4-counter-trace/tests/test-lifecycle.py
 ```

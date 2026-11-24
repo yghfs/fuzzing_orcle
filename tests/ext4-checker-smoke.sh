@@ -2,15 +2,18 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
-kernel_image="${root_dir}/kernel/linux-6.12.1/arch/x86/boot/bzImage"
-base_image="${SYZ_BASE_IMAGE:-${work_dir}/debian-clean-smalljournal.img}"
+kernel_image="${FUZZING_ORCLE_BZIMAGE}"
+base_image="${SYZ_BASE_IMAGE:-${ext4_normal_guest_image}}"
 ssh_key="${work_dir}/debian.id_rsa"
 port="${1:-10030}"
 run_id="${port}-$$"
 overlay="${work_dir}/checker-smoke-${run_id}.qcow2"
 pid_file="${work_dir}/checker-smoke-${run_id}.pid"
 serial_log="${work_dir}/checker-smoke-${run_id}.log"
+
+ext4_require_normal_kernel "${kernel_image}"
 
 cleanup() {
 	if [[ -s "${pid_file}" ]]; then
@@ -43,8 +46,6 @@ for _ in $(seq 1 40); do
 done
 
 ssh_opts=(-i "${ssh_key}" -p "${port}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
-ssh "${ssh_opts[@]}" root@127.0.0.1 \
-	'test ! -e /sys/module/ext4/parameters/ext4_fault_mode'
 
 report="$(ssh "${ssh_opts[@]}" root@127.0.0.1 '
 set -eu
@@ -61,4 +62,4 @@ echo "${report}"
 rg -q 'snapshot OK' <<<"${report}"
 rg -q '^violations_total=0$' <<<"${report}"
 
-echo "runtime checker smoke: passed (fault injection disabled)"
+echo "runtime checker smoke: passed"

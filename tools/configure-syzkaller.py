@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 
@@ -30,19 +31,32 @@ def relocate(value):
 
 
 config = relocate(config)
-if "vm" in config:
-	config["kernel_obj"] = str(root / "experiments/ext4-invariant-checker/build/linux-invariant-checker")
-	config["vm"]["kernel"] = str(
-		root / "experiments/ext4-invariant-checker/build/linux-invariant-checker/arch/x86/boot/bzImage"
-	)
-	config["image"] = str(root / "work/debian.img")
-	config["sshkey"] = str(root / "work/debian.id_rsa")
-	config["syzkaller"] = str(root / "tools/syzkaller")
-	config["workdir"] = str(root / "work/syzkaller" / source.stem)
-	if "http" in config:
-		config["http"] = "127.0.0.1:56742"
+
+
+def local_path(variable, configured, default):
+    return str(Path(os.environ.get(variable) or configured or default).resolve())
+
+
+if config.get("type") == "qemu":
+    counter = root / "experiments/ext4-counter-trace"
+    vm = config.setdefault("vm", {})
+    build = local_path("FUZZING_ORCLE_KERNEL_OBJ", config.get("kernel_obj"),
+                       counter / "build/linux-counter-trace-normal")
+    config["kernel_obj"] = build
+    if "kernel_src" not in config and "kernel" in vm:
+        config["kernel_src"] = build
+    config["kernel_src"] = local_path("FUZZING_ORCLE_KERNEL", config.get("kernel_src"),
+                                      counter / "dev/linux-6.12.1")
+    configured_kernel = None if os.environ.get("FUZZING_ORCLE_KERNEL_OBJ") else vm.get("kernel")
+    vm["kernel"] = local_path("FUZZING_ORCLE_BZIMAGE", configured_kernel,
+                              Path(build) / "arch/x86/boot/bzImage")
+    config["image"] = local_path("FUZZING_ORCLE_ROOTFS", config.get("image"),
+                                 root / "work/debian-normal.img")
+    config.setdefault("sshkey", str(root / "work/debian.id_rsa"))
+    config.setdefault("syzkaller", str(root / "tools/syzkaller"))
+    config.setdefault("workdir", str(root / "work/syzkaller" / source.stem))
 if "workdir" in config:
-	Path(config["workdir"]).mkdir(parents=True, exist_ok=True)
+    Path(config["workdir"]).mkdir(parents=True, exist_ok=True)
 target.parent.mkdir(parents=True, exist_ok=True)
 target.write_text(json.dumps(config, indent=2) + "\n")
 print(target)

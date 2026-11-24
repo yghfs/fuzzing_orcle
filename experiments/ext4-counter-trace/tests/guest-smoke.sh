@@ -3,13 +3,13 @@ set -eu
 trace=/sys/kernel/tracing
 mkdir -p "$trace" /mnt/ct /tmp/ct-results
 mount -t tracefs tracefs "$trace" 2>/dev/null || true
+mount -t debugfs debugfs /sys/kernel/debug 2>/dev/null || true
 echo 0 > "$trace/tracing_on"
 echo global > "$trace/trace_clock"
 echo "${EXT4_CT_TRACE_BUFFER_KB:-131072}" > "$trace/buffer_size_kb"
 echo > "$trace/trace"
 echo 1 > "$trace/events/ext4_counter/ext4_counter_event/enable"
 echo 1 > "$trace/tracing_on"
-test ! -e /sys/module/ext4/parameters/ext4_fault_mode
 uname -r > /tmp/ct-results/kernel.txt
 
 stable()
@@ -41,6 +41,9 @@ for pair in regular:vdb bigalloc:vdc nojournal:vdd lazy:vde; do
 	wait "$worker"
 	if [ "$kind" = regular ]; then
 		/tmp/buddy-stress /mnt/ct/buddy > "/tmp/ct-results/buddy-stress.txt"
+		cat "/sys/kernel/debug/ext4/$dev/invariant_check" > /tmp/ct-results/invariant-check.txt
+		grep -q 'snapshot OK' /tmp/ct-results/invariant-check.txt
+		grep -qx 'violations_total=0' /tmp/ct-results/invariant-check.txt
 	fi
 	# Deliberately sample before sync or unmount.
 	stable "$dev" "/tmp/ct-results/$kind-after.json"

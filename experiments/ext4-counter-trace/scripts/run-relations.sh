@@ -2,15 +2,17 @@
 set -euo pipefail
 project=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 root=$(cd "$project/../.." && pwd)
+. "$root/tools/kernel-paths.sh"
+mkdir -p "$project/results"
 run=$(mktemp -d "$project/results/relations-XXXXXXXX")
 port=${EXT4_CT_RELATIONS_PORT:-11922}
 key="$root/work/debian.id_rsa"
-kernel="$project/build/linux-counter-trace/arch/x86/boot/bzImage"
+kernel="$FUZZING_ORCLE_BZIMAGE"
 test -s "$kernel"
-python3 "$project/scripts/source_audit.py" --require-build
+python3 "$project/scripts/source_audit.py" --require-build --kernel-obj "$FUZZING_ORCLE_KERNEL_OBJ"
 mkdir -p "$run/evidence/scripts" "$run/evidence/tests"
 cp "$kernel" "$run/kernel.bzImage"
-cp "$project/build/linux-counter-trace/.config" "$run/evidence/kernel.config"
+cp "$FUZZING_ORCLE_KERNEL_OBJ/.config" "$run/evidence/kernel.config"
 cp "$project/patches/0001-counter-trace-core-and-probes.patch" "$project/patches/manifest.json" "$run/evidence/"
 cp "$project/scripts/trace_lifecycle.py" "$project/scripts/analyze-lifecycle.py" \
   "$project/scripts/formula_relations.py" "$project/scripts/point_report.py" \
@@ -19,7 +21,7 @@ cp "$project/scripts/trace_lifecycle.py" "$project/scripts/analyze-lifecycle.py"
 cp "$project/tests/relations-workload.c" "$project/tests/guest-relations.sh" "$run/evidence/tests/"
 kernel="$run/kernel.bzImage"
 gcc -O2 -Wall -Wextra -Werror -static -o "$run/ct-relations-workload" "$project/tests/relations-workload.c"
-qemu-img create -q -f qcow2 -F raw -b "$root/work/debian-clean-smalljournal.img" "$run/root.qcow2"
+qemu-img create -q -f qcow2 -F raw -b "$FUZZING_ORCLE_ROOTFS" "$run/root.qcow2"
 for kind in regular bigalloc inline legacy; do
   size=132M
   qemu-img create -q -f raw "$run/$kind.raw" "$size"
@@ -29,7 +31,7 @@ for kind in regular bigalloc inline legacy; do
   [[ $kind != legacy ]] || args+=(-O ^orphan_file,^metadata_csum,^metadata_csum_seed,^64bit)
   mke2fs -q -F -t ext4 "${args[@]}" "$run/$kind.raw"
 done
-qemu-system-x86_64 -machine q35,accel=tcg -cpu max -m 2048 -smp 2 \
+qemu-system-x86_64 -machine q35,accel=tcg -cpu qemu64 -m 2048 -smp 2 \
   -kernel "$kernel" -drive "file=$run/root.qcow2,format=qcow2,if=virtio" \
   -drive "file=$run/regular.raw,format=raw,if=virtio" \
   -drive "file=$run/bigalloc.raw,format=raw,if=virtio" \

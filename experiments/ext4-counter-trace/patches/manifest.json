@@ -1,67 +1,72 @@
 {
   "patch": "0001-counter-trace-core-and-probes.patch",
-  "sha256": "347d99fcb9b01b5f29d3d178fe7247ff0a5fc9056724f1a49727a89004ed0f36",
+  "sha256": "549a6f783d7e6a63742e07cb659d7dbae30b75007bde9154a3310cb464113104",
   "replay_verified": true,
   "files": [
     {
       "path": "fs/ext4/Kconfig",
       "before_sha256": "6d7008b18336f23009bf997b1bfb0b8f4f9dd92ef69ef633d3268a5557db2de5",
-      "after_sha256": "07d55d8d14758d70cd70a337e6cc978b635bae79aa5e73191e8a26e24cdc689d"
+      "after_sha256": "0c9d8e3cbcb7381431fc9e47aeff702d0182c42b15ca6bbf31dc4efecd331614"
     },
     {
       "path": "fs/ext4/Makefile",
       "before_sha256": "236554253e990c3d12efe453049ea68b789918c4deccf41fe693361d8ec84ba0",
-      "after_sha256": "84a4bec8ec5344d21b9d1d311dada078a8dfc5c2403cd0c63b6a357f049162b0"
+      "after_sha256": "b5192a7e248e17387b1e4a8e8dc6bbaea970aecc107bc8f22a4b2d0b71794ed7"
     },
     {
       "path": "fs/ext4/acl.c",
       "before_sha256": "8742da7ae1629ff90567764c951a4a8381c1f6c1f0a2d43df0bb4a4a06e85e34",
-      "after_sha256": "093f250304ca05b3cc64aab7bb9ef12d4ec659f3274bea23fb5da16b247dc288"
+      "after_sha256": "f584ec56ee45095b449bfb1793b32e178a78a1e4db4838d023cc08cb9ef8a147"
     },
     {
       "path": "fs/ext4/balloc.c",
       "before_sha256": "bedeb9e8753b3add2edea8086aa19374f4efa192368fcfdb8ceb3b788642c55c",
-      "after_sha256": "df525cfbafd354c051cd905f925216c767a6d25a4214206ed048f3f611a15db4"
+      "after_sha256": "27653202a8741c42776791d4a4b9d99eb56e52a9b6bfc9127be39d94c9f04bd4"
+    },
+    {
+      "path": "fs/ext4/counter_models.c",
+      "before_sha256": null,
+      "after_sha256": "b2143556d73a3647af38c4b91487667730fa842debe57527fd33c128577a7440"
     },
     {
       "path": "fs/ext4/counter_relations.c",
       "before_sha256": null,
-      "after_sha256": "064eb43b74ab1a4689aeb5984e964244d7991e0362e6dc19540b0aaf2d3486d0"
+      "after_sha256": "e2fa3a989c38a1a653bd4183813d7ad6af8b130ac99dadcdfa9b1be23aab70e1"
     },
     {
       "path": "fs/ext4/counter_trace.c",
       "before_sha256": null,
-      "after_sha256": "a7e664265930d3bd51722ff10a2ab02469f243d6682490e648621089a007c566"
+      "after_sha256": "c1d52fdc3ca0160732935f3c788353cdc3e96dd5a78127499cba9d3845e5d8bc"
     },
     {
       "path": "fs/ext4/counter_trace.h",
       "before_sha256": null,
-      "after_sha256": "3f823bb73304fa2baad6026c1fe8274fe5afebff302efa3f6f120235d54d738c"
+      "after_sha256": "082f5bd0df988d20e38d50a29e449ebcf4955bab121c0d20917d5a912579c7b3"
     },
     {
       "path": "fs/ext4/ext4.h",
       "before_sha256": "3a3cdc0439c0c828176bd9f6bc5f25b041f273de29ee0b53c3970716052f114e",
-      "after_sha256": "a8813bbe9d3eb3dad42886a8e76e4bb62628273cac6ded7c77f417dd0302afae"
+      "after_sha256": "116806309ad6673e5435762b7354e0c71b8848c2b7b155b5fb04eea69dde479f"
     },
     {
       "path": "fs/ext4/ext4_jbd2.c",
       "before_sha256": "7dc3f7dca7b6410470b1c48241dbbe0a29e599c6bc2d88629697bf60c310bccc",
-      "after_sha256": "fa8cdb4d47aee6ec6cd12e4954d99d9cc54eac184203efbef42db3959add4780"
+      "after_sha256": "20051206da9653ae46f5eece153727438cd499f063601ab875263a7a7742033c"
     },
     {
       "path": "fs/ext4/ext4_jbd2.h",
       "before_sha256": "537f5240ba825faac41b4f982b5c598297cf60469cfbd651ef5e77b73015497d",
-      "after_sha256": "e577d7524189847acc6cca4880eeff5a35bcee1a431f0cfddf96fc8845938845"
+      "after_sha256": "dccec89191d6e327c028261926e18f31c2b957608a77cf0cf1e67eb89bf4fae4"
     },
     {
       "path": "fs/ext4/extents.c",
       "before_sha256": "ca997b4124cdfd81fe4124187ff00c8c0e325afa4f0b8926b40c17063dc6fd65",
-      "after_sha256": "5f35b8969f153374778271ef9cf0c1638a6b8b31aedc3e50a1ad4d01f8a72a8e"
+      "after_sha256": "4c88e6a7288faad37ebe88fa1da2db904c553f23610ff68fd5cd231a16725d36"
     },
     {
       "path": "fs/ext4/extents_status.c",
       "before_sha256": "1e63eb6e2240bdbd90f1044816a1f5cf10eed4640a3c87875d7a30efa8f67a47",
-      "after_sha256": "757abc3c5b1cdafa8cde254d89a19c741b65b44ce5469ae9a3c98d1fe1b19207"
+      "after_sha256": "95867498f3789795341839da28e1600f7d94102208a9f02730fbbbda76c01633"
     },
     {
       "path": "fs/ext4/fast_commit.c",
@@ -69,89 +74,94 @@
       "after_sha256": "4127dc25dc1663258955ec4fd5b55e412eee5a25857cfc8062aecf6714527991"
     },
     {
-      "path": "fs/ext4/fault_errno_catalog.h",
-      "before_sha256": null,
-      "after_sha256": "c8200bf8ea7277e26d4a8fe62e352d05f739356f64d66c6634845d48639e027d"
+      "path": "fs/ext4/file.c",
+      "before_sha256": "8df7171fdd5fabc60c9f4cf6965c14cff83e222cb908a6cb23ae099eef9dbb9c",
+      "after_sha256": "632dab53aaa26951390cfd3d4429c5be81c808e0de5a43ad5a9c10917ea5d5aa"
     },
     {
-      "path": "fs/ext4/fault_inject.c",
-      "before_sha256": null,
-      "after_sha256": "d82f8e336e111b9a155c3051a225c43e9499e7612b55744f65cdfac266821d0b"
-    },
-    {
-      "path": "fs/ext4/fault_inject.h",
-      "before_sha256": null,
-      "after_sha256": "16422d2080c3f40c2c84977993e5f6c6c4777906020b06060040cd81fa239df4"
+      "path": "fs/ext4/fsync.c",
+      "before_sha256": "c5f0a5e1a076540d80595248eac0d8ced9226abc70eb25eff54b38876240568f",
+      "after_sha256": "accb6e33a025cd1e058565d4f4782cbb408ef6089ec8a6f22e6adf1edc73f91f"
     },
     {
       "path": "fs/ext4/ialloc.c",
       "before_sha256": "117ef02067d775223e47e38117db692f827e6375756766ee8c6a29d48ccc739f",
-      "after_sha256": "b3a896e4881c53d0de56b8994dd6349b235a9e27af4d39b10a485d7b62ba2ceb"
+      "after_sha256": "217cd24462e8253c4cae30fa603b04554cd36f7a34e6e02133e804e486fe5df4"
+    },
+    {
+      "path": "fs/ext4/indirect.c",
+      "before_sha256": "7c0f33a9ec71fa16a0630f613a7e1ab8f94e7667e42f89f72cf2b1b51b8a50e2",
+      "after_sha256": "17676d544bb16a4a55761c555be23f42ca25295f1d5202a1e68a51def67bf228"
     },
     {
       "path": "fs/ext4/inline.c",
       "before_sha256": "9891b0f71c4bd48461a0b54520448938bb8a1a6e9e00218c61e3425c25042e96",
-      "after_sha256": "d879ae5ea385511b08b501b585580e37e62b41253afd637a673576251f7bf908"
+      "after_sha256": "7fbf4f360189614f32339b0bb221a7c44a51fbfebbdf5fb9c4b3719763ac8955"
     },
     {
       "path": "fs/ext4/inode.c",
       "before_sha256": "a85d3c8a372212fabef113e9805c0101ec33dc02f7717b2f06bd6bfc40ecc4fa",
-      "after_sha256": "153cc1ec967c12d3dd761ccd9e415e07a7c62e83189fe689f7c1063cfe97360e"
+      "after_sha256": "bf18bfb5938d08dc27cb05c15028e2859bb69fab362aded571ba640d355a1fb5"
     },
     {
       "path": "fs/ext4/ioctl.c",
       "before_sha256": "cd060d252d03292ad8737ee61f9801320e7384beb2430300863569609b1df8d4",
-      "after_sha256": "68bf3990a62fc9268f309da3d3016ab41e5954f47e2644da34c75cbdc7f7877a"
+      "after_sha256": "5664ebf53518f5112a9baedfdb39d919deae4869881073099ed142903d24c8ad"
     },
     {
       "path": "fs/ext4/mballoc.c",
       "before_sha256": "abb18c4a4a41e7cd4b159e90736d0ccf31f39556f6468a5138e755793ca37c08",
-      "after_sha256": "8aa6a11fa208cc9306b6abbd5e0aa6422176098ecaa0f4c1ee80a8e5be65ccf7"
+      "after_sha256": "74920e849f6a4e086c33bea9f8c30d4a94742e3edc853b7e8bf2601e15943674"
     },
     {
       "path": "fs/ext4/migrate.c",
       "before_sha256": "826b72a914b8527379cf05189ecf75780ecadde251388330d03b85ac1200e052",
-      "after_sha256": "785ace186ee652d2d8672193a0cac6179c5582541fc8fec9eaa7aa926a666cd2"
+      "after_sha256": "0cabbdfc405fc73779508f7b8df45ce1ef300b5444d2bd1ac7730c4cfbbe874b"
     },
     {
       "path": "fs/ext4/namei.c",
       "before_sha256": "5db5af62747549e38d0474ed5c34de504cf861f2d46432f46724d446b02da7e6",
-      "after_sha256": "ed7bcbe6b0a0d53179105a8ce512da9700f0728d169d36e83ce6380bae6683aa"
+      "after_sha256": "d03fb5e44371df3a0b844ababab6b2c38e6f470ae48bab92e79811eeaa89a41f"
     },
     {
       "path": "fs/ext4/orphan.c",
       "before_sha256": "1d01da885095a3f909c208ea716bbb566df7afec06e39698e639a9d125a332c3",
-      "after_sha256": "1e409117de6968c0df1c75dcbf95fe428391284c4fb6169e7a27ed2bb7f46654"
+      "after_sha256": "183304932280306be738581ee046f6f1010d73d22ce5a3330dc343b358ebcc63"
     },
     {
       "path": "fs/ext4/resize.c",
       "before_sha256": "4c17badc08b682d9af9201727317cf6f4d50d336593652163de00742710ec2ef",
-      "after_sha256": "ef2d2a649fa9ba12b22e7a324cf6ce5ee74e6e2f8ff941030cea763ff2dd486a"
+      "after_sha256": "64099b44c596770b6dcad54dfee9d35b7271760e91f2b5c8a158105bfb1feabb"
     },
     {
       "path": "fs/ext4/super.c",
       "before_sha256": "7e40a398a52482bf47cc0c12e8a4cf22f3fc9b1103841823b8e800a17fd0ef13",
-      "after_sha256": "76d7587e54b539fe7c2f5671af88ba5f1269237746523d226758dafad52841cf"
+      "after_sha256": "30cd3d4111ada941eb2ce0aeacccf8ec3b940be45aa9f94ff205aba11c4d806c"
     },
     {
       "path": "fs/ext4/sysfs.c",
       "before_sha256": "47e8134c9e8e76cf933fec48183f5fef7ebeba05b59ef0fb864eba7a54adce7e",
-      "after_sha256": "b7152d559cf142da13be39f8e0eeb5970f1ca5f6224508bab190efbf1d446b5b"
+      "after_sha256": "19e0c99b7707009c3b0239ceac4b89bbe0927d4a96d1645a14ed382f6cb50f6c"
     },
     {
       "path": "fs/ext4/xattr.c",
       "before_sha256": "4f3ec9ccb9dbfbe5623766705dcae02c0251b3da20c128d16372aeac19f775a7",
-      "after_sha256": "a7459f60e3536c89df33a4447ba1dea89bc1cfc087508a87548f334d89bc6d48"
+      "after_sha256": "5293eb9dd8b60f30b16c0c402bbd195a2015eb7782515a3f488f6d9153f8de81"
+    },
+    {
+      "path": "fs/jbd2/journal.c",
+      "before_sha256": "6c672a85a75c2735cb3f76afedfeba17c07fbc1d8ce6eff4d7837b376eb0b352",
+      "after_sha256": "c0f27f7bf227dd854483b2641d745d6dbb3d06eed896b8f5e70b9da53f859eb9"
+    },
+    {
+      "path": "include/linux/jbd2.h",
+      "before_sha256": "c4670f9a9d9e91cbf2829267f7f643c9d63cdfebaecfacc2485f889878c704db",
+      "after_sha256": "1f04c4ba85a0b296b5fd3753da6c6406d6ec749f7b24fe1c6e5378c3d46ad73c"
     },
     {
       "path": "include/trace/events/ext4_counter.h",
       "before_sha256": null,
       "after_sha256": "dba3255ca2de59700a77aacd18ae84f538a3c1df3fd88e4493657b10e50df311"
-    },
-    {
-      "path": "include/trace/events/ext4_fault.h",
-      "before_sha256": null,
-      "after_sha256": "896545df79dbd087302b197cd377231cde8c334c071f25027e3891e057033b83"
     }
   ]
 }

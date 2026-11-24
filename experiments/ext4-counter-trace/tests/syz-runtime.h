@@ -13,7 +13,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 #include <unistd.h>
 
 #define CT_KCOV_MAX_ENTRIES 16777216UL
@@ -74,167 +73,7 @@ static unsigned long ct_fallocate_adaptations;
 static unsigned long long ct_fallocate_max_bytes = CT_FALLOCATE_DEFAULT_MAX_BYTES;
 static unsigned long long ct_io_max_bytes = CT_IO_DEFAULT_MAX_BYTES;
 static unsigned long ct_io_adaptations;
-static int ct_fault_stop_after_hit;
-
-/*
- * Fault injection is deliberately an opt-in lane.  The generated process
- * arms one operation for one generated call and records the controller state
- * before disabling it at process exit.  Keeping this state in the workload
- * gives the host an exact PID/program/call boundary even when several
- * workers share a mounted filesystem.
- */
-#define CT_FAULT_PATH_MAX 512
-#define CT_FAULT_VALUE_MAX 96
-#define CT_FAULT_CALL_ANY UINT_MAX
-static int ct_fault_enabled;
-static int ct_fault_armed;
-static unsigned ct_fault_call_index;
-static unsigned ct_fault_count = 1;
-static unsigned ct_fault_generation = 1;
-static char ct_fault_path[CT_FAULT_PATH_MAX];
-static char ct_fault_status_path[CT_FAULT_PATH_MAX];
-static char ct_fault_operation[CT_FAULT_VALUE_MAX];
-static char ct_fault_errno[CT_FAULT_VALUE_MAX] = "-EIO";
-static char ct_fault_program[CT_FAULT_VALUE_MAX];
-static char ct_fault_evidence_dir[CT_FAULT_PATH_MAX];
-
 static int ct_write_all(int fd, const void *buffer, size_t length);
-
-static int ct_fault_write_all(int fd, const char *text)
-{
-  size_t length = strlen(text);
-  return ct_write_all(fd, text, length);
-}
-
-static int ct_fault_write_path(const char *path, const char *text)
-{
-  int fd = open(path, O_WRONLY | O_CLOEXEC);
-  int result;
-  if (fd < 0) return -1;
-  result = ct_fault_write_all(fd, text);
-  close(fd);
-  return result;
-}
-
-static void ct_fault_marker(const char *kind, const char *phase,
-                            unsigned call_index, const char *status)
-{
-  int fd = open("/sys/kernel/tracing/trace_marker", O_WRONLY | O_CLOEXEC);
-  char line[768];
-  int length;
-  if (fd < 0) return;
-  length = snprintf(line, sizeof(line),
-                    "CT_%s phase=%s target_pid=%ld program=%s call_index=%u "
-                    "operation=%s errno=%s generation=%u status=%s\n",
-                    kind, phase, (long)getpid(),
-                    ct_fault_program[0] ? ct_fault_program : "unknown",
-                    call_index, ct_fault_operation[0] ? ct_fault_operation : "off",
-                    ct_fault_errno, ct_fault_generation,
-                    status ? status : "unknown");
-  if (length > 0 && length < (int)sizeof(line))
-    (void)write(fd, line, (size_t)length);
-  close(fd);
-}
-
-static int ct_fault_parse_unsigned(const char *name, unsigned *value,
-                                   unsigned fallback, unsigned maximum)
-{
-  const char *text = getenv(name);
-  char *end = NULL;
-  unsigned long parsed;
-  if (!text || !*text) {
-    *value = fallback;
-    return 0;
-  }
-  parsed = strtoul(text, &end, 10);
-  if (!end || *end || parsed > maximum) return -1;
-  *value = (unsigned)parsed;
-  return 0;
-}
-
-static void ct_fault_status_evidence(unsigned call_index, const char *phase)
-{
-  int fd;
-  char status[2048];
-  ssize_t length;
-  char path[CT_FAULT_PATH_MAX];
-  if (!ct_fault_enabled || !ct_fault_status_path[0]) return;
-  fd = open(ct_fault_status_path, O_RDONLY | O_CLOEXEC);
-  if (fd < 0) return;
-  length = read(fd, status, sizeof(status) - 1);
-  close(fd);
-  if (length <= 0) return;
-  status[length] = '\0';
-  /* Keep trace_marker one-line and retain a bounded copy for host evidence. */
-  for (ssize_t i = 0; i < length; i++)
-    if (isspace((unsigned char)status[i])) status[i] = '_';
-  ct_fault_marker("FAULT_STATUS", phase, call_index, status);
-  if (!ct_fault_evidence_dir[0] || !ct_fault_program[0]) return;
-  if (snprintf(path, sizeof(path), "%s/%s-call-%u-%s.status",
-               ct_fault_evidence_dir, ct_fault_program, call_index, phase) >=
-      (int)sizeof(path)) return;
-  fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
-  if (fd >= 0) {
-    (void)ct_fault_write_all(fd, status);
-    (void)ct_fault_write_all(fd, "\n");
-    close(fd);
-  }
-}
-
-static void ct_fault_disable(void)
-{
-  if (!ct_fault_enabled || !ct_fault_path[0]) return;
-  (void)ct_fault_write_path(ct_fault_path, "off\n");
-  ct_fault_marker("FAULT_ARM", "END", ct_fault_call_index, "off");
-  ct_fault_armed = 0;
-}
-
-static void ct_fault_init(void)
-{
-  const char *path = getenv("CT_FAULT_SYSFS");
-  const char *operation = getenv("CT_FAULT_OPERATION");
-  const char *fault_errno = getenv("CT_FAULT_ERRNO");
-  const char *program = getenv("CT_PROGRAM_ID");
-  const char *status = getenv("CT_FAULT_STATUS");
-  const char *evidence = getenv("CT_FAULT_EVIDENCE_DIR");
-  size_t path_length;
-  if (!path || !*path || !operation || !*operation) return;
-  if (snprintf(ct_fault_path, sizeof(ct_fault_path), "%s", path) >=
-      (int)sizeof(ct_fault_path)) exit(91);
-  if (status && *status) {
-    if (snprintf(ct_fault_status_path, sizeof(ct_fault_status_path), "%s", status) >=
-        (int)sizeof(ct_fault_status_path)) exit(91);
-  } else {
-    path_length = strlen(path);
-    if (path_length < strlen("fault_inject") ||
-        strcmp(path + path_length - strlen("fault_inject"), "fault_inject"))
-      exit(91);
-    if (snprintf(ct_fault_status_path, sizeof(ct_fault_status_path), "%.*s%s",
-                 (int)(path_length - strlen("fault_inject")), path,
-                 "fault_inject_status") >= (int)sizeof(ct_fault_status_path))
-      exit(91);
-  }
-  if (snprintf(ct_fault_operation, sizeof(ct_fault_operation), "%s", operation) >=
-      (int)sizeof(ct_fault_operation)) exit(91);
-  if (fault_errno && *fault_errno &&
-      snprintf(ct_fault_errno, sizeof(ct_fault_errno), "%s", fault_errno) >=
-      (int)sizeof(ct_fault_errno)) exit(91);
-  if (program && *program &&
-      snprintf(ct_fault_program, sizeof(ct_fault_program), "%s", program) >=
-      (int)sizeof(ct_fault_program)) exit(91);
-  if (evidence && *evidence &&
-      snprintf(ct_fault_evidence_dir, sizeof(ct_fault_evidence_dir), "%s", evidence) >=
-      (int)sizeof(ct_fault_evidence_dir)) exit(91);
-  if (ct_fault_parse_unsigned("CT_FAULT_CALL_INDEX", &ct_fault_call_index, 0,
-                              CT_KCOV_MAX_CALLS - 1) < 0 ||
-      ct_fault_parse_unsigned("CT_FAULT_COUNT", &ct_fault_count, 1, 1000000) < 0 ||
-      ct_fault_parse_unsigned("CT_FAULT_GENERATION", &ct_fault_generation, 1,
-                              0x7fffffffU) < 0 || !ct_fault_count)
-    exit(91);
-  ct_fault_enabled = 1;
-  ct_fault_marker("FAULT_ARM", "READY", ct_fault_call_index, "configured");
-}
-
 static int ct_barrier_fd(const char *name)
 {
   const char *text = getenv(name);
@@ -260,28 +99,6 @@ static void ct_wait_worker_barrier(void)
   do result = read(run_fd, &byte, 1); while (result < 0 && errno == EINTR);
   close(run_fd);
   if (result != 1) exit(91);
-}
-
-static void ct_fault_maybe_arm(unsigned call_index)
-{
-  char config[768];
-  int length;
-  if (!ct_fault_enabled || ct_fault_armed || call_index != ct_fault_call_index)
-    return;
-  length = snprintf(config, sizeof(config),
-                    "operation=%s errno=%s count=%u pid=%ld program=%s "
-                    "call_index=%u generation=%u\n",
-                    ct_fault_operation, ct_fault_errno, ct_fault_count,
-                    (long)getpid(), ct_fault_program[0] ? ct_fault_program : "unknown",
-                    call_index, ct_fault_generation);
-  if (length <= 0 || length >= (int)sizeof(config) ||
-      ct_fault_write_path(ct_fault_path, config) < 0) {
-    ct_fault_marker("FAULT_ARM", "END", call_index, "write_failed");
-    return;
-  }
-  ct_fault_armed = 1;
-  ct_fault_marker("FAULT_ARM", "END", call_index, "armed");
-  ct_fault_status_evidence(call_index, "before");
 }
 
 static int ct_write_all(int fd, const void *buffer, size_t length)
@@ -890,60 +707,5 @@ static long ct_call(unsigned index, const char *name, long nr,
   if (size < 0 || size >= (int)sizeof(line) || write(marker,line,size) != size) exit(90);
   close(marker);
   errno = error;
-  const char *stop_setting = getenv("CT_FAULT_STOP_AFTER_HIT");
-  const char *status_path = getenv("CT_FAULT_STATUS_PATH");
-  if (stop_setting && !strcmp(stop_setting, "1") && status_path) {
-    int status_fd = open(status_path, O_RDONLY | O_CLOEXEC);
-    if (status_fd >= 0) {
-      char status[2048];
-      ssize_t count = read(status_fd, status, sizeof(status) - 1);
-      close(status_fd);
-      if (count > 0) {
-        status[count] = '\0';
-        char *injected = strstr(status, "\"injected\":");
-        char *target_pid = strstr(status, "\"target_pid\":");
-        char *errno_operation = strstr(status, "\"errno_operation\":\"");
-        long hit_count = injected ? strtol(injected + strlen("\"injected\":"), NULL, 10) : 0;
-        long target = target_pid ? strtol(target_pid + strlen("\"target_pid\":"), NULL, 10) : 0;
-        if (hit_count > 0 && target == (long)getpid() && errno_operation) {
-          const char *program_id = getenv("CT_PROGRAM_ID");
-          const char *stop_marker = getenv("CT_FAULT_STOP_MARKER");
-          int trace_fd = open("/sys/kernel/tracing/trace_marker", O_WRONLY | O_CLOEXEC);
-          if (trace_fd >= 0) {
-            char stop_line[256];
-            const char *operation_start = errno_operation + strlen("\"errno_operation\":\"");
-            const char *quote = strchr(operation_start, '"');
-            if (quote) {
-              size_t operation_size = (size_t)(quote -
-                  operation_start);
-              if (operation_size < sizeof(stop_line)) {
-                char operation[96];
-                if (operation_size < sizeof(operation)) {
-                  memcpy(operation, errno_operation + strlen("\"errno_operation\":\""), operation_size);
-                  operation[operation_size] = '\0';
-                  int stop_size = snprintf(stop_line, sizeof(stop_line),
-                      "CT_FAULT_STOP_AFTER_CALL program=%s call_index=%u operation=%s\n",
-                      program_id ? program_id : "unknown", index, operation);
-                  if (stop_size > 0 && stop_size < (int)sizeof(stop_line))
-                    (void)write(trace_fd, stop_line, (size_t)stop_size);
-                  if (stop_marker) {
-                    int stop_fd = open(stop_marker, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
-                    if (stop_fd >= 0) {
-                      (void)dprintf(stop_fd, "program=%s\ncall_index=%u\noperation=%s\n",
-                                    program_id ? program_id : "unknown", index, operation);
-                      close(stop_fd);
-                    }
-                  }
-                  close(trace_fd);
-                  exit(0);
-                }
-              }
-            }
-            close(trace_fd);
-          }
-        }
-      }
-    }
-  }
   return ret;
 }

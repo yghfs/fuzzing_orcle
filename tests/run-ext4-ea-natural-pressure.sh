@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="$root_dir/work"
-kernel="${EXT4_EA_PRESSURE_KERNEL:-$work_dir/kernels/ext4-count-normal-new/bzImage}"
-base="${EXT4_EA_PRESSURE_ROOT_IMAGE:-$work_dir/debian-clean-smalljournal.img}"
+kernel="${EXT4_EA_PRESSURE_KERNEL:-${FUZZING_ORCLE_BZIMAGE}}"
+base="${EXT4_EA_PRESSURE_ROOT_IMAGE:-${ext4_normal_guest_image}}"
 port="${EXT4_EA_PRESSURE_PORT:-12281}"
 qemu_mem="${EXT4_EA_PRESSURE_QEMU_MEM:-512}"
 run="${EXT4_EA_PRESSURE_RUN_DIR:-$work_dir/ext4-ea-natural-pressure-$(date +%Y%m%d%H%M%S)-$$}"
+ext4_require_normal_kernel "${kernel}"
+if [[ ! -r "${base}" ]]; then
+  echo "missing root image: ${base}" >&2
+  exit 2
+fi
 mkdir -p "$run"
 gcc -O2 -Wall -Wextra -Werror -static -o "$run/workload" "$root_dir/tests/ext4-ea-natural-pressure.c"
 qemu-img create -q -f raw "$run/test.raw" 512M
@@ -23,7 +29,7 @@ pid=$(<"$run/qemu.pid"); trap 'kill "$pid" 2>/dev/null || true' EXIT
 ssh_opts=(-i "$work_dir/debian.id_rsa" -p "$port" -o BatchMode=yes -o ConnectTimeout=4 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR)
 for _ in $(seq 1 120); do ssh "${ssh_opts[@]}" root@127.0.0.1 'test -r /sys/kernel/debug/ext4' >/dev/null 2>&1 && break; sleep 1; done
 scp -q -i "$work_dir/debian.id_rsa" -P "$port" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$run/workload" root@127.0.0.1:/tmp/ea-pressure
-ssh "${ssh_opts[@]}" root@127.0.0.1 'mkdir -p /mnt/test; mount /dev/vdb /mnt/test; printf 1 > /sys/kernel/debug/ext4/vdb/invariant_reset; test ! -e /sys/module/ext4/parameters/ext4_fault_mode'
+ssh "${ssh_opts[@]}" root@127.0.0.1 'mkdir -p /mnt/test; mount /dev/vdb /mnt/test; printf 1 > /sys/kernel/debug/ext4/vdb/invariant_reset'
 set +e
 ssh "${ssh_opts[@]}" root@127.0.0.1 "timeout --foreground 300s /tmp/ea-pressure /mnt/test ${EXT4_EA_PRESSURE_FILES:-200} ${EXT4_EA_PRESSURE_MIB:-384}; rc=\$?; echo workload_rc=\$rc; cat /sys/kernel/debug/ext4/vdb/invariant_summary; cat /sys/kernel/debug/ext4/vdb/invariant_check; dmesg | grep -E 'ea_references|xattr_container_release|EXT4 invariant violation|Out of memory|ENOMEM|BUG:' | tail -200; sync; umount /mnt/test; poweroff -f" >"$run/runtime.txt" 2>&1
 runtime_rc=$?

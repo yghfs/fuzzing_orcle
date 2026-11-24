@@ -2,21 +2,20 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
-kernel="${EXT4_NATURAL_KERNEL:-${work_dir}/kernels/ext4-count-normal-new/bzImage}"
-root_base="${EXT4_BASE_IMAGE:-${work_dir}/debian-clean-smalljournal.img}"
+kernel="${EXT4_NATURAL_KERNEL:-${FUZZING_ORCLE_BZIMAGE}}"
+root_base="${EXT4_BASE_IMAGE:-${ext4_normal_guest_image}}"
 test_base="${EXT4_NATURAL_BASE:-${work_dir}/ext4-natural-pressure-1g.raw}"
 quota_mode="${EXT4_NATURAL_QUOTA_MODE:-0}"
 port="${EXT4_NATURAL_PORT:-11669}"
 run_dir="${EXT4_NATURAL_RUN_DIR:-${work_dir}/ext4-natural-pressure-$(date +%Y%m%d%H%M%S)-$$}"
+ext4_require_normal_kernel "${kernel}"
+test -r "${root_base}" || { echo "missing base image: ${root_base}" >&2; exit 2; }
 mkdir -p "${run_dir}"
 program="${run_dir}/ext4-natural-pressure-workload"
 gcc -O2 -Wall -Wextra -Werror -static -o "${program}" \
 	"${root_dir}/tests/ext4-natural-pressure-workload.c"
-if [[ ! -r "${kernel}" || ! -r "${root_base}" ]]; then
-	echo "missing kernel or root image" >&2
-	exit 2
-fi
 if [[ ! -e "${test_base}" ]]; then
 	qemu-img create -q -f raw "${test_base}" 1G
 	mkfs_features=(-O ^orphan_file)
@@ -61,7 +60,7 @@ for _ in $(seq 1 120); do
 	sleep 1
 done
 ssh "${opts[@]}" root@127.0.0.1 \
-	'test ! -e /sys/module/ext4/parameters/ext4_fault_mode && mount -o remount,commit=1 /mnt/ext4-natural-pressure'
+	'mount -o remount,commit=1 /mnt/ext4-natural-pressure'
 scp -q -i "${work_dir}/debian.id_rsa" -P "${port}" \
 	-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
 	"${program}" root@127.0.0.1:/tmp/ext4-natural-pressure-workload

@@ -2,10 +2,10 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${root_dir}/tests/ext4-normal-env.sh"
 work_dir="${root_dir}/work"
-kernel="${EXT4_EXTGROW_NATURAL_KERNEL:-${root_dir}/kernel/linux-6.12.1/arch/x86/boot/bzImage}"
-kernel_config="${EXT4_EXTGROW_NATURAL_CONFIG:-${root_dir}/work/ext4-new-kbuild/.config}"
-root_base="${EXT4_EXTGROW_NATURAL_ROOT_IMAGE:-${work_dir}/debian-clean-smalljournal.img}"
+kernel="${EXT4_EXTGROW_NATURAL_KERNEL:-${FUZZING_ORCLE_BZIMAGE}}"
+root_base="${EXT4_EXTGROW_NATURAL_ROOT_IMAGE:-${ext4_normal_guest_image}}"
 port="${EXT4_EXTGROW_NATURAL_PORT:-11943}"
 qemu_mem="${EXT4_EXTGROW_NATURAL_QEMU_MEM:-768}"
 limits="${EXT4_EXTGROW_NATURAL_LIMITS:-4194304,8388608,12582912,16777216,25165824,33554432,50331648}"
@@ -15,18 +15,9 @@ ssh_opts=(-i "${ssh_key}" -p "${port}" -o BatchMode=yes
 	-o ConnectTimeout=4 -o StrictHostKeyChecking=no
 	-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR)
 
-if ! grep -q '^CONFIG_EXT4_INVARIANT_CHECKER=y$' \
-	"${kernel_config}"; then
-	echo "kernel config must enable CONFIG_EXT4_INVARIANT_CHECKER" >&2
-	exit 2
-fi
-if grep -q '^CONFIG_EXT4_FAULT_INJECTION=y$' \
-	"${kernel_config}"; then
-	echo "natural discovery run refuses CONFIG_EXT4_FAULT_INJECTION=y" >&2
-	exit 2
-fi
-if [[ ! -r "${kernel}" || ! -r "${root_base}" ]]; then
-	echo "missing normal checker kernel or root image" >&2
+ext4_require_normal_kernel "${kernel}" "${EXT4_EXTGROW_NATURAL_CONFIG:-}"
+if [[ ! -r "${root_base}" ]]; then
+	echo "missing root image: ${root_base}" >&2
 	exit 2
 fi
 
@@ -71,7 +62,7 @@ if [[ "${mounted}" != 1 ]]; then
 	exit 1
 fi
 ssh "${ssh_opts[@]}" root@127.0.0.1 \
-	'test ! -e /sys/module/ext4/parameters/ext4_fault_mode; sysctl -w vm.overcommit_memory=1 >/dev/null; echo 3 > /proc/sys/vm/drop_caches'
+	'sysctl -w vm.overcommit_memory=1 >/dev/null; echo 3 > /proc/sys/vm/drop_caches'
 scp -q -i "${ssh_key}" -P "${port}" -o StrictHostKeyChecking=no \
 	-o UserKnownHostsFile=/dev/null "${program}" \
 	root@127.0.0.1:/tmp/ext4-extent-grow-natural-enomem

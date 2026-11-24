@@ -1,6 +1,6 @@
 # ext4 Fast-Commit Directory Count Finding
 
-Status: confirmed natural-syscall `R-UG` violation; one finding identified toward the requested five.
+Status: confirmed natural-syscall `R-UG` violation; reproduced on 2026-11-24.
 
 ## Finding
 
@@ -18,22 +18,24 @@ The test creates a full-commit baseline, then issues ordinary filesystem operati
 4. Boot again and mount the ext4 filesystem, causing journal recovery and fast-commit replay.
 5. Verify the child directory and its file are visible, then compare directory inodes with group descriptors.
 
-The test uses no ext4 fault injection. The guest workload is [`special-fc-workload.c`](tests/special-fc-workload.c), run through [`run-special.sh`](scripts/run-special.sh).
+The guest workload runs under the unified checker. See [special-fc-workload.c](tests/special-fc-workload.c) and [run-special.sh](scripts/run-special.sh).
 
 ## Evidence
 
-The original special run directory was pruned after this report was consolidated. This report is
-the sole retained evidence index for the finding.
+The 2026-11-24 run reproduced the finding. The raw trace, disk image, and
+reports were deleted in the results cleanup. The observations below summarize
+that run.
 
 - Standard ext4 replay trace records `tag 3` (`EXT4_FC_TAG_CREAT`) for directory inode 14. The checker trace records inode 14's replay bitmap claim and directory initialization.
 - Post-replay syscall verification succeeds: `fast_commit_verify=ok`.
 - Stable runtime snapshot records group 0 directory count 3 while its independent inode-mode scan finds 4. The corresponding `SNAPSHOT.MEMORY.STABLE` `R-UG` event is valid and has `actual=3`, `expected=4`.
 - The independent offline checker reports `descriptor_dirs=3`, `inode_dirs=4`, `r_ug.valid=false` for group 0.
 - `e2fsck -fn` independently reports `Directories count wrong for group #0 (3, counted=4)` and exits 4.
-- The targeted analyzer validated the run trace, expected runtime mismatch signature, offline checker result, and fsck diagnostic before the raw run directory was pruned.
+- The targeted analyzer validated the new run's trace, expected runtime mismatch signature,
+  offline checker result, and fsck diagnostic with `finding_reproduced=true, issues=[]`.
 
-The recovered directory also exposes a directory link-count discrepancy in the same replay chain. This report counts the `R-UG` violation as one finding and does not split one trigger path into multiple findings. Other `e2fsck` diagnostics in the run are retained as secondary observations, not included in the claim above.
+The recovered directory also exposes a directory link-count discrepancy in the same replay chain. This report counts one finding for the `R-UG` violation. The other `e2fsck` diagnostics were secondary observations.
 
 ## Mainline Check
 
-The current torvalds/linux `master` was fetched at commit `0fcb05b72344f40806cbe810de8872f1698bf053` (2026-10-14). In that tree, `fs/ext4/ialloc.c:761` still has `ext4_mark_inode_used()` updating free inodes without updating used directories, and `fs/ext4/fast_commit.c:2031-2078` still replays a directory create without compensating for that omission. This specific `R-UG` issue was not fixed at the checked mainline HEAD.
+The historical mainline check used torvalds/linux commit `0fcb05b72344f40806cbe810de8872f1698bf053` (2026-10-14). In that tree, `fs/ext4/ialloc.c:761` still has `ext4_mark_inode_used()` updating free inodes without updating used directories, and `fs/ext4/fast_commit.c:2031-2078` still replays a directory create without compensating for that omission. This specific `R-UG` issue was not fixed at that revision. The latest upstream state was not rechecked during the 2026-11-24 local reproduction.

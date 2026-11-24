@@ -2,64 +2,65 @@
   "schema": 1,
   "scope": "Linux 6.12.1 ext4 production authority paths; lexical drift guard",
   "source_sha256": {
-    "fs/ext4/acl.c": "093f250304ca05b3cc64aab7bb9ef12d4ec659f3274bea23fb5da16b247dc288",
-    "fs/ext4/balloc.c": "df525cfbafd354c051cd905f925216c767a6d25a4214206ed048f3f611a15db4",
+    "fs/ext4/acl.c": "f584ec56ee45095b449bfb1793b32e178a78a1e4db4838d023cc08cb9ef8a147",
+    "fs/ext4/balloc.c": "27653202a8741c42776791d4a4b9d99eb56e52a9b6bfc9127be39d94c9f04bd4",
     "fs/ext4/bitmap.c": "e9ba24d26fbdfa1645199fb45d1530f99f94efc29774250e7908948409ea043e",
     "fs/ext4/block_validity.c": "e91277785e1e9c99401111f7f6abb75fabda87fb46d4af72a56f5ac590ddfa3a",
-    "fs/ext4/counter_relations.c": "064eb43b74ab1a4689aeb5984e964244d7991e0362e6dc19540b0aaf2d3486d0",
-    "fs/ext4/counter_trace.c": "a7e664265930d3bd51722ff10a2ab02469f243d6682490e648621089a007c566",
+    "fs/ext4/counter_models.c": "b2143556d73a3647af38c4b91487667730fa842debe57527fd33c128577a7440",
+    "fs/ext4/counter_relations.c": "e2fa3a989c38a1a653bd4183813d7ad6af8b130ac99dadcdfa9b1be23aab70e1",
+    "fs/ext4/counter_trace.c": "c1d52fdc3ca0160732935f3c788353cdc3e96dd5a78127499cba9d3845e5d8bc",
     "fs/ext4/crypto.c": "75d78a6107febf3c6bf6362019d8d432a74493815d496f40a77dc7358799deed",
     "fs/ext4/dir.c": "04f7031d451f309dac41a8cc94d22721a19400387c558317736ecf2e1568abac",
-    "fs/ext4/ext4_jbd2.c": "fa8cdb4d47aee6ec6cd12e4954d99d9cc54eac184203efbef42db3959add4780",
-    "fs/ext4/extents.c": "5f35b8969f153374778271ef9cf0c1638a6b8b31aedc3e50a1ad4d01f8a72a8e",
-    "fs/ext4/extents_status.c": "757abc3c5b1cdafa8cde254d89a19c741b65b44ce5469ae9a3c98d1fe1b19207",
+    "fs/ext4/ext4_jbd2.c": "20051206da9653ae46f5eece153727438cd499f063601ab875263a7a7742033c",
+    "fs/ext4/extents.c": "4c88e6a7288faad37ebe88fa1da2db904c553f23610ff68fd5cd231a16725d36",
+    "fs/ext4/extents_status.c": "95867498f3789795341839da28e1600f7d94102208a9f02730fbbbda76c01633",
     "fs/ext4/fast_commit.c": "4127dc25dc1663258955ec4fd5b55e412eee5a25857cfc8062aecf6714527991",
-    "fs/ext4/fault_inject.c": "d82f8e336e111b9a155c3051a225c43e9499e7612b55744f65cdfac266821d0b",
-    "fs/ext4/file.c": "8df7171fdd5fabc60c9f4cf6965c14cff83e222cb908a6cb23ae099eef9dbb9c",
+    "fs/ext4/file.c": "632dab53aaa26951390cfd3d4429c5be81c808e0de5a43ad5a9c10917ea5d5aa",
     "fs/ext4/fsmap.c": "f6e3ba789968396af824bfab984e8bc284fa7aadc2d4a1a77b94b19c7b800386",
-    "fs/ext4/fsync.c": "c5f0a5e1a076540d80595248eac0d8ced9226abc70eb25eff54b38876240568f",
+    "fs/ext4/fsync.c": "accb6e33a025cd1e058565d4f4782cbb408ef6089ec8a6f22e6adf1edc73f91f",
     "fs/ext4/hash.c": "3f67cedec0e0b9f97d5364f6e43899337e4faaff48a3df30beced56193d5f6a2",
-    "fs/ext4/ialloc.c": "b3a896e4881c53d0de56b8994dd6349b235a9e27af4d39b10a485d7b62ba2ceb",
-    "fs/ext4/indirect.c": "7c0f33a9ec71fa16a0630f613a7e1ab8f94e7667e42f89f72cf2b1b51b8a50e2",
-    "fs/ext4/inline.c": "d879ae5ea385511b08b501b585580e37e62b41253afd637a673576251f7bf908",
+    "fs/ext4/ialloc.c": "217cd24462e8253c4cae30fa603b04554cd36f7a34e6e02133e804e486fe5df4",
+    "fs/ext4/indirect.c": "17676d544bb16a4a55761c555be23f42ca25295f1d5202a1e68a51def67bf228",
+    "fs/ext4/inline.c": "7fbf4f360189614f32339b0bb221a7c44a51fbfebbdf5fb9c4b3719763ac8955",
     "fs/ext4/inode-test.c": "c14b1507275cf26f27b81e0d83b958f0bb2653c0c402551d959f06d852caff95",
-    "fs/ext4/inode.c": "153cc1ec967c12d3dd761ccd9e415e07a7c62e83189fe689f7c1063cfe97360e",
-    "fs/ext4/ioctl.c": "68bf3990a62fc9268f309da3d3016ab41e5954f47e2644da34c75cbdc7f7877a",
+    "fs/ext4/inode.c": "bf18bfb5938d08dc27cb05c15028e2859bb69fab362aded571ba640d355a1fb5",
+    "fs/ext4/ioctl.c": "5664ebf53518f5112a9baedfdb39d919deae4869881073099ed142903d24c8ad",
     "fs/ext4/mballoc-test.c": "ae2e37c10e32d71ae954cd9370d388c1d65e930aac83e94fde1dc339abda4faf",
-    "fs/ext4/mballoc.c": "8aa6a11fa208cc9306b6abbd5e0aa6422176098ecaa0f4c1ee80a8e5be65ccf7",
-    "fs/ext4/migrate.c": "785ace186ee652d2d8672193a0cac6179c5582541fc8fec9eaa7aa926a666cd2",
+    "fs/ext4/mballoc.c": "74920e849f6a4e086c33bea9f8c30d4a94742e3edc853b7e8bf2601e15943674",
+    "fs/ext4/migrate.c": "0cabbdfc405fc73779508f7b8df45ce1ef300b5444d2bd1ac7730c4cfbbe874b",
     "fs/ext4/mmp.c": "5697802f363e8cfe771b1849ccbcceaa77029fb9c55ff47b883e7a5aad876540",
     "fs/ext4/move_extent.c": "8b5a05ebcee0ea051c8fea3ae96adabf5914e766d2767ae322b58b2426d9370d",
-    "fs/ext4/namei.c": "ed7bcbe6b0a0d53179105a8ce512da9700f0728d169d36e83ce6380bae6683aa",
-    "fs/ext4/orphan.c": "1e409117de6968c0df1c75dcbf95fe428391284c4fb6169e7a27ed2bb7f46654",
+    "fs/ext4/namei.c": "d03fb5e44371df3a0b844ababab6b2c38e6f470ae48bab92e79811eeaa89a41f",
+    "fs/ext4/orphan.c": "183304932280306be738581ee046f6f1010d73d22ce5a3330dc343b358ebcc63",
     "fs/ext4/page-io.c": "ff63521cac2fbed9a48879c46137a47037854ba413be34e98b3db4761f20a204",
     "fs/ext4/readpage.c": "5c345e68b4b9fb1b8852960e5bbad1b1cfafcdfb8558ffc3e205d073c9288176",
-    "fs/ext4/resize.c": "ef2d2a649fa9ba12b22e7a324cf6ce5ee74e6e2f8ff941030cea763ff2dd486a",
-    "fs/ext4/super.c": "76d7587e54b539fe7c2f5671af88ba5f1269237746523d226758dafad52841cf",
+    "fs/ext4/resize.c": "64099b44c596770b6dcad54dfee9d35b7271760e91f2b5c8a158105bfb1feabb",
+    "fs/ext4/super.c": "30cd3d4111ada941eb2ce0aeacccf8ec3b940be45aa9f94ff205aba11c4d806c",
     "fs/ext4/symlink.c": "ede2de4f4c6f431b618818a529cf374d2ccaa16cc20907d279c6b35f98af7dae",
-    "fs/ext4/sysfs.c": "b7152d559cf142da13be39f8e0eeb5970f1ca5f6224508bab190efbf1d446b5b",
+    "fs/ext4/sysfs.c": "19e0c99b7707009c3b0239ceac4b89bbe0927d4a96d1645a14ed382f6cb50f6c",
     "fs/ext4/verity.c": "929643a591f7a1256fc4ed2fd47f5e34c0d8c490c57e5fe3d77eeedf8eff5ef9",
-    "fs/ext4/xattr.c": "a7459f60e3536c89df33a4447ba1dea89bc1cfc087508a87548f334d89bc6d48",
+    "fs/ext4/xattr.c": "5293eb9dd8b60f30b16c0c402bbd195a2015eb7782515a3f488f6d9153f8de81",
     "fs/ext4/xattr_hurd.c": "4945880a4e788bf12e65be2e6c121177be49dfa6172b813c4c9eb72c823a33ec",
     "fs/ext4/xattr_security.c": "9ff6ed915a847cd4c2976f4d004ef99ce2d53adc718ec6db5a221825da29b4ac",
     "fs/ext4/xattr_trusted.c": "57eb676c2b9fd98765a013577fad3b23352f61e9e5f7aa2415e7ced731a6482b",
     "fs/ext4/xattr_user.c": "9edb34db46c9d60cdefdfad8908fb476246f6fe17d1a71e1070f06532788224c",
     "fs/ext4/acl.h": "ef2e000a0bb991629bab6a814ef3974712065702135b8dd30d2a0fc5f58efb58",
-    "fs/ext4/counter_trace.h": "3f823bb73304fa2baad6026c1fe8274fe5afebff302efa3f6f120235d54d738c",
-    "fs/ext4/ext4.h": "a8813bbe9d3eb3dad42886a8e76e4bb62628273cac6ded7c77f417dd0302afae",
+    "fs/ext4/counter_trace.h": "082f5bd0df988d20e38d50a29e449ebcf4955bab121c0d20917d5a912579c7b3",
+    "fs/ext4/ext4.h": "116806309ad6673e5435762b7354e0c71b8848c2b7b155b5fb04eea69dde479f",
     "fs/ext4/ext4_extents.h": "673cde1c12fe4d3f8cfbc1e879f6fec165cdb50bc8d595b9414ed24c24d3e48c",
-    "fs/ext4/ext4_jbd2.h": "e577d7524189847acc6cca4880eeff5a35bcee1a431f0cfddf96fc8845938845",
+    "fs/ext4/ext4_jbd2.h": "dccec89191d6e327c028261926e18f31c2b957608a77cf0cf1e67eb89bf4fae4",
     "fs/ext4/extents_status.h": "262d58c0deb81d8deee6483759fd16be36ba90e00eb35a679a6338fb29b4a6d4",
     "fs/ext4/fast_commit.h": "abcfd203d2f3a3bf09470df91f4ba366919b9d89f1e196104aaba35fdcb5380a",
-    "fs/ext4/fault_errno_catalog.h": "c8200bf8ea7277e26d4a8fe62e352d05f739356f64d66c6634845d48639e027d",
-    "fs/ext4/fault_inject.h": "16422d2080c3f40c2c84977993e5f6c6c4777906020b06060040cd81fa239df4",
     "fs/ext4/fsmap.h": "58fcd2537d5771ed98d5b385fdaee168125a592a04dc4a1ce78f4977080fc50d",
     "fs/ext4/mballoc.h": "5e8f795d525d7a0e1c77f8865ecfa38a11e3255ea71de2af5e05527ffd185eb8",
     "fs/ext4/truncate.h": "0ccf52c1f98c4e718606a745d73b6c151ca80db816c595443c731ef9cb672883",
     "fs/ext4/xattr.h": "3225508ad8535bb61273606d4dbdc2c9284fd64f5d792dec1ba1fecb595498c2",
     "include/trace/events/ext4.h": "a140e2ab4e9d118225c5a11348aa5e59a22f4859e955be7080fca70066040927",
     "include/trace/events/ext4_counter.h": "dba3255ca2de59700a77aacd18ae84f538a3c1df3fd88e4493657b10e50df311",
-    "include/trace/events/ext4_fault.h": "896545df79dbd087302b197cd377231cde8c334c071f25027e3891e057033b83"
+    "fs/ext4/Kconfig": "0c9d8e3cbcb7381431fc9e47aeff702d0182c42b15ca6bbf31dc4efecd331614",
+    "fs/ext4/Makefile": "b5192a7e248e17387b1e4a8e8dc6bbaea970aecc107bc8f22a4b2d0b71794ed7",
+    "fs/jbd2/journal.c": "c0f27f7bf227dd854483b2641d745d6dbb3d06eed896b8f5e70b9da53f859eb9",
+    "include/linux/jbd2.h": "1f04c4ba85a0b296b5fd3753da6c6406d6ec749f7b24fe1c6e5378c3d46ad73c"
   },
   "sites": [
     {
@@ -90,7 +91,7 @@
       "file": "fs/ext4/balloc.c",
       "line": 231,
       "kind": "bitmap",
-      "source": "ext4_mark_bitmap_end(num_clusters_in_group(sb, block_group),"
+      "source": "ext4_mark_bitmap_end(ext4_num_clusters_in_group(sb, block_group),"
     },
     {
       "file": "fs/ext4/counter_trace.c",
@@ -106,7 +107,7 @@
     },
     {
       "file": "fs/ext4/extents.c",
-      "line": 2497,
+      "line": 2474,
       "kind": "global",
       "source": "ext4_ct_global_add(inode->i_sb, &sbi->s_freeclusters_counter, 1, \"WRITE-B\");"
     },
@@ -136,181 +137,181 @@
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 329,
+      "line": 330,
       "kind": "bitmap",
       "source": "ext4_test_and_clear_bit(bit, bitmap_bh->b_data);"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 345,
+      "line": 347,
       "kind": "descriptor",
       "source": "ext4_ct_free_inodes_set(sb, gdp, block_group, count);"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 350,
+      "line": 352,
       "kind": "descriptor",
       "source": "ext4_ct_used_dirs_set(sb, gdp, block_group, count);"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 353,
+      "line": 355,
       "kind": "global",
       "source": "ext4_ct_global_add(sb, &sbi->s_dirs_counter, -(s64)(1), \"WRITE-U\");"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 364,
+      "line": 366,
       "kind": "global",
       "source": "ext4_ct_global_add(sb, &sbi->s_freeinodes_counter, 1, \"WRITE-I\");"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 834,
+      "line": 853,
       "kind": "bitmap",
       "source": "ext4_set_bit(bit, inode_bitmap_bh->b_data);"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 870,
+      "line": 889,
       "kind": "flags",
       "source": "ext4_ct_group_flags_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 874,
+      "line": 893,
       "kind": "descriptor",
       "source": "ext4_ct_free_group_clusters_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 902,
+      "line": 921,
       "kind": "flags",
       "source": "ext4_ct_group_flags_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 913,
+      "line": 932,
       "kind": "itable_highwater",
       "source": "ext4_ct_itable_unused_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 919,
+      "line": 938,
       "kind": "descriptor",
       "source": "ext4_ct_free_inodes_set(sb, gdp, group, ext4_free_inodes_count(sb, gdp) - 1);"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1193,
+      "line": 1217,
       "kind": "bitmap",
       "source": "ext4_test_and_set_bit(ino, inode_bitmap_bh->b_data);"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1200,
+      "line": 1224,
       "kind": "bitmap",
       "source": "ext4_set_bit(ino, inode_bitmap_bh->b_data);"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1270,
+      "line": 1303,
       "kind": "flags",
       "source": "ext4_ct_group_flags_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1274,
+      "line": 1307,
       "kind": "descriptor",
       "source": "ext4_ct_free_group_clusters_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1314,
+      "line": 1347,
       "kind": "flags",
       "source": "ext4_ct_group_flags_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1324,
+      "line": 1357,
       "kind": "itable_highwater",
       "source": "ext4_ct_itable_unused_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1332,
+      "line": 1367,
       "kind": "descriptor",
       "source": "ext4_ct_free_inodes_set(sb, gdp, group, ext4_free_inodes_count(sb, gdp) - 1);"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1334,
+      "line": 1369,
       "kind": "descriptor",
       "source": "ext4_ct_used_dirs_set(sb, gdp, group, ext4_used_dirs_count(sb, gdp) + 1);"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1361,
+      "line": 1401,
       "kind": "global",
       "source": "ext4_ct_global_add(sb, &sbi->s_freeinodes_counter, -(s64)(1), \"WRITE-I\");"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1366,
+      "line": 1406,
       "kind": "global",
       "source": "ext4_ct_global_add(sb, &sbi->s_dirs_counter, 1, \"WRITE-U\");"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1392,
+      "line": 1441,
       "kind": "xattr_reference",
       "source": "i_file_acl = 0;"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1485,
+      "line": 1534,
       "kind": "nlink",
       "source": "ext4_ct_nlink(inode, 0, \"NAMESPACE.NLINK.ROLLBACK\");"
     },
     {
       "file": "fs/ext4/ialloc.c",
-      "line": 1740,
+      "line": 1800,
       "kind": "flags",
       "source": "ext4_ct_group_flags_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/inline.c",
-      "line": 1119,
+      "line": 1126,
       "kind": "dirent",
       "source": "de->inode = 0;"
     },
     {
       "file": "fs/ext4/inline.c",
-      "line": 1706,
+      "line": 1700,
       "kind": "dirent",
       "source": "de->inode = cpu_to_le32(parent->i_ino);"
     },
     {
       "file": "fs/ext4/inline.c",
-      "line": 1708,
+      "line": 1702,
       "kind": "dirent",
       "source": "de->inode = 0;"
     },
     {
       "file": "fs/ext4/inline.c",
-      "line": 1714,
+      "line": 1708,
       "kind": "nlink",
       "source": "ext4_ct_nlink(inode, 2, \"NAMESPACE.NLINK.INIT_DIR\");"
     },
     {
       "file": "fs/ext4/inode.c",
-      "line": 4833,
+      "line": 4826,
       "kind": "nlink",
       "source": "set_nlink(inode, le16_to_cpu(raw_inode->i_links_count));"
     },
     {
       "file": "fs/ext4/inode.c",
-      "line": 4867,
+      "line": 4860,
       "kind": "xattr_reference",
       "source": "i_file_acl = le32_to_cpu(raw_inode->i_file_acl_lo);"
     },
@@ -418,253 +419,265 @@
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 1773,
+      "line": 1764,
       "kind": "bitmap",
       "source": "mb_clear_bits(void *bm, int cur, int len)"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 1818,
+      "line": 1809,
       "kind": "bitmap",
       "source": "mb_set_bits(void *bm, int cur, int len)"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 1898,
+      "line": 1889,
       "kind": "bitmap",
       "source": "mb_clear_bits(buddy, first, last - first + 1);"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 2136,
+      "line": 2127,
       "kind": "bitmap",
       "source": "mb_set_bits(e4b->bd_bitmap, ex->fe_start, len0);"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 4088,
+      "line": 4154,
       "kind": "flags",
       "source": "ext4_ct_group_flags_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 4092,
+      "line": 4158,
       "kind": "descriptor",
       "source": "ext4_ct_free_group_clusters_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 4117,
+      "line": 4183,
       "kind": "bitmap",
       "source": "mb_set_bits(bitmap_bh->b_data, blkoff, len);"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 4122,
+      "line": 4188,
       "kind": "descriptor",
       "source": "ext4_ct_free_group_clusters_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 4125,
+      "line": 4191,
       "kind": "bitmap",
       "source": "mb_clear_bits(bitmap_bh->b_data, blkoff, len);"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 4130,
+      "line": 4196,
       "kind": "descriptor",
       "source": "ext4_ct_free_group_clusters_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 4266,
+      "line": 4320,
       "kind": "global",
       "source": "ext4_ct_global_add(sb, &sbi->s_freeclusters_counter, -(s64)(ac->ac_b_ex.fe_len), \"WRITE-B\");"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 5174,
+      "line": 5231,
       "kind": "bitmap",
       "source": "mb_set_bits(bitmap, start, len);"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 6694,
+      "line": 6751,
       "kind": "global",
       "source": "ext4_ct_global_add(sb, &sbi->s_freeclusters_counter, count_clusters, \"WRITE-B\");"
     },
     {
       "file": "fs/ext4/mballoc.c",
-      "line": 6886,
+      "line": 6943,
       "kind": "global",
       "source": "ext4_ct_global_add(sb, &sbi->s_freeclusters_counter, changed, \"WRITE-B\");"
     },
     {
       "file": "fs/ext4/migrate.c",
-      "line": 482,
+      "line": 477,
       "kind": "nlink",
       "source": "ext4_ct_nlink(tmp_inode, 0, \"NAMESPACE.NLINK.MIGRATE\");"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 1959,
+      "line": 1891,
       "kind": "dirent",
       "source": "de->inode = 0;"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 2188,
+      "line": 2109,
       "kind": "dirent",
       "source": "de->inode = cpu_to_le32(inode->i_ino);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 2591,
+      "line": 2474,
       "kind": "dirent",
       "source": "de->inode = 0;"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 2866,
+      "line": 2704,
       "kind": "dirent",
       "source": "de->inode = 0;"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 2982,
+      "line": 2790,
       "kind": "nlink",
       "source": "inc_nlink(inode);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 2985,
+      "line": 2793,
       "kind": "nlink",
       "source": "set_nlink(inode, 1);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 2999,
+      "line": 2807,
       "kind": "nlink",
       "source": "drop_nlink(inode);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3027,
+      "line": 2835,
       "kind": "nlink",
       "source": "drop_nlink(inode);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3161,
+      "line": 2969,
       "kind": "dirent",
       "source": "de->inode = cpu_to_le32(inode->i_ino);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3169,
+      "line": 2977,
       "kind": "dirent",
       "source": "de->inode = cpu_to_le32(parent_ino);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3215,
+      "line": 3022,
       "kind": "nlink",
       "source": "ext4_ct_nlink(inode, 2, \"NAMESPACE.NLINK.INIT_DIR\");"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3281,
+      "line": 3077,
       "kind": "nlink",
       "source": "ext4_ct_nlink(inode, 0, \"NAMESPACE.NLINK.ROLLBACK\");"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3451,
+      "line": 3078,
       "kind": "nlink",
       "source": "clear_nlink(inode);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3551,
+      "line": 3267,
+      "kind": "nlink",
+      "source": "clear_nlink(inode);"
+    },
+    {
+      "file": "fs/ext4/namei.c",
+      "line": 3381,
       "kind": "nlink",
       "source": "drop_nlink(inode);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3706,
+      "line": 3539,
       "kind": "nlink",
       "source": "ext4_ct_nlink(inode, 0, \"NAMESPACE.NLINK.ROLLBACK\");"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3752,
+      "line": 3586,
       "kind": "nlink",
       "source": "drop_nlink(inode);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3894,
+      "line": 3725,
       "kind": "dirent",
       "source": "ent->parent_de->inode = cpu_to_le32(dir_ino);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3939,
+      "line": 3763,
       "kind": "dirent",
       "source": "ent->de->inode = cpu_to_le32(ino);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 4312,
+      "line": 3769,
+      "kind": "dirent",
+      "source": "ent->de->inode = cpu_to_le32(ino);"
+    },
+    {
+      "file": "fs/ext4/namei.c",
+      "line": 4109,
       "kind": "nlink",
       "source": "clear_nlink(new.inode);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 4371,
+      "line": 4165,
       "kind": "nlink",
       "source": "drop_nlink(whiteout);"
     },
     {
       "file": "fs/ext4/orphan.c",
-      "line": 32,
+      "line": 64,
       "kind": "orphan_free",
       "source": "atomic_dec_if_positive(&oi->of_binfo[i].ob_free_entries)"
     },
     {
       "file": "fs/ext4/orphan.c",
-      "line": 55,
+      "line": 88,
       "kind": "orphan_free",
       "source": "atomic_inc(&oi->of_binfo[i].ob_free_entries);"
     },
     {
       "file": "fs/ext4/orphan.c",
-      "line": 72,
+      "line": 106,
       "kind": "orphan_free",
       "source": "atomic_inc(&oi->of_binfo[i].ob_free_entries);"
     },
     {
       "file": "fs/ext4/orphan.c",
-      "line": 84,
+      "line": 119,
       "kind": "orphan_slot",
       "source": "cmpxchg(&bdata[j], (__le32)0, cpu_to_le32(inode->i_ino)) !="
     },
     {
       "file": "fs/ext4/orphan.c",
-      "line": 259,
+      "line": 296,
       "kind": "orphan_slot",
       "source": "bdata[off] = 0;"
     },
     {
       "file": "fs/ext4/orphan.c",
-      "line": 263,
+      "line": 300,
       "kind": "orphan_free",
       "source": "atomic_inc(&oi->of_binfo[blk].ob_free_entries);"
     },
     {
       "file": "fs/ext4/orphan.c",
-      "line": 699,
+      "line": 761,
       "kind": "orphan_free",
       "source": "atomic_set(&oi->of_binfo[i].ob_free_entries, free);"
     },
@@ -700,55 +713,55 @@
     },
     {
       "file": "fs/ext4/resize.c",
-      "line": 1431,
+      "line": 1405,
       "kind": "descriptor",
       "source": "ext4_ct_free_group_clusters_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/resize.c",
-      "line": 1433,
+      "line": 1407,
       "kind": "descriptor",
       "source": "ext4_ct_free_inodes_set(sb, gdp, group, EXT4_INODES_PER_GROUP(sb));"
     },
     {
       "file": "fs/ext4/resize.c",
-      "line": 1435,
+      "line": 1409,
       "kind": "itable_highwater",
       "source": "ext4_ct_itable_unused_set(sb, gdp, group,"
     },
     {
       "file": "fs/ext4/resize.c",
-      "line": 1437,
+      "line": 1411,
       "kind": "flags",
       "source": "ext4_ct_group_flags_set(sb, gdp, group, cpu_to_le16(*bg_flags));"
     },
     {
       "file": "fs/ext4/resize.c",
-      "line": 1519,
+      "line": 1490,
       "kind": "super_summary",
       "source": "ext4_free_blocks_count_set(es, ext4_free_blocks_count(es) + free_blocks);"
     },
     {
       "file": "fs/ext4/resize.c",
-      "line": 1525,
+      "line": 1496,
       "kind": "super_summary",
       "source": "le32_add_cpu(&es->s_free_inodes_count, EXT4_INODES_PER_GROUP(sb) *"
     },
     {
       "file": "fs/ext4/resize.c",
-      "line": 1564,
+      "line": 1535,
       "kind": "global",
       "source": "ext4_ct_global_add(sb, &sbi->s_freeclusters_counter, EXT4_NUM_B2C(sbi, free_blocks), \"WRITE-B\");"
     },
     {
       "file": "fs/ext4/resize.c",
-      "line": 1565,
+      "line": 1536,
       "kind": "global",
       "source": "ext4_ct_global_add(sb, &sbi->s_freeinodes_counter, EXT4_INODES_PER_GROUP(sb) * flex_gd->count, \"WRITE-I\");"
     },
     {
       "file": "fs/ext4/resize.c",
-      "line": 1902,
+      "line": 1870,
       "kind": "super_summary",
       "source": "ext4_free_blocks_count_set(es, ext4_free_blocks_count(es) + add);"
     },
@@ -814,145 +827,145 @@
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 1114,
+      "line": 1144,
       "kind": "bitmap",
       "source": "ext4_test_and_set_bit(EXT4_GROUP_INFO_BBITMAP_CORRUPT_BIT,"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 1119,
+      "line": 1148,
       "kind": "global",
       "source": "ext4_ct_global_add(sb, &sbi->s_freeclusters_counter, -(s64)(grp->bb_free), \"WRITE-B\");"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 1123,
+      "line": 1153,
       "kind": "bitmap",
       "source": "ext4_test_and_set_bit(EXT4_GROUP_INFO_IBITMAP_CORRUPT_BIT,"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 1130,
+      "line": 1160,
       "kind": "global",
       "source": "ext4_ct_global_add(sb, &sbi->s_freeinodes_counter, -(s64)(count), \"WRITE-I\");"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 1233,
+      "line": 1263,
       "kind": "super_summary",
       "source": "ext4_free_blocks_count_set(sbi->s_es, EXT4_C2B(sbi, block));"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 1237,
+      "line": 1267,
       "kind": "global",
       "source": "percpu_counter_init(&sbi->s_freeclusters_counter, block,"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 1244,
+      "line": 1274,
       "kind": "super_summary",
       "source": "sbi->s_es->s_free_inodes_count = cpu_to_le32(freei);"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 1248,
+      "line": 1278,
       "kind": "global",
       "source": "percpu_counter_init(&sbi->s_freeinodes_counter, freei,"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 1256,
+      "line": 1286,
       "kind": "global",
       "source": "percpu_counter_init(&sbi->s_dirs_counter, dirs, GFP_KERNEL);"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 4186,
+      "line": 4194,
       "kind": "bitmap",
       "source": "ext4_set_bit(EXT4_B2C(sbi, b - first_block), buf);"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 4191,
+      "line": 4199,
       "kind": "bitmap",
       "source": "ext4_set_bit(EXT4_B2C(sbi, b - first_block), buf);"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 4198,
+      "line": 4206,
       "kind": "bitmap",
       "source": "ext4_set_bit(c, buf);"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 4205,
+      "line": 4213,
       "kind": "bitmap",
       "source": "ext4_set_bit(s++, buf);"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 4216,
+      "line": 4224,
       "kind": "bitmap",
       "source": "ext4_set_bit(EXT4_B2C(sbi, s++), buf);"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 6196,
+      "line": 6189,
       "kind": "super_summary",
       "source": "ext4_free_blocks_count_set(es, ct_blocks);"
     },
     {
       "file": "fs/ext4/super.c",
-      "line": 6200,
+      "line": 6193,
       "kind": "super_summary",
       "source": "es->s_free_inodes_count = cpu_to_le32(ct_inodes);"
     },
     {
       "file": "fs/ext4/xattr.c",
-      "line": 1061,
+      "line": 1137,
       "kind": "nlink",
       "source": "ext4_ct_nlink(ea_inode, 1, \"EXCLUDED.NLINK.EA\");"
     },
     {
       "file": "fs/ext4/xattr.c",
-      "line": 1073,
+      "line": 1149,
       "kind": "nlink",
       "source": "ext4_ct_nlink(ea_inode, 0, \"EXCLUDED.NLINK.EA\");"
     },
     {
       "file": "fs/ext4/xattr.c",
-      "line": 1356,
+      "line": 1456,
       "kind": "xattr_reference",
       "source": "h_refcount = cpu_to_le32(ref);"
     },
     {
       "file": "fs/ext4/xattr.c",
-      "line": 2027,
+      "line": 2128,
       "kind": "xattr_reference",
       "source": "h_refcount = cpu_to_le32(1);"
     },
     {
       "file": "fs/ext4/xattr.c",
-      "line": 2068,
+      "line": 2169,
       "kind": "xattr_reference",
       "source": "h_refcount = cpu_to_le32(1);"
     },
     {
       "file": "fs/ext4/xattr.c",
-      "line": 2136,
+      "line": 2238,
       "kind": "xattr_reference",
       "source": "h_refcount = cpu_to_le32(ref);"
     },
     {
       "file": "fs/ext4/xattr.c",
-      "line": 2229,
+      "line": 2331,
       "kind": "xattr_reference",
       "source": "i_file_acl = new_bh ? new_bh->b_blocknr : 0;"
     },
     {
       "file": "fs/ext4/xattr.c",
-      "line": 3072,
+      "line": 3184,
       "kind": "xattr_reference",
       "source": "i_file_acl = 0;"
     }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Targeted verification for the special counter paths: bigalloc rereserve,
-# online resize, fast-commit replay and corruption exclusion.
+# online resize and fast-commit replay.
 #
 # The fast-commit stage needs a real power cut, because any clean shutdown
 # flushes the journal and leaves nothing for replay.  The runner therefore
@@ -10,20 +10,22 @@
 set -euo pipefail
 project=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 root=$(cd "$project/../.." && pwd)
+. "$root/tools/kernel-paths.sh"
+mkdir -p "$project/results"
 run=$(mktemp -d "$project/results/special-XXXXXXXX")
 port=${EXT4_CT_SPECIAL_PORT:-11872}
 fc_mode=${EXT4_CT_FC_MODE:-dir}
 key="$root/work/debian.id_rsa"
-kernel="$project/build/linux-counter-trace/arch/x86/boot/bzImage"
+kernel="$FUZZING_ORCLE_BZIMAGE"
 test -s "$kernel"
 fc_seed="$run/ext4-fast-commit-inode-replay"
 gcc -O2 -Wall -Wextra -Werror -static \
   -o "$fc_seed" "$project/tests/special-fc-workload.c"
 
-qemu-img create -q -f qcow2 -F raw -b "$root/work/debian-clean-smalljournal.img" "$run/root.qcow2"
+qemu-img create -q -f qcow2 -F raw -b "$FUZZING_ORCLE_ROOTFS" "$run/root.qcow2"
 # One image per targeted path.  The resize image contains a 128 MiB
 # filesystem in a 256 MiB device so resize2fs can grow it online.
-for kind in bigalloc resize fc corrupt; do
+for kind in bigalloc resize fc; do
   qemu-img create -q -f raw "$run/$kind.raw" 256M
 done
 args=(-O ^orphan_file -b 4096 -N 4096)
@@ -32,17 +34,6 @@ args=(-O ^orphan_file -b 4096 -N 1024)
 mke2fs -q -F -t ext4 "${args[@]}" "$run/resize.raw" 128M
 args=(-O ^orphan_file -b 4096 -N 4096)
 mke2fs -q -F -t ext4 "${args[@]}" -O fast_commit,^orphan_file "$run/fc.raw"
-mke2fs -q -F -t ext4 "${args[@]}" "$run/corrupt.raw"
-
-# Corrupt one content byte inside the group-0 block and inode bitmaps while
-# the image is offline.  The structure and the checksum trailer stay intact,
-# so ext4 bitmap validation detects the change instead of a raw zeroed block.
-read -r bitmap ibitmap <<EOF
-$(dumpe2fs -g "$run/corrupt.raw" 2>/dev/null | awk -F: '$1 ~ /^[0-9]+$/ {print $5, $6; exit}')
-EOF
-test -n "$bitmap"; test -n "$ibitmap"
-printf '\001' | dd of="$run/corrupt.raw" bs=1 seek=$((bitmap * 4096 + 17)) conv=notrunc status=none
-printf '\001' | dd of="$run/corrupt.raw" bs=1 seek=$((ibitmap * 4096 + 17)) conv=notrunc status=none
 
 opts=(-i "$key" -p "$port" -o BatchMode=yes -o ConnectTimeout=3 \
   -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR)
@@ -52,12 +43,11 @@ scp_opts=(-i "$key" -P "$port" -o StrictHostKeyChecking=no \
 boot_guest()
 {
   local boot=$1 log=$2
-  qemu-system-x86_64 -machine pc,accel=tcg -cpu max -m 2048 -smp 2 \
+  qemu-system-x86_64 -machine pc,accel=tcg -cpu qemu64 -m 2048 -smp 2 \
     -kernel "$kernel" -drive "file=$run/root.qcow2,format=qcow2,if=virtio" \
     -drive "file=$run/bigalloc.raw,format=raw,if=virtio" \
     -drive "file=$run/resize.raw,format=raw,if=virtio" \
     -drive "file=$run/fc.raw,format=raw,if=virtio" \
-    -drive "file=$run/corrupt.raw,format=raw,if=virtio" \
     -netdev "user,id=n0,hostfwd=tcp:127.0.0.1:$port-:22" \
     -device virtio-net-pci,netdev=n0 \
     -append 'root=/dev/vda rw console=ttyS0 net.ifnames=0 selinux=0' \
@@ -112,7 +102,7 @@ trap - EXIT
 
 #############################################################################
 # Second boot: the pending fast commit is replayed during the vdd mount with
-# tracing enabled, then the corrupted bitmaps are exercised.
+# tracing enabled.
 #############################################################################
 boot_guest second serial-second.log
 second_pid=$(<"$run/qemu-second.pid")
@@ -131,7 +121,7 @@ fi
 ssh "${opts[@]}" root@127.0.0.1 'systemctl poweroff' >/dev/null 2>&1 || true
 stop_guest "$second_pid"
 trap - EXIT
-sha256sum "$kernel" "$project/build/linux-counter-trace/.config" > "$run/build.sha256"
+sha256sum "$kernel" "$FUZZING_ORCLE_KERNEL_OBJ/.config" > "$run/build.sha256"
 # Preserve independent offline evidence for the replayed fast-commit image.
 # This runs only after the guest has shut down cleanly.
 if e2fsck -fn "$run/fc.raw" > "$run/fc-fsck.txt" 2>&1; then

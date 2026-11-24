@@ -18,7 +18,7 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
-def make_arm(root, mode, fault=False):
+def make_arm(root, mode):
     run = root / mode
     run.mkdir()
     limits = {
@@ -33,7 +33,7 @@ def make_arm(root, mode, fault=False):
         'buffer_kb': 65536, 'max_trace_mb': 64, 'max_run_mb': 40960,
         'min_free_mb': 1024, 'strict_kcov_feedback': True,
         'effect_aware_admission': True, 'require_target_success': False,
-        'random_fault_injection': fault, 'feedback_mode': mode,
+        'feedback_mode': mode,
     }
     (run / 'campaign.json').write_text(json.dumps({
         'status': 'complete', 'stop_reason': 'duration_limit', 'limits': limits,
@@ -71,20 +71,17 @@ class FeedbackAblationSummaryTests(unittest.TestCase):
             report = MODULE.build_report(runs, 99, 7200, 'ext4_jbd2')
             self.assertTrue(report['measurement_complete'])
             self.assertEqual(report['deltas_vs_pc']['pc_edge']['effect_target_pc_delta_vs_pc'], 0)
-            self.assertFalse(report['fault_injection'])
 
-    def test_fault_injection_or_mismatched_image_makes_measurement_incomplete(self):
+    def test_mismatched_image_makes_measurement_incomplete(self):
         with tempfile.TemporaryDirectory() as temp:
             root = pathlib.Path(temp)
-            runs = {mode: make_arm(root, mode, fault=(mode == 'pc_semantic'))
-                    for mode in MODULE.MODES}
+            runs = {mode: make_arm(root, mode) for mode in MODULE.MODES}
             campaign_path = runs['pc_edge'] / 'campaign.json'
             campaign = json.loads(campaign_path.read_text())
             campaign['start_images']['regular']['sha256'] = 'different-image'
             campaign_path.write_text(json.dumps(campaign))
             report = MODULE.build_report(runs, 99, 7200, 'ext4_jbd2')
             self.assertFalse(report['measurement_complete'])
-            self.assertIn('pc_semantic_fault_injection_was_enabled', report['warnings'])
             self.assertIn('arms_regular_image_sha256_mismatch', report['warnings'])
 
 
@@ -125,8 +122,8 @@ class FeedbackAblationRunnerTests(unittest.TestCase):
             self.assertNotIn('[pc] 30\n', saved)
 
     def test_one_failed_arm_does_not_cancel_other_arms_by_default(self):
-        rootfs = PROJECT.parents[1] / 'work' / 'debian-clean-smalljournal.img'
-        kernel_obj = PROJECT / 'build' / 'linux-counter-trace'
+        rootfs = PROJECT.parents[1] / 'work' / 'debian-normal.img'
+        kernel_obj = PROJECT / 'build' / 'linux-counter-trace-normal'
         ssh_key = PROJECT.parents[1] / 'work' / 'debian.id_rsa'
         tools = ('python3', 'qemu-img', 'mke2fs', 'debugfs', 'sha256sum',
                  'ssh', 'scp', 'setsid', 'awk', 'tee', 'stdbuf')
