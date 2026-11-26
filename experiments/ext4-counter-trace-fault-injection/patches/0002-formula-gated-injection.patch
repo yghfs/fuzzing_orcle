@@ -1,0 +1,3995 @@
+--- a/fs/ext4/Kconfig
++++ b/fs/ext4/Kconfig
+@@ -129,8 +129,9 @@
+ 
+ 
+ config EXT4_ERROR_SITE_TRACE
+-	bool "Trace reviewed ext4 error sites"
+-	depends on EXT4_COUNTER_TRACE && EXT4_FS=y
++	bool "Trace and inject faults at reviewed ext4 error sites"
++	depends on EXT4_COUNTER_TRACE && EXT4_FS=y && STACKTRACE && HAVE_SYSCALL_TRACEPOINTS
+ 	help
+ 	  Observe reviewed call sites, return values and per-site hit counts.
+-	  Tracing is disabled at runtime by default. This does not inject faults.
++	  Global tracing is disabled by default. A root-owned debugfs session
++	  can inject contract failures after a formula in a native syscall.
+--- a/fs/ext4/Makefile
++++ b/fs/ext4/Makefile
+@@ -52,3 +52,5 @@
+ CFLAGS_sysfs.o += -DEXT4_ERROR_SITE_TU=27
+ CFLAGS_xattr.o += -DEXT4_ERROR_SITE_TU=28
+ endif
++
++ext4-$(CONFIG_EXT4_ERROR_SITE_TRACE) += efi.o
+--- a/fs/ext4/acl.c
++++ b/fs/ext4/acl.c
+@@ -5,7 +5,7 @@
+  * Copyright (C) 2001-2003 Andreas Gruenbacher, <agruen@suse.de>
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/quotaops.h>
+ #include "ext4_jbd2.h"
+ #include "ext4.h"
+@@ -36,7 +36,7 @@
+ 		return ERR_PTR(-EINVAL);
+ 	if (count == 0)
+ 		return NULL;
+-	acl = EXT4_ES_CALL(2, posix_acl_alloc(count, GFP_NOFS));
++	acl = ({ __auto_type __efi_a0 = (count); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(2, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, posix_acl_alloc(__efi_a0, __efi_a1)); });
+ 	if (!acl)
+ 		return ERR_PTR(-ENOMEM);
+ 	for (n = 0; n < count; n++) {
+@@ -97,8 +97,8 @@
+ 	size_t n;
+ 
+ 	*size = ext4_acl_size(acl->a_count);
+-	ext_acl = EXT4_ES_CALL(6, kmalloc(sizeof(ext4_acl_header) + acl->a_count *
+-			sizeof(ext4_acl_entry), GFP_NOFS));
++	ext_acl = ({ __auto_type __efi_a0 = (sizeof(ext4_acl_header) + acl->a_count *
++			sizeof(ext4_acl_entry)); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(6, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmalloc(__efi_a0, __efi_a1)); });
+ 	if (!ext_acl)
+ 		return ERR_PTR(-ENOMEM);
+ 	ext_acl->a_version = cpu_to_le32(EXT4_ACL_VERSION);
+@@ -166,7 +166,7 @@
+ 	}
+ 	retval = ext4_xattr_get(inode, name_index, "", NULL, 0);
+ 	if (retval > 0) {
+-		value = EXT4_ES_CALL(1, kmalloc(retval, GFP_NOFS));
++		value = ({ __auto_type __efi_a0 = (retval); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(1, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmalloc(__efi_a0, __efi_a1)); });
+ 		if (!value)
+ 			return ERR_PTR(-ENOMEM);
+ 		retval = ext4_xattr_get(inode, name_index, "", value, retval);
+@@ -237,7 +237,7 @@
+ 	umode_t mode = inode->i_mode;
+ 	int update_mode = 0;
+ 
+-	error = EXT4_ES_CALL(3, dquot_initialize(inode));
++	error = ({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(3, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (error)
+ 		return error;
+ retry:
+@@ -283,7 +283,7 @@
+ 	struct posix_acl *default_acl, *acl;
+ 	int error;
+ 
+-	error = EXT4_ES_CALL(5, posix_acl_create(dir, &inode->i_mode, &default_acl, &acl));
++	error = ({ __auto_type __efi_a0 = (dir); __auto_type __efi_a1 = (&inode->i_mode); __auto_type __efi_a2 = (&default_acl); __auto_type __efi_a3 = (&acl); EXT4_EFI_CALL(5, true, -ENOMEM, (void)0, posix_acl_create(__efi_a0, __efi_a1, __efi_a2, __efi_a3)); });
+ 	if (error)
+ 		return error;
+ 
+--- a/fs/ext4/balloc.c
++++ b/fs/ext4/balloc.c
+@@ -12,7 +12,7 @@
+  *        David S. Miller (davem@caip.rutgers.edu), 1995
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/time.h>
+ #include <linux/capability.h>
+ #include <linux/fs.h>
+@@ -583,7 +583,7 @@
+ 		return -EFSCORRUPTED;
+ 	wait_on_buffer(bh);
+ 	ext4_simulate_fail_bh(sb, bh, EXT4_SIM_BBITMAP_EIO);
+-	if (!EXT4_ES_CALL(16, buffer_uptodate(bh))) {
++	if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(16, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
+ 		ext4_error_err(sb, EIO, "Cannot read block bitmap - "
+ 			       "block_group = %u, block_bitmap = %llu",
+ 			       block_group, (unsigned long long) bh->b_blocknr);
+@@ -1005,3 +1005,4 @@
+ 			((last_block - bg_start) / 16);
+ 	return bg_start + colour;
+ }
++
+--- a/fs/ext4/block_validity.c
++++ b/fs/ext4/block_validity.c
+@@ -9,7 +9,7 @@
+  * should never be used as data blocks by files or directories.
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/time.h>
+ #include <linux/fs.h>
+ #include <linux/namei.h>
+@@ -86,8 +86,7 @@
+ 			return -EFSCORRUPTED;
+ 	}
+ 
+-	new_entry = EXT4_ES_CALL(22, kmem_cache_alloc(ext4_system_zone_cachep,
+-				     GFP_KERNEL));
++	new_entry = ({ __auto_type __efi_a0 = (ext4_system_zone_cachep); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(22, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmem_cache_alloc(__efi_a0, __efi_a1)); });
+ 	if (!new_entry)
+ 		return -ENOMEM;
+ 	new_entry->start_blk = start_blk;
+@@ -218,7 +217,7 @@
+ 	ext4_group_t i;
+ 	int ret;
+ 
+-	system_blks = EXT4_ES_CALL(21, kzalloc(sizeof(*system_blks), GFP_KERNEL));
++	system_blks = ({ __auto_type __efi_a0 = (sizeof(*system_blks)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(21, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	if (!system_blks)
+ 		return -ENOMEM;
+ 
+--- a/fs/ext4/counter_trace.c
++++ b/fs/ext4/counter_trace.c
+@@ -1,3 +1,4 @@
++#include <linux/ext4_efi.h>
+ // SPDX-License-Identifier: GPL-2.0
+ #include <linux/buffer_head.h>
+ #include <linux/ktime.h>
+@@ -113,6 +114,7 @@
+ 			break;
+ 		}
+ 	spin_unlock_irqrestore(&ct->lock, flags);
++	ext4_efi_formula(sb, point, formula);
+ 	trace_ext4_counter_event(sb, ct->epoch, seq, op, parent, point, formula,
+ 				ino, group, tid, actual, expected, update_delta,
+ 			status, reason, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, block, slot);
+@@ -172,6 +174,7 @@
+ 			break;
+ 		}
+ 	spin_unlock_irqrestore(&ct->lock, flags);
++	ext4_efi_formula(sb, point, formula);
+ 	trace_ext4_counter_event(sb, ct->epoch, seq, op, parent, point, formula,
+ 			ev->ino, ~0U, 0, ev->target_nlink_after, 0, 0, EXT4_CT_RAW,
+ 			"namespace_step", ev->target_nlink_before,
+--- a/fs/ext4/dir.c
++++ b/fs/ext4/dir.c
+@@ -22,7 +22,7 @@
+  *
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/fs.h>
+ #include <linux/buffer_head.h>
+ #include <linux/slab.h>
+@@ -136,7 +136,7 @@
+ 	struct fscrypt_str fstr = FSTR_INIT(NULL, 0);
+ 	struct dir_private_info *info = file->private_data;
+ 
+-	err = EXT4_ES_CALL(25, fscrypt_prepare_readdir(inode));
++	err = ({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(25, IS_ENCRYPTED(__efi_a0), -EOPNOTSUPP, (void)0, fscrypt_prepare_readdir(__efi_a0)); });
+ 	if (err)
+ 		return err;
+ 
+@@ -479,7 +479,7 @@
+ 
+ 	/* Create and allocate the fname structure */
+ 	len = sizeof(struct fname) + ent_name->len + 1;
+-	new_fn = EXT4_ES_CALL(24, kzalloc(len, GFP_KERNEL));
++	new_fn = ({ __auto_type __efi_a0 = (len); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(24, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	if (!new_fn)
+ 		return -ENOMEM;
+ 	new_fn->hash = hash;
+@@ -671,7 +671,7 @@
+ {
+ 	struct dir_private_info *info;
+ 
+-	info = EXT4_ES_CALL(31, kzalloc(sizeof(*info), GFP_KERNEL));
++	info = ({ __auto_type __efi_a0 = (sizeof(*info)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(31, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	if (!info)
+ 		return -ENOMEM;
+ 	file->private_data = info;
+--- /dev/null
++++ b/fs/ext4/efi.c
+@@ -0,0 +1,236 @@
++// SPDX-License-Identifier: GPL-2.0
++/* One sequential program owns the session. Only native syscall windows count. */
++#include <linux/debugfs.h>
++#include <linux/ext4_efi.h>
++#include <linux/fs.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/mutex.h>
++#include <linux/rcupdate.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/stacktrace.h>
++#include <linux/uaccess.h>
++#include <trace/events/syscalls.h>
++#define CREATE_TRACE_POINTS
++#include <trace/events/ext4_efi.h>
++
++#define EFI_SITES 588
++#define EFI_PLANS 64
++struct efi_plan { u32 call, site, occurrence; u64 context; bool hit, blocked; };
++struct efi_session {
++	struct task_struct *owner;
++	dev_t dev;
++	u64 run, order, formulas, sites, injected;
++	u32 call, call_count, nplans;
++	long nr;
++	bool running, prepared, native_active, target, formula_seen;
++	u32 occurrences[EFI_SITES];
++	struct efi_plan plans[EFI_PLANS];
++};
++static DEFINE_MUTEX(efi_mutex);
++static struct efi_session __rcu *efi_current;
++
++static struct efi_session *efi_owner(void)
++{
++	struct efi_session *s = rcu_dereference(efi_current);
++	return s && s->owner == current && !in_interrupt() ? s : NULL;
++}
++
++static void efi_sys_enter(void *data, struct pt_regs *regs, long id)
++{
++	struct efi_session *s;
++	rcu_read_lock();
++	s = efi_owner();
++	if (s && s->running && s->prepared && id == s->nr) {
++		s->prepared = false;
++		s->native_active = true;
++	}
++	rcu_read_unlock();
++}
++static void efi_sys_exit(void *data, struct pt_regs *regs, long ret)
++{
++	struct efi_session *s;
++	rcu_read_lock();
++	s = efi_owner();
++	if (s)
++		s->native_active = false;
++	rcu_read_unlock();
++}
++
++void ext4_efi_formula(struct super_block *sb, const char *point, const char *formula)
++{
++	struct efi_session *s;
++	/* Scope boundaries and observer scans are not formula gates. */
++	if (!strcmp(formula, "BEGIN") || !strcmp(formula, "END") ||
++	    !strcmp(formula, "ALL") || !strncmp(point, "SNAPSHOT.", 9) ||
++	    !strncmp(point, "MOUNT.", 6) || !strncmp(point, "UNMOUNT.", 8))
++		return;
++	rcu_read_lock();
++	s = efi_owner();
++	if (s && s->running && s->native_active && s->target && s->dev == sb->s_dev) {
++		s->formula_seen = true;
++		s->formulas++;
++		trace_efi_formula(s->run, ++s->order, s->call, sb->s_dev, point, formula);
++	}
++	rcu_read_unlock();
++}
++
++struct ext4_efi_decision ext4_efi_before(u32 site, bool allowed)
++{
++	struct ext4_efi_decision d = {0};
++	struct efi_session *s;
++	unsigned long frames[24];
++	u32 n, i;
++	u64 hash = 1469598103934665603ULL;
++	rcu_read_lock();
++	s = efi_owner();
++	if (!s || !s->running || !s->native_active || !s->target || site >= EFI_SITES)
++		goto out;
++	n = stack_trace_save(frames, ARRAY_SIZE(frames), 1);
++	for (i = 0; i < n; i++) {
++		hash ^= frames[i];
++		hash *= 1099511628211ULL;
++	}
++	d.run = s->run;
++	d.order = ++s->order;
++	d.call = s->call;
++	d.occurrence = ++s->occurrences[site];
++	d.context = hash;
++	d.eligible = s->formula_seen;
++	d.allowed = allowed;
++	d.tracked = true;
++	s->sites++;
++	for (i = 0; i < s->nplans; i++) {
++		struct efi_plan *p = &s->plans[i];
++		if (p->call != d.call || p->site != site || p->occurrence != d.occurrence ||
++		    p->context != hash || p->hit)
++			continue;
++		if (allowed && d.eligible) {
++			p->hit = true;
++			d.inject = true;
++			s->injected++;
++		} else {
++			p->blocked = true;
++		}
++	}
++	trace_efi_site(d.run, d.order, d.call, site, d.occurrence, hash,
++		       d.eligible, allowed, d.inject, false, 0, false);
++out:
++	rcu_read_unlock();
++	return d;
++}
++
++void ext4_efi_after(u32 site, struct ext4_efi_decision *d, long result, bool pointer)
++{
++	if (pointer && result && !IS_ERR_VALUE((unsigned long)result))
++		result = 1;
++	trace_efi_site(d->run, d->order, d->call, site, d->occurrence,
++		       d->context, d->eligible, d->allowed, d->inject, true, result, pointer);
++}
++
++static int efi_open(struct inode *inode, struct file *file)
++{
++	struct efi_session *s;
++	if (!mutex_trylock(&efi_mutex))
++		return -EBUSY;
++	s = kzalloc(sizeof(*s), GFP_KERNEL);
++	if (!s) { mutex_unlock(&efi_mutex); return -ENOMEM; }
++	s->owner = current;
++	file->private_data = s;
++	rcu_assign_pointer(efi_current, s);
++	return 0;
++}
++static int efi_release(struct inode *inode, struct file *file)
++{
++	rcu_assign_pointer(efi_current, NULL);
++	synchronize_rcu();
++	kfree(file->private_data);
++	mutex_unlock(&efi_mutex);
++	return 0;
++}
++
++static ssize_t efi_write(struct file *file, const char __user *buffer, size_t length, loff_t *pos)
++{
++	struct efi_session *s = file->private_data;
++	char command[160], extra;
++	unsigned int major, minor, call, site, occurrence;
++	unsigned long long value;
++	long nr;
++	if (current != s->owner || !length || length >= sizeof(command))
++		return -EINVAL;
++	if (copy_from_user(command, buffer, length))
++		return -EFAULT;
++	command[length] = 0;
++	if (sscanf(command, "begin %u %u %llu %c", &major, &minor, &value, &extra) == 3) {
++		if (s->running || major > 0xfff || minor > 0xfffff || !value)
++			return -EINVAL;
++		s->dev = MKDEV(major, minor); s->run = value;
++		s->running = true; s->formula_seen = false;
++	} else if (sscanf(command, "plan %u %u %u %llu %c", &call, &site, &occurrence, &value, &extra) == 4) {
++		if (s->running || s->nplans >= EFI_PLANS || !site || site >= EFI_SITES || !occurrence || call >= 256)
++			return -EINVAL;
++		s->plans[s->nplans++] = (struct efi_plan){call, site, occurrence, value, false, false};
++	} else if (sscanf(command, "call %u %u %u %ld %c", &call, &major, &minor, &nr, &extra) == 4) {
++		if (!s->running || s->prepared || call != s->call_count || call >= 256 || nr < 0)
++			return -EINVAL;
++		s->call = call; s->call_count++; s->nr = nr;
++		s->target = s->dev == MKDEV(major, minor);
++		memset(s->occurrences, 0, sizeof(s->occurrences));
++		s->prepared = true;
++	} else if (!strcmp(command, "leave\n")) {
++		if (!s->running || s->prepared || s->native_active)
++			return -EINVAL;
++	} else if (!strcmp(command, "end\n")) {
++		if (!s->running || s->prepared || s->native_active)
++			return -EINVAL;
++		s->running = false;
++	} else {
++		return -EINVAL;
++	}
++	return length;
++}
++
++static ssize_t efi_read(struct file *file, char __user *buffer, size_t length, loff_t *pos)
++{
++	struct efi_session *s = file->private_data;
++	char *text;
++	ssize_t result;
++	size_t used;
++	u32 i;
++	if (current != s->owner || s->running)
++		return -EBUSY;
++	text = kzalloc(12288, GFP_KERNEL);
++	if (!text)
++		return -ENOMEM;
++	used = scnprintf(text, 12288, "run=%llu calls=%u formulas=%llu sites=%llu injected=%llu\n",
++			 s->run, s->call_count, s->formulas, s->sites, s->injected);
++	for (i = 0; i < s->nplans; i++) {
++		struct efi_plan *p = &s->plans[i];
++		used += scnprintf(text + used, 12288 - used,
++			"call=%u site_id=%u occurrence=%u context=%llu status=%s\n",
++			p->call, p->site, p->occurrence, p->context,
++			p->hit ? "injected" : p->blocked ? "blocked" : "not_reached");
++	}
++	result = simple_read_from_buffer(buffer, length, pos, text, used);
++	kfree(text);
++	return result;
++}
++static const struct file_operations efi_fops = {
++	.open = efi_open, .release = efi_release, .write = efi_write,
++	.read = efi_read,
++};
++
++static int __init ext4_efi_init(void)
++{
++	struct dentry *dir;
++	int result;
++	result = register_trace_sys_enter(efi_sys_enter, NULL);
++	if (result) return result;
++	result = register_trace_sys_exit(efi_sys_exit, NULL);
++	if (result) { unregister_trace_sys_enter(efi_sys_enter, NULL); return result; }
++	dir = debugfs_create_dir("ext4_efi", NULL);
++	debugfs_create_file("session", 0600, dir, NULL, &efi_fops);
++	return 0;
++}
++late_initcall(ext4_efi_init);
+--- a/fs/ext4/ext4.h
++++ b/fs/ext4/ext4.h
+@@ -17,7 +17,7 @@
+ #ifndef _EXT4_H
+ #define _EXT4_H
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/refcount.h>
+ #include <linux/types.h>
+ #include <linux/blkdev.h>
+@@ -57,7 +57,7 @@
+  * with AGGRESSIVE_CHECK allocator runs consistency checks over
+  * structures. these checks slow things down a lot
+  */
+-#define AGGRESSIVE_CHECK
++#define AGGRESSIVE_CHECK__
+ 
+ /*
+  * with DOUBLE_CHECK defined mballoc creates persistent in-core
+@@ -4037,7 +4037,7 @@
+ 				    struct inode *dir,
+ 				    struct ext4_dir_entry_2 *de_del,
+ 				    struct buffer_head *bh,
+-					    int *has_inline_data);
++				    int *has_inline_data);
+ extern bool empty_inline_dir(struct inode *dir, int *has_inline_data);
+ extern struct buffer_head *ext4_get_first_inline_block(struct inode *inode,
+ 					struct ext4_dir_entry_2 **parent_de,
+@@ -4291,7 +4291,7 @@
+ 	 * have to read the block because we may read the old data
+ 	 * successfully.
+ 	 */
+-	if (EXT4_ES_CALL((EXT4_ERROR_SITE_TU == 15 ? 187 : EXT4_ERROR_SITE_TU == 25 ? 447 : EXT4_ERROR_SITE_TU == 26 ? 550 : 0), buffer_write_io_error(bh)))
++	if (({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL((EXT4_ERROR_SITE_TU == 15 ? 187 : EXT4_ERROR_SITE_TU == 25 ? 447 : EXT4_ERROR_SITE_TU == 26 ? 550 : 0), false, 0, (void)0, buffer_write_io_error(__efi_a0)); }))
+ 		set_buffer_uptodate(bh);
+ 	return buffer_uptodate(bh);
+ }
+--- a/fs/ext4/ext4_jbd2.c
++++ b/fs/ext4/ext4_jbd2.c
+@@ -3,7 +3,7 @@
+  * Interface between ext4 and JBD
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include "ext4_jbd2.h"
+ 
+ #include <trace/events/ext4.h>
+@@ -166,9 +166,8 @@
+ 	struct super_block *sb;
+ 	int err;
+ 
+-	if (!ext4_handle_valid(handle)) {
++	if (!ext4_handle_valid(handle))
+ 		return ext4_get_nojournal();
+-	}
+ 
+ 	sb = handle->h_journal->j_private;
+ 	trace_ext4_journal_start_reserved(sb,
+@@ -179,7 +178,7 @@
+ 		return ERR_PTR(err);
+ 	}
+ 
+-	err = EXT4_ES_CALL(32, jbd2_journal_start_reserved(handle, type, line));
++	err = ({ __auto_type __efi_a0 = (handle); __auto_type __efi_a1 = (type); __auto_type __efi_a2 = (line); EXT4_EFI_CALL(32, false, 0, (void)0, jbd2_journal_start_reserved(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (err < 0)
+ 		return ERR_PTR(err);
+ 	ext4_checker_tx_event(sb, EXT4_CHECKER_EVENT_TX_BEGIN, NULL,
+@@ -192,7 +191,7 @@
+ {
+ 	if (!ext4_handle_valid(handle))
+ 		return 0;
+-	if (EXT4_ES_CALL(33, is_handle_aborted(handle)))
++	if (({ __auto_type __efi_a0 = (handle); EXT4_EFI_CALL(33, false, 0, (void)0, is_handle_aborted(__efi_a0)); }))
+ 		return -EROFS;
+ 	if (jbd2_handle_buffer_credits(handle) >= check_cred &&
+ 	    handle->h_revoke_credits >= revoke_cred)
+@@ -259,7 +258,7 @@
+ 	might_sleep();
+ 
+ 	if (ext4_handle_valid(handle)) {
+-		err = EXT4_ES_CALL(34, jbd2_journal_get_write_access(handle, bh));
++		err = ({ __auto_type __efi_a0 = (handle); __auto_type __efi_a1 = (bh); EXT4_EFI_CALL(34, false, 0, (void)0, jbd2_journal_get_write_access(__efi_a0, __efi_a1)); });
+ 		if (err) {
+ 			ext4_journal_abort_handle(where, line, __func__, bh,
+ 						  handle, err);
+@@ -274,7 +273,6 @@
+ 		&EXT4_SB(sb)->s_journal_triggers[trigger_type].tr_triggers);
+ 	return 0;
+ }
+-
+ 
+ /*
+  * The ext4 forget function must perform a revoke if we are freeing data
+@@ -328,7 +326,7 @@
+ 	 * data!=journal && (is_metadata || should_journal_data(inode))
+ 	 */
+ 	BUFFER_TRACE(bh, "call jbd2_journal_revoke");
+-	err = EXT4_ES_CALL(36, jbd2_journal_revoke(handle, blocknr, bh));
++	err = ({ __auto_type __efi_a0 = (handle); __auto_type __efi_a1 = (blocknr); __auto_type __efi_a2 = (bh); EXT4_EFI_CALL(36, false, 0, (void)0, jbd2_journal_revoke(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (err) {
+ 		ext4_journal_abort_handle(where, line, __func__,
+ 					  bh, handle, err);
+@@ -349,7 +347,7 @@
+ 	if (!ext4_handle_valid(handle))
+ 		return 0;
+ 
+-	err = EXT4_ES_CALL(37, jbd2_journal_get_create_access(handle, bh));
++	err = ({ __auto_type __efi_a0 = (handle); __auto_type __efi_a1 = (bh); EXT4_EFI_CALL(37, false, 0, (void)0, jbd2_journal_get_create_access(__efi_a0, __efi_a1)); });
+ 	if (err) {
+ 		ext4_journal_abort_handle(where, line, __func__, bh, handle,
+ 					  err);
+@@ -363,36 +361,6 @@
+ 	return 0;
+ }
+ 
+-static int ext4_handle_dirty_metadata_error(const char *where,
+-					    unsigned int line,
+-					    handle_t *handle,
+-					    struct inode *inode,
+-					    struct buffer_head *bh,
+-					    int err)
+-{
+-	/* Errors can only happen due to an aborted journal or a nasty bug. */
+-	if (!is_handle_aborted(handle) && WARN_ON_ONCE(err)) {
+-		ext4_journal_abort_handle(where, line, __func__, bh, handle, err);
+-		if (inode == NULL) {
+-			pr_err("EXT4: jbd2_journal_dirty_metadata "
+-			       "failed: handle type %u started at "
+-			       "line %u, credits %u/%u, errcode %d",
+-			       handle->h_type, handle->h_line_no,
+-			       handle->h_requested_credits,
+-			       jbd2_handle_buffer_credits(handle), err);
+-			return err;
+-		}
+-		ext4_error_inode(inode, where, line, bh->b_blocknr,
+-				 "journal_dirty_metadata failed: "
+-				 "handle type %u started at line %u, "
+-				 "credits %u/%u, errcode %d",
+-				 handle->h_type, handle->h_line_no,
+-				 handle->h_requested_credits,
+-				 jbd2_handle_buffer_credits(handle), err);
+-	}
+-	return err;
+-}
+-
+ int __ext4_handle_dirty_metadata(const char *where, unsigned int line,
+ 				 handle_t *handle, struct inode *inode,
+ 				 struct buffer_head *bh)
+@@ -405,23 +373,46 @@
+ 	set_buffer_prio(bh);
+ 	set_buffer_uptodate(bh);
+ 	if (ext4_handle_valid(handle)) {
+-		err = EXT4_ES_CALL(38, jbd2_journal_dirty_metadata(handle, bh));
+-		return ext4_handle_dirty_metadata_error(where, line, handle,
+-							inode, bh, err);
+-	}
+-
+-	if (inode)
+-		mark_buffer_dirty_inode(bh, inode);
+-	else
+-		mark_buffer_dirty(bh);
+-	if (inode && inode_needs_sync(inode)) {
+-		sync_dirty_buffer(bh);
+-		if (buffer_req(bh) && !EXT4_ES_CALL(41, buffer_uptodate(bh))) {
+-			ext4_error_inode_err(inode, where, line, bh->b_blocknr,
+-					     EIO, "IO error syncing itable block");
+-			err = -EIO;
++		err = ({ __auto_type __efi_a0 = (handle); __auto_type __efi_a1 = (bh); EXT4_EFI_CALL(38, false, 0, (void)0, jbd2_journal_dirty_metadata(__efi_a0, __efi_a1)); });
++		/* Errors can only happen due to aborted journal or a nasty bug */
++		if (!is_handle_aborted(handle) && WARN_ON_ONCE(err)) {
++			ext4_journal_abort_handle(where, line, __func__, bh,
++						  handle, err);
++			if (inode == NULL) {
++				pr_err("EXT4: jbd2_journal_dirty_metadata "
++				       "failed: handle type %u started at "
++				       "line %u, credits %u/%u, errcode %d",
++				       handle->h_type,
++				       handle->h_line_no,
++				       handle->h_requested_credits,
++				       jbd2_handle_buffer_credits(handle), err);
++				return err;
++			}
++			ext4_error_inode(inode, where, line,
++					 bh->b_blocknr,
++					 "journal_dirty_metadata failed: "
++					 "handle type %u started at line %u, "
++					 "credits %u/%u, errcode %d",
++					 handle->h_type,
++					 handle->h_line_no,
++					 handle->h_requested_credits,
++					 jbd2_handle_buffer_credits(handle),
++					 err);
+ 		}
++	} else {
++		if (inode)
++			mark_buffer_dirty_inode(bh, inode);
++		else
++			mark_buffer_dirty(bh);
++		if (inode && inode_needs_sync(inode)) {
++			sync_dirty_buffer(bh);
++			if (buffer_req(bh) && !({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(41, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
++				ext4_error_inode_err(inode, where, line,
++						     bh->b_blocknr, EIO,
++					"IO error syncing itable block");
++				err = -EIO;
++			}
++		}
+ 	}
+ 	return err;
+ }
+-
+--- a/fs/ext4/ext4_jbd2.h
++++ b/fs/ext4/ext4_jbd2.h
+@@ -234,6 +234,7 @@
+ 				    handle_t *handle, struct super_block *sb,
+ 				    struct buffer_head *bh,
+ 				    enum ext4_journal_trigger_type trigger_type);
++
+ int __ext4_forget(const char *where, unsigned int line, handle_t *handle,
+ 		  int is_metadata, struct inode *inode,
+ 		  struct buffer_head *bh, ext4_fsblk_t blocknr);
+--- a/fs/ext4/extents.c
++++ b/fs/ext4/extents.c
+@@ -17,7 +17,7 @@
+  *   - smart tree reduction
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/fs.h>
+ #include <linux/time.h>
+ #include <linux/jbd2.h>
+@@ -209,10 +209,6 @@
+ 	}
+ 	return err;
+ }
+-
+-/* Route the formula hook through the same dirty-metadata/inode-dirty
+- * contracts used by an ordinary extent publication. */
+-
+ 
+ #define ext4_ext_dirty(handle, inode, path) \
+ 		__ext4_ext_dirty(__func__, __LINE__, (handle), (inode), (path))
+@@ -567,7 +563,7 @@
+ 		gfp_flags |= __GFP_NOFAIL;
+ 
+ 	pblk = ext4_idx_pblock(idx);
+-	bh = EXT4_ES_CALL(43, sb_getblk_gfp(inode->i_sb, pblk, gfp_flags));
++	bh = ({ __auto_type __efi_a0 = (inode->i_sb); __auto_type __efi_a1 = (pblk); __auto_type __efi_a2 = (gfp_flags); EXT4_EFI_CALL(43, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, sb_getblk_gfp(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (unlikely(!bh))
+ 		return ERR_PTR(-ENOMEM);
+ 
+@@ -625,8 +621,7 @@
+ 		return ret;
+ 	}
+ 
+-	path = EXT4_ES_CALL(42, kcalloc(depth + 1, sizeof(struct ext4_ext_path),
+-		       GFP_NOFS));
++	path = ({ __auto_type __efi_a0 = (depth + 1); __auto_type __efi_a1 = (sizeof(struct ext4_ext_path)); __auto_type __efi_a2 = (GFP_NOFS); EXT4_EFI_CALL(42, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kcalloc(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (path == NULL) {
+ 		up_read(&ei->i_data_sem);
+ 		return -ENOMEM;
+@@ -918,8 +913,7 @@
+ 	}
+ 	if (!path) {
+ 		/* account possible depth increase */
+-		path = EXT4_ES_CALL(46, kcalloc(depth + 2, sizeof(struct ext4_ext_path),
+-				gfp_flags));
++		path = ({ __auto_type __efi_a0 = (depth + 2); __auto_type __efi_a1 = (sizeof(struct ext4_ext_path)); __auto_type __efi_a2 = (gfp_flags); EXT4_EFI_CALL(46, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kcalloc(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (unlikely(!path))
+ 			return ERR_PTR(-ENOMEM);
+ 		path[0].p_maxdepth = depth + 1;
+@@ -1107,7 +1101,7 @@
+ 	 * We need this to handle errors and free blocks
+ 	 * upon them.
+ 	 */
+-	ablocks = EXT4_ES_CALL(63, kcalloc(depth, sizeof(ext4_fsblk_t), gfp_flags));
++	ablocks = ({ __auto_type __efi_a0 = (depth); __auto_type __efi_a1 = (sizeof(ext4_fsblk_t)); __auto_type __efi_a2 = (gfp_flags); EXT4_EFI_CALL(63, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kcalloc(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!ablocks)
+ 		return -ENOMEM;
+ 
+@@ -1120,11 +1114,7 @@
+ 			goto cleanup;
+ 		ablocks[a] = newblock;
+ 	}
+-	/*
+-	 * Fail after reserving the split's metadata blocks but before linking
+-	 * any of them into the extent tree.  The common error path below owns
+-	 * and releases every block recorded in @ablocks.
+-	 */
++
+ 	/* initialize new leaf */
+ 	newblock = ablocks[--a];
+ 	if (unlikely(newblock == 0)) {
+@@ -1132,7 +1122,7 @@
+ 		err = -EFSCORRUPTED;
+ 		goto cleanup;
+ 	}
+-	bh = EXT4_ES_CALL(64, sb_getblk_gfp(inode->i_sb, newblock, __GFP_MOVABLE | GFP_NOFS));
++	bh = ({ __auto_type __efi_a0 = (inode->i_sb); __auto_type __efi_a1 = (newblock); __auto_type __efi_a2 = (__GFP_MOVABLE | GFP_NOFS); EXT4_EFI_CALL(64, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, sb_getblk_gfp(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (unlikely(!bh)) {
+ 		err = -ENOMEM;
+ 		goto cleanup;
+@@ -1340,11 +1330,8 @@
+ 	if (newblock == 0)
+ 		return err;
+ 
+-	bh = EXT4_ES_CALL(67, sb_getblk_gfp(inode->i_sb, newblock, __GFP_MOVABLE | GFP_NOFS));
++	bh = ({ __auto_type __efi_a0 = (inode->i_sb); __auto_type __efi_a1 = (newblock); __auto_type __efi_a2 = (__GFP_MOVABLE | GFP_NOFS); EXT4_EFI_CALL(67, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, sb_getblk_gfp(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (unlikely(!bh)) {
+-		ext4_free_blocks(handle, inode, NULL, newblock, 1,
+-				 EXT4_FREE_BLOCKS_METADATA |
+-				 EXT4_FREE_BLOCKS_FORGET);
+ 		ext4_checker_extent_blocks_error(inode, -ENOMEM);
+ 		return -ENOMEM;
+ 	}
+@@ -2246,11 +2233,7 @@
+ 			es.es_pblk = 0;
+ 		else
+ 			es.es_pblk = ext4_es_pblock(&es);
+-		err = EXT4_ES_CALL(57, fiemap_fill_next_extent(fieinfo,
+-				(__u64)es.es_lblk << blksize_bits,
+-				(__u64)es.es_pblk << blksize_bits,
+-				(__u64)es.es_len << blksize_bits,
+-				flags));
++		err = ({ __auto_type __efi_a0 = (fieinfo); __auto_type __efi_a1 = ((__u64)es.es_lblk << blksize_bits); __auto_type __efi_a2 = ((__u64)es.es_pblk << blksize_bits); __auto_type __efi_a3 = ((__u64)es.es_len << blksize_bits); __auto_type __efi_a4 = (flags); EXT4_EFI_CALL(57, true, -EFAULT, (void)0, fiemap_fill_next_extent(__efi_a0, __efi_a1, __efi_a2, __efi_a3, __efi_a4)); });
+ 		if (next == 0)
+ 			break;
+ 		block = next;
+@@ -4337,6 +4320,7 @@
+ 		map->m_len = min_t(unsigned int, map->m_len, len);
+ 		goto out;
+ 	}
++
+ 	/*
+ 	 * Okay, we need to do block allocation.
+ 	 */
+@@ -4662,7 +4646,7 @@
+ 	    (offset + len > inode->i_size ||
+ 	     offset + len > EXT4_I(inode)->i_disksize)) {
+ 		new_size = offset + len;
+-		ret = EXT4_ES_CALL(54, inode_newsize_ok(inode, new_size));
++		ret = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (new_size); EXT4_EFI_CALL(54, true, -EFBIG, (void)0, inode_newsize_ok(__efi_a0, __efi_a1)); });
+ 		if (ret)
+ 			goto out_mutex;
+ 	}
+@@ -4672,7 +4656,7 @@
+ 	/* Wait all existing dio workers, newcomers will block on i_rwsem */
+ 	inode_dio_wait(inode);
+ 
+-	ret = EXT4_ES_CALL(55, file_modified(file));
++	ret = ({ __auto_type __efi_a0 = (file); EXT4_EFI_CALL(55, true, -EIO, (void)0, file_modified(__efi_a0)); });
+ 	if (ret)
+ 		goto out_mutex;
+ 
+@@ -4851,7 +4835,7 @@
+ 	    (offset + len > inode->i_size ||
+ 	     offset + len > EXT4_I(inode)->i_disksize)) {
+ 		new_size = offset + len;
+-		ret = EXT4_ES_CALL(50, inode_newsize_ok(inode, new_size));
++		ret = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (new_size); EXT4_EFI_CALL(50, true, -EFBIG, (void)0, inode_newsize_ok(__efi_a0, __efi_a1)); });
+ 		if (ret)
+ 			goto out;
+ 	}
+@@ -4859,7 +4843,7 @@
+ 	/* Wait all existing dio workers, newcomers will block on i_rwsem */
+ 	inode_dio_wait(inode);
+ 
+-	ret = EXT4_ES_CALL(51, file_modified(file));
++	ret = ({ __auto_type __efi_a0 = (file); EXT4_EFI_CALL(51, true, -EIO, (void)0, file_modified(__efi_a0)); });
+ 	if (ret)
+ 		goto out;
+ 
+@@ -5103,7 +5087,7 @@
+ 		fieinfo->fi_flags &= ~FIEMAP_FLAG_CACHE;
+ 	}
+ 
+-	error = EXT4_ES_CALL(56, fiemap_prep(inode, fieinfo, start, &len, 0));
++	error = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (fieinfo); __auto_type __efi_a2 = (start); __auto_type __efi_a3 = (&len); __auto_type __efi_a4 = (0); EXT4_EFI_CALL(56, true, -EINVAL, (void)0, fiemap_prep(__efi_a0, __efi_a1, __efi_a2, __efi_a3, __efi_a4)); });
+ 	if (error)
+ 		return error;
+ 
+@@ -5418,7 +5402,7 @@
+ 	/* Wait for existing dio to complete */
+ 	inode_dio_wait(inode);
+ 
+-	ret = EXT4_ES_CALL(52, file_modified(file));
++	ret = ({ __auto_type __efi_a0 = (file); EXT4_EFI_CALL(52, true, -EIO, (void)0, file_modified(__efi_a0)); });
+ 	if (ret)
+ 		goto out_mutex;
+ 
+@@ -5561,7 +5545,7 @@
+ 	/* Wait for existing dio to complete */
+ 	inode_dio_wait(inode);
+ 
+-	ret = EXT4_ES_CALL(53, file_modified(file));
++	ret = ({ __auto_type __efi_a0 = (file); EXT4_EFI_CALL(53, true, -EIO, (void)0, file_modified(__efi_a0)); });
+ 	if (ret)
+ 		goto out_mutex;
+ 
+--- a/fs/ext4/extents_status.c
++++ b/fs/ext4/extents_status.c
+@@ -10,7 +10,7 @@
+  *
+  * Ext4 extents status tree core functions.
+  */
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/list_sort.h>
+ #include <linux/proc_fs.h>
+ #include <linux/seq_file.h>
+@@ -454,9 +454,8 @@
+ 
+ static inline struct pending_reservation *__alloc_pending(bool nofail)
+ {
+-	if (!nofail) {
+-		return EXT4_ES_CALL(71, kmem_cache_alloc(ext4_pending_cachep, GFP_ATOMIC));
+-	}
++	if (!nofail)
++		return ({ __auto_type __efi_a0 = (ext4_pending_cachep); __auto_type __efi_a1 = (GFP_ATOMIC); EXT4_EFI_CALL(71, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmem_cache_alloc(__efi_a0, __efi_a1)); });
+ 
+ 	return kmem_cache_zalloc(ext4_pending_cachep, GFP_KERNEL | __GFP_NOFAIL);
+ }
+@@ -482,7 +481,7 @@
+ static inline struct extent_status *__es_alloc_extent(bool nofail)
+ {
+ 	if (!nofail)
+-		return EXT4_ES_CALL(69, kmem_cache_alloc(ext4_es_cachep, GFP_ATOMIC));
++		return ({ __auto_type __efi_a0 = (ext4_es_cachep); __auto_type __efi_a1 = (GFP_ATOMIC); EXT4_EFI_CALL(69, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmem_cache_alloc(__efi_a0, __efi_a1)); });
+ 
+ 	return kmem_cache_zalloc(ext4_es_cachep, GFP_KERNEL | __GFP_NOFAIL);
+ }
+@@ -859,9 +858,8 @@
+ 
+ 	if (prealloc)
+ 		es = prealloc;
+-	else {
++	else
+ 		es = __es_alloc_extent(false);
+-	}
+ 	if (!es)
+ 		return -ENOMEM;
+ 	ext4_es_init_extent(inode, es, newes->es_lblk, newes->es_len,
+@@ -1766,24 +1764,22 @@
+ 	sbi->s_es_nr_inode = 0;
+ 	spin_lock_init(&sbi->s_es_lock);
+ 	sbi->s_es_stats.es_stats_shrunk = 0;
+-	err = EXT4_ES_CALL(73, percpu_counter_init(&sbi->s_es_stats.es_stats_cache_hits, 0,
+-				  GFP_KERNEL));
++	err = ({ __auto_type __efi_a0 = (&sbi->s_es_stats.es_stats_cache_hits); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(73, true, -ENOMEM, (void)0, percpu_counter_init(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (err)
+ 		return err;
+-	err = EXT4_ES_CALL(74, percpu_counter_init(&sbi->s_es_stats.es_stats_cache_misses, 0,
+-				  GFP_KERNEL));
++	err = ({ __auto_type __efi_a0 = (&sbi->s_es_stats.es_stats_cache_misses); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(74, true, -ENOMEM, (void)0, percpu_counter_init(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (err)
+ 		goto err1;
+ 	sbi->s_es_stats.es_stats_scan_time = 0;
+ 	sbi->s_es_stats.es_stats_max_scan_time = 0;
+-	err = EXT4_ES_CALL(75, percpu_counter_init(&sbi->s_es_stats.es_stats_all_cnt, 0, GFP_KERNEL));
++	err = ({ __auto_type __efi_a0 = (&sbi->s_es_stats.es_stats_all_cnt); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(75, true, -ENOMEM, (void)0, percpu_counter_init(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (err)
+ 		goto err2;
+-	err = EXT4_ES_CALL(76, percpu_counter_init(&sbi->s_es_stats.es_stats_shk_cnt, 0, GFP_KERNEL));
++	err = ({ __auto_type __efi_a0 = (&sbi->s_es_stats.es_stats_shk_cnt); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(76, true, -ENOMEM, (void)0, percpu_counter_init(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (err)
+ 		goto err3;
+ 
+-	sbi->s_es_shrinker = EXT4_ES_CALL(77, shrinker_alloc(0, "ext4-es:%s", sbi->s_sb->s_id));
++	sbi->s_es_shrinker = ({ __auto_type __efi_a0 = (0); __auto_type __efi_a1 = ("ext4-es:%s"); __auto_type __efi_a2 = (sbi->s_sb->s_id); EXT4_EFI_CALL(77, true, 0, (void)0, shrinker_alloc(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!sbi->s_es_shrinker) {
+ 		err = -ENOMEM;
+ 		goto err4;
+--- a/fs/ext4/fast_commit.c
++++ b/fs/ext4/fast_commit.c
+@@ -7,7 +7,7 @@
+  *
+  * Ext4 fast commits routines.
+  */
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include "ext4.h"
+ #include "ext4_jbd2.h"
+ #include "ext4_extents.h"
+@@ -442,7 +442,7 @@
+ 		return -EOPNOTSUPP;
+ 	}
+ 
+-	node = EXT4_ES_CALL(96, kmem_cache_alloc(ext4_fc_dentry_cachep, GFP_NOFS));
++	node = ({ __auto_type __efi_a0 = (ext4_fc_dentry_cachep); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(96, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmem_cache_alloc(__efi_a0, __efi_a1)); });
+ 	if (!node) {
+ 		ext4_fc_mark_ineligible(sb, EXT4_FC_REASON_NOMEM, handle);
+ 		mutex_lock(&ei->i_fc_lock);
+@@ -453,7 +453,7 @@
+ 	node->fcd_parent = dir->i_ino;
+ 	node->fcd_ino = inode->i_ino;
+ 	if (dentry->d_name.len > DNAME_INLINE_LEN) {
+-		node->fcd_name.name = EXT4_ES_CALL(97, kmalloc(dentry->d_name.len, GFP_NOFS));
++		node->fcd_name.name = ({ __auto_type __efi_a0 = (dentry->d_name.len); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(97, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmalloc(__efi_a0, __efi_a1)); });
+ 		if (!node->fcd_name.name) {
+ 			kmem_cache_free(ext4_fc_dentry_cachep, node);
+ 			ext4_fc_mark_ineligible(sb, EXT4_FC_REASON_NOMEM, handle);
+@@ -721,7 +721,7 @@
+ 		return NULL;
+ 
+ 	if (!sbi->s_fc_bh) {
+-		ret = EXT4_ES_CALL(114, jbd2_fc_get_buf(EXT4_SB(sb)->s_journal, &bh));
++		ret = ({ __auto_type __efi_a0 = (EXT4_SB(sb)->s_journal); __auto_type __efi_a1 = (&bh); EXT4_EFI_CALL(114, true, -ENOSPC, (void)0, jbd2_fc_get_buf(__efi_a0, __efi_a1)); });
+ 		if (ret)
+ 			return NULL;
+ 		sbi->s_fc_bh = bh;
+@@ -751,7 +751,7 @@
+ 
+ 	ext4_fc_submit_bh(sb, false);
+ 
+-	ret = EXT4_ES_CALL(115, jbd2_fc_get_buf(EXT4_SB(sb)->s_journal, &bh));
++	ret = ({ __auto_type __efi_a0 = (EXT4_SB(sb)->s_journal); __auto_type __efi_a1 = (&bh); EXT4_EFI_CALL(115, true, -ENOSPC, (void)0, jbd2_fc_get_buf(__efi_a0, __efi_a1)); });
+ 	if (ret)
+ 		return NULL;
+ 	sbi->s_fc_bh = bh;
+@@ -998,7 +998,7 @@
+ 			finish_wait(&ei->i_fc_wait, &wait);
+ 		}
+ 		spin_unlock(&sbi->s_fc_lock);
+-		ret = EXT4_ES_CALL(110, jbd2_submit_inode_data(journal, ei->jinode));
++		ret = ({ __auto_type __efi_a0 = (journal); __auto_type __efi_a1 = (ei->jinode); EXT4_EFI_CALL(110, true, -EIO, (void)0, jbd2_submit_inode_data(__efi_a0, __efi_a1)); });
+ 		if (ret)
+ 			return ret;
+ 		spin_lock(&sbi->s_fc_lock);
+@@ -1023,7 +1023,7 @@
+ 			continue;
+ 		spin_unlock(&sbi->s_fc_lock);
+ 
+-		ret = EXT4_ES_CALL(111, jbd2_wait_inode_data(journal, pos->jinode));
++		ret = ({ __auto_type __efi_a0 = (journal); __auto_type __efi_a1 = (pos->jinode); EXT4_EFI_CALL(111, true, -EIO, (void)0, jbd2_wait_inode_data(__efi_a0, __efi_a1)); });
+ 		if (ret)
+ 			return ret;
+ 		spin_lock(&sbi->s_fc_lock);
+@@ -1220,7 +1220,7 @@
+ 	start_time = ktime_get();
+ 
+ restart_fc:
+-	ret = EXT4_ES_CALL(100, jbd2_fc_begin_commit(journal, commit_tid));
++	ret = ({ __auto_type __efi_a0 = (journal); __auto_type __efi_a1 = (commit_tid); EXT4_EFI_CALL(100, true, -EIO, (void)0, jbd2_fc_begin_commit(__efi_a0, __efi_a1)); });
+ 	if (ret == -EALREADY) {
+ 		/* There was an ongoing commit, check if we need to restart */
+ 		if (atomic_read(&sbi->s_fc_subtid) <= subtid &&
+@@ -1255,7 +1255,7 @@
+ 		goto fallback;
+ 	}
+ 	nblks = (sbi->s_fc_bytes + bsize - 1) / bsize - fc_bufs_before;
+-	ret = EXT4_ES_CALL(103, jbd2_fc_wait_bufs(journal, nblks));
++	ret = ({ __auto_type __efi_a0 = (journal); __auto_type __efi_a1 = (nblks); EXT4_EFI_CALL(103, true, -EIO, (void)0, jbd2_fc_wait_bufs(__efi_a0, __efi_a1)); });
+ 	if (ret < 0) {
+ 		status = EXT4_FC_STATUS_FAILED;
+ 		goto fallback;
+@@ -1453,7 +1453,7 @@
+ 		goto out;
+ 	}
+ 
+-	dentry_inode = EXT4_ES_CALL(116, d_alloc(dentry_dir, &qstr_dname));
++	dentry_inode = ({ __auto_type __efi_a0 = (dentry_dir); __auto_type __efi_a1 = (&qstr_dname); EXT4_EFI_CALL(116, true, 0, (void)0, d_alloc(__efi_a0, __efi_a1)); });
+ 	if (!dentry_inode) {
+ 		ext4_debug("Inode dentry not created.");
+ 		ret = -ENOMEM;
+@@ -1527,10 +1527,8 @@
+ 	if (state->fc_modified_inodes_used == state->fc_modified_inodes_size) {
+ 		int *fc_modified_inodes;
+ 
+-		fc_modified_inodes = EXT4_ES_CALL(117, krealloc(state->fc_modified_inodes,
+-				sizeof(int) * (state->fc_modified_inodes_size +
+-				EXT4_FC_REPLAY_REALLOC_INCREMENT),
+-				GFP_KERNEL));
++		fc_modified_inodes = ({ __auto_type __efi_a0 = (state->fc_modified_inodes); __auto_type __efi_a1 = (sizeof(int) * (state->fc_modified_inodes_size +
++				EXT4_FC_REPLAY_REALLOC_INCREMENT)); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(117, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, krealloc(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (!fc_modified_inodes)
+ 			return -ENOMEM;
+ 		state->fc_modified_inodes = fc_modified_inodes;
+@@ -1728,11 +1726,9 @@
+ 	if (state->fc_regions_used == state->fc_regions_size) {
+ 		struct ext4_fc_alloc_region *fc_regions;
+ 
+-		fc_regions = EXT4_ES_CALL(104, krealloc(state->fc_regions,
+-				      sizeof(struct ext4_fc_alloc_region) *
++		fc_regions = ({ __auto_type __efi_a0 = (state->fc_regions); __auto_type __efi_a1 = (sizeof(struct ext4_fc_alloc_region) *
+ 				      (state->fc_regions_size +
+-				       EXT4_FC_REPLAY_REALLOC_INCREMENT),
+-				      GFP_KERNEL));
++				       EXT4_FC_REPLAY_REALLOC_INCREMENT)); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(104, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, krealloc(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (!fc_regions)
+ 			return -ENOMEM;
+ 		state->fc_regions_size +=
+--- a/fs/ext4/file.c
++++ b/fs/ext4/file.c
+@@ -19,7 +19,7 @@
+  *	(jj@sunsite.ms.mff.cuni.cz)
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/time.h>
+ #include <linux/fs.h>
+ #include <linux/iomap.h>
+@@ -73,7 +73,7 @@
+ 	struct inode *inode = file_inode(iocb->ki_filp);
+ 
+ 	if (iocb->ki_flags & IOCB_NOWAIT) {
+-		if (!EXT4_ES_CALL(123, inode_trylock_shared(inode)))
++		if (!({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(123, true, 0, (void)0, inode_trylock_shared(__efi_a0)); }))
+ 			return -EAGAIN;
+ 	} else {
+ 		inode_lock_shared(inode);
+@@ -256,7 +256,7 @@
+ 	if (unlikely(IS_IMMUTABLE(inode)))
+ 		return -EPERM;
+ 
+-	ret = EXT4_ES_CALL(129, generic_write_checks(iocb, from));
++	ret = ({ __auto_type __efi_a0 = (iocb); __auto_type __efi_a1 = (from); EXT4_EFI_CALL(129, true, -EINVAL, (void)0, generic_write_checks(__efi_a0, __efi_a1)); });
+ 	if (ret <= 0)
+ 		return ret;
+ 
+@@ -283,7 +283,7 @@
+ 	if (count <= 0)
+ 		return count;
+ 
+-	ret = EXT4_ES_CALL(131, file_modified(iocb->ki_filp));
++	ret = ({ __auto_type __efi_a0 = (iocb->ki_filp); EXT4_EFI_CALL(131, true, -EIO, (void)0, file_modified(__efi_a0)); });
+ 	if (ret)
+ 		return ret;
+ 	return count;
+@@ -489,7 +489,7 @@
+ 		*dio_flags = IOMAP_DIO_FORCE_WAIT;
+ 	}
+ 
+-	ret = EXT4_ES_CALL(127, file_modified(file));
++	ret = ({ __auto_type __efi_a0 = (file); EXT4_EFI_CALL(127, true, -EIO, (void)0, file_modified(__efi_a0)); });
+ 	if (ret < 0)
+ 		goto out;
+ 
+@@ -524,10 +524,10 @@
+ 
+ 	if (iocb->ki_flags & IOCB_NOWAIT) {
+ 		if (ilock_shared) {
+-			if (!EXT4_ES_CALL(125, inode_trylock_shared(inode)))
++			if (!({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(125, true, 0, (void)0, inode_trylock_shared(__efi_a0)); }))
+ 				return -EAGAIN;
+ 		} else {
+-			if (!EXT4_ES_CALL(126, inode_trylock(inode)))
++			if (!({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(126, true, 0, (void)0, inode_trylock(__efi_a0)); }))
+ 				return -EAGAIN;
+ 		}
+ 	} else {
+@@ -873,11 +873,11 @@
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = EXT4_ES_CALL(121, fscrypt_file_open(inode, filp));
++	ret = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (filp); EXT4_EFI_CALL(121, IS_ENCRYPTED(__efi_a0), -EOPNOTSUPP, (void)0, fscrypt_file_open(__efi_a0, __efi_a1)); });
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = EXT4_ES_CALL(122, fsverity_file_open(inode, filp));
++	ret = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (filp); EXT4_EFI_CALL(122, IS_VERITY(__efi_a0), -EOPNOTSUPP, (void)0, fsverity_file_open(__efi_a0, __efi_a1)); });
+ 	if (ret)
+ 		return ret;
+ 
+@@ -916,14 +916,12 @@
+ 						maxbytes, i_size_read(inode));
+ 	case SEEK_HOLE:
+ 		inode_lock_shared(inode);
+-		offset = EXT4_ES_CALL(119, iomap_seek_hole(inode, offset,
+-					 &ext4_iomap_report_ops));
++		offset = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (offset); __auto_type __efi_a2 = (&ext4_iomap_report_ops); EXT4_EFI_CALL(119, true, -EIO, (void)0, iomap_seek_hole(__efi_a0, __efi_a1, __efi_a2)); });
+ 		inode_unlock_shared(inode);
+ 		break;
+ 	case SEEK_DATA:
+ 		inode_lock_shared(inode);
+-		offset = EXT4_ES_CALL(120, iomap_seek_data(inode, offset,
+-					 &ext4_iomap_report_ops));
++		offset = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (offset); __auto_type __efi_a2 = (&ext4_iomap_report_ops); EXT4_EFI_CALL(120, true, -EIO, (void)0, iomap_seek_data(__efi_a0, __efi_a1, __efi_a2)); });
+ 		inode_unlock_shared(inode);
+ 		break;
+ 	}
+@@ -964,3 +962,4 @@
+ 	.fileattr_get	= ext4_fileattr_get,
+ 	.fileattr_set	= ext4_fileattr_set,
+ };
++
+--- a/fs/ext4/fsmap.c
++++ b/fs/ext4/fsmap.c
+@@ -4,7 +4,7 @@
+  *
+  * Author: Darrick J. Wong <darrick.wong@oracle.com>
+  */
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include "ext4.h"
+ #include <linux/fsmap.h>
+ #include "fsmap.h"
+@@ -295,7 +295,7 @@
+ {
+ 	struct ext4_fsmap *fsm;
+ 
+-	fsm = EXT4_ES_CALL(133, kmalloc(sizeof(*fsm), GFP_NOFS));
++	fsm = ({ __auto_type __efi_a0 = (sizeof(*fsm)); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(133, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmalloc(__efi_a0, __efi_a1)); });
+ 	if (!fsm)
+ 		return -ENOMEM;
+ 	fsm->fmr_device = 0;
+--- a/fs/ext4/fsync.c
++++ b/fs/ext4/fsync.c
+@@ -23,7 +23,7 @@
+  * we can depend on generic_block_fdatasync() to sync the data blocks.
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/time.h>
+ #include <linux/fs.h>
+ #include <linux/sched.h>
+@@ -69,10 +69,10 @@
+ 		 * through ext4_evict_inode()) and so we are safe to flush
+ 		 * metadata blocks and the inode.
+ 		 */
+-		ret = EXT4_ES_CALL(138, sync_mapping_buffers(inode->i_mapping));
++		ret = ({ __auto_type __efi_a0 = (inode->i_mapping); EXT4_EFI_CALL(138, true, -EIO, (void)0, sync_mapping_buffers(__efi_a0)); });
+ 		if (ret)
+ 			break;
+-		ret = EXT4_ES_CALL(139, sync_inode_metadata(inode, 1));
++		ret = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (1); EXT4_EFI_CALL(139, true, -EIO, (void)0, sync_inode_metadata(__efi_a0, __efi_a1)); });
+ 		if (ret)
+ 			break;
+ 	}
+@@ -86,7 +86,7 @@
+ 	struct inode *inode = file->f_inode;
+ 	int ret;
+ 
+-	ret = EXT4_ES_CALL(135, generic_buffers_fsync_noflush(file, start, end, datasync));
++	ret = ({ __auto_type __efi_a0 = (file); __auto_type __efi_a1 = (start); __auto_type __efi_a2 = (end); __auto_type __efi_a3 = (datasync); EXT4_EFI_CALL(135, true, -EIO, (void)0, generic_buffers_fsync_noflush(__efi_a0, __efi_a1, __efi_a2, __efi_a3)); });
+ 	if (!ret)
+ 		ret = ext4_sync_parent(inode);
+ 	if (test_opt(inode->i_sb, BARRIER))
+@@ -156,7 +156,7 @@
+ 		goto out;
+ 	}
+ 
+-	ret = EXT4_ES_CALL(134, file_write_and_wait_range(file, start, end));
++	ret = ({ __auto_type __efi_a0 = (file); __auto_type __efi_a1 = (start); __auto_type __efi_a2 = (end); EXT4_EFI_CALL(134, true, -EIO, (void)0, file_write_and_wait_range(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (ret)
+ 		goto out;
+ 
+--- a/fs/ext4/ialloc.c
++++ b/fs/ext4/ialloc.c
+@@ -13,7 +13,7 @@
+  *        David S. Miller (davem@caip.rutgers.edu), 1995
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/time.h>
+ #include <linux/fs.h>
+ #include <linux/stat.h>
+@@ -200,7 +200,7 @@
+ 	trace_ext4_load_inode_bitmap(sb, block_group);
+ 	ext4_read_bh(bh, REQ_META | REQ_PRIO, ext4_end_bitmap_read);
+ 	ext4_simulate_fail_bh(sb, bh, EXT4_SIM_IBITMAP_EIO);
+-	if (!EXT4_ES_CALL(144, buffer_uptodate(bh))) {
++	if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(144, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
+ 		put_bh(bh);
+ 		ext4_error_err(sb, EIO, "Cannot read inode bitmap - "
+ 			       "block_group = %u, inode_bitmap = %llu",
+@@ -985,7 +985,7 @@
+ 	struct super_block *sb = dir->i_sb;
+ 	int nblocks = 0;
+ #ifdef CONFIG_EXT4_FS_POSIX_ACL
+-	struct posix_acl *p = EXT4_ES_CALL(154, get_inode_acl(dir, ACL_TYPE_DEFAULT));
++	struct posix_acl *p = ({ __auto_type __efi_a0 = (dir); __auto_type __efi_a1 = (ACL_TYPE_DEFAULT); EXT4_EFI_CALL(154, true, -ENOMEM, (void)0, get_inode_acl(__efi_a0, __efi_a1)); });
+ 
+ 	if (IS_ERR(p))
+ 		return PTR_ERR(p);
+@@ -1075,7 +1075,7 @@
+ 
+ 	ngroups = ext4_get_groups_count(sb);
+ 	trace_ext4_request_inode(dir, mode);
+-	inode = EXT4_ES_CALL(147, new_inode(sb));
++	inode = ({ __auto_type __efi_a0 = (sb); EXT4_EFI_CALL(147, true, 0, (void)0, new_inode(__efi_a0)); });
+ 	if (!inode)
+ 		return ERR_PTR(-ENOMEM);
+ 	ext4_ct_enter(sb, &ct_scope, "INODE.ALLOC");
+@@ -1104,12 +1104,12 @@
+ 		ei->i_projid = make_kprojid(&init_user_ns, EXT4_DEF_PROJID);
+ 
+ 	if (!(i_flags & EXT4_EA_INODE_FL)) {
+-		err = EXT4_ES_CALL(148, fscrypt_prepare_new_inode(dir, inode, &encrypt));
++		err = ({ __auto_type __efi_a0 = (dir); __auto_type __efi_a1 = (inode); __auto_type __efi_a2 = (&encrypt); EXT4_EFI_CALL(148, IS_ENCRYPTED(__efi_a0), -EOPNOTSUPP, (void)0, fscrypt_prepare_new_inode(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (err)
+ 			goto out;
+ 	}
+ 
+-	err = EXT4_ES_CALL(149, dquot_initialize(inode));
++	err = ({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(149, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (err)
+ 		goto out;
+ 
+@@ -1266,7 +1266,7 @@
+ 
+ 	BUFFER_TRACE(group_desc_bh, "get_write_access");
+ 	err = ext4_journal_get_write_access(handle, sb, group_desc_bh,
+-						    EXT4_JTR_NONE);
++					    EXT4_JTR_NONE);
+ 	if (err) {
+ 		ext4_checker_io_stage(sb, EXT4_CHECKER_IO_INODE_ALLOC_DESC);
+ 		ext4_checker_target_error(sb,
+@@ -1287,7 +1287,7 @@
+ 		}
+ 		BUFFER_TRACE(block_bitmap_bh, "get block bitmap access");
+ 		err = ext4_journal_get_write_access(handle, sb, block_bitmap_bh,
+-							    EXT4_JTR_NONE);
++						    EXT4_JTR_NONE);
+ 		if (err) {
+ 			brelse(block_bitmap_bh);
+ 			ext4_std_error(sb, err);
+@@ -1447,7 +1447,7 @@
+ 	ext4_set_inode_flags(inode, true);
+ 	if (IS_DIRSYNC(inode))
+ 		ext4_handle_sync(handle);
+-	if (EXT4_ES_CALL(151, insert_inode_locked(inode)) < 0) {
++	if (({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(151, false, 0, (void)0, insert_inode_locked(__efi_a0)); }) < 0) {
+ 		/*
+ 		 * Likely a bitmap corruption causing inode to be allocated
+ 		 * twice.
+@@ -1482,7 +1482,7 @@
+ 	    (!(ei->i_flags & EXT4_DAX_FL) || S_ISDIR(mode)))
+ 		ext4_set_inode_state(inode, EXT4_STATE_MAY_INLINE_DATA);
+ 	ret = inode;
+-	err = EXT4_ES_CALL(152, dquot_alloc_inode(inode));
++	err = ({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(152, sb_any_quota_loaded(__efi_a0->i_sb), -EDQUOT, (void)0, dquot_alloc_inode(__efi_a0)); });
+ 	if (err)
+ 		goto fail_drop;
+ 
+@@ -1790,7 +1790,7 @@
+ 
+ 	ext4_debug("going to zero out inode table in group %d\n",
+ 		   group);
+-	ret = EXT4_ES_CALL(158, sb_issue_zeroout(sb, blk, num, GFP_NOFS));
++	ret = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (blk); __auto_type __efi_a2 = (num); __auto_type __efi_a3 = (GFP_NOFS); EXT4_EFI_CALL(158, true, -EIO, (void)0, sb_issue_zeroout(__efi_a0, __efi_a1, __efi_a2, __efi_a3)); });
+ 	if (ret < 0)
+ 		goto err_out;
+ 	if (barrier)
+--- a/fs/ext4/indirect.c
++++ b/fs/ext4/indirect.c
+@@ -21,7 +21,7 @@
+  *	(sct@redhat.com), 1993, 1998
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include "ext4_jbd2.h"
+ #include "truncate.h"
+ #include <linux/dax.h>
+@@ -164,7 +164,7 @@
+ 			ret = -EFSCORRUPTED;
+ 			goto failure;
+ 		}
+-		bh = EXT4_ES_CALL(165, sb_getblk(sb, key));
++		bh = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (key); EXT4_EFI_CALL(165, false, 0, (void)0, sb_getblk(__efi_a0, __efi_a1)); });
+ 		if (unlikely(!bh)) {
+ 			ret = -ENOMEM;
+ 			goto failure;
+@@ -975,7 +975,7 @@
+ 		 * block pointed to itself, it would have been detached when
+ 		 * the block was cleared. Check for this instead of OOPSing.
+ 		 */
+-		if ((EXT4_JOURNAL(inode) == NULL) || EXT4_ES_CALL(168, bh2jh(this_bh)))
++		if ((EXT4_JOURNAL(inode) == NULL) || ({ __auto_type __efi_a0 = (this_bh); EXT4_EFI_CALL(168, false, 0, (void)0, bh2jh(__efi_a0)); }))
+ 			ext4_handle_dirty_metadata(handle, inode, this_bh);
+ 		else
+ 			EXT4_ERROR_INODE(inode,
+@@ -1098,8 +1098,8 @@
+ 					BUFFER_TRACE(parent_bh,
+ 					"call ext4_handle_dirty_metadata");
+ 					ext4_handle_dirty_metadata(handle,
+-									   inode,
+-									   parent_bh);
++								   inode,
++								   parent_bh);
+ 				}
+ 			}
+ 		}
+--- a/fs/ext4/inline.c
++++ b/fs/ext4/inline.c
+@@ -4,7 +4,7 @@
+  * Written by Tao Ma <boyu.mt@taobao.com>
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/iomap.h>
+ #include <linux/fiemap.h>
+ #include <linux/namei.h>
+@@ -354,7 +354,7 @@
+ 	BUG_ON(is.s.not_found);
+ 
+ 	len -= EXT4_MIN_INLINE_DATA_SIZE;
+-	value = EXT4_ES_CALL(175, kzalloc(len, GFP_NOFS));
++	value = ({ __auto_type __efi_a0 = (len); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(175, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	if (!value) {
+ 		error = -ENOMEM;
+ 		goto out;
+@@ -394,7 +394,7 @@
+ }
+ 
+ static int ext4_prepare_inline_data(handle_t *handle, struct inode *inode,
+-				    loff_t len)
++				    unsigned int len)
+ {
+ 	int ret, size, no_expand;
+ 	struct ext4_inode_info *ei = EXT4_I(inode);
+@@ -644,16 +644,17 @@
+ 
+ 	if (ext4_should_dioread_nolock(inode)) {
+ 		ret = ext4_block_write_begin(handle, folio, from, to,
+-						       ext4_get_block_unwritten);
++					     ext4_get_block_unwritten);
+ 	} else
+ 		ret = ext4_block_write_begin(handle, folio, from, to,
+-						       ext4_get_block);
++					     ext4_get_block);
+ 
+ 	if (!ret && ext4_should_journal_data(inode)) {
+ 		ret = ext4_walk_page_buffers(handle, inode,
+ 					     folio_buffers(folio), from, to,
+ 					     NULL, do_journal_get_write_access);
+ 	}
++
+ 	if (ret) {
+ 		folio_unlock(folio);
+ 		folio_put(folio);
+@@ -903,7 +904,7 @@
+ 	}
+ 
+ 	ret = ext4_block_write_begin(NULL, folio, 0, inline_size,
+-						 ext4_da_get_block_prep);
++				     ext4_da_get_block_prep);
+ 	if (ret) {
+ 		up_read(&EXT4_I(inode)->xattr_sem);
+ 		folio_unlock(folio);
+@@ -1210,8 +1211,7 @@
+ 	if (err)
+ 		return err;
+ 	set_buffer_verified(dir_block);
+-	err = ext4_mark_inode_dirty(handle, inode);
+-	return err;
++	return ext4_mark_inode_dirty(handle, inode);
+ }
+ 
+ static int ext4_convert_inline_data_nolock(handle_t *handle,
+@@ -1225,7 +1225,7 @@
+ 	int inline_size;
+ 
+ 	inline_size = ext4_get_inline_size(inode);
+-	buf = EXT4_ES_CALL(169, kmalloc(inline_size, GFP_NOFS));
++	buf = ({ __auto_type __efi_a0 = (inline_size); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(169, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmalloc(__efi_a0, __efi_a1)); });
+ 	if (!buf) {
+ 		error = -ENOMEM;
+ 		goto out;
+@@ -1406,7 +1406,7 @@
+ 	}
+ 
+ 	inline_size = ext4_get_inline_size(inode);
+-	dir_buf = EXT4_ES_CALL(171, kmalloc(inline_size, GFP_NOFS));
++	dir_buf = ({ __auto_type __efi_a0 = (inline_size); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(171, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmalloc(__efi_a0, __efi_a1)); });
+ 	if (!dir_buf) {
+ 		ret = -ENOMEM;
+ 		up_read(&EXT4_I(inode)->xattr_sem);
+@@ -1525,7 +1525,7 @@
+ 	}
+ 
+ 	inline_size = ext4_get_inline_size(inode);
+-	dir_buf = EXT4_ES_CALL(172, kmalloc(inline_size, GFP_NOFS));
++	dir_buf = ({ __auto_type __efi_a0 = (inline_size); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(172, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmalloc(__efi_a0, __efi_a1)); });
+ 	if (!dir_buf) {
+ 		ret = -ENOMEM;
+ 		up_read(&EXT4_I(inode)->xattr_sem);
+@@ -1641,7 +1641,7 @@
+ 
+ 	ret = -ENOMEM;
+ 	inline_size = ext4_get_inline_size(inode);
+-	link = EXT4_ES_CALL(173, kmalloc(inline_size + 1, GFP_NOFS));
++	link = ({ __auto_type __efi_a0 = (inline_size + 1); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(173, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmalloc(__efi_a0, __efi_a1)); });
+ 	if (!link)
+ 		goto out;
+ 
+@@ -1822,9 +1822,8 @@
+ 	ext4_show_inline_dir(dir, iloc.bh, inline_start, inline_size);
+ out:
+ 	ext4_write_unlock_xattr(dir, &no_expand);
+-	if (likely(err == 0)) {
++	if (likely(err == 0))
+ 		err = ext4_mark_inode_dirty(handle, dir);
+-	}
+ 	brelse(iloc.bh);
+ 	if (err != -ENOENT)
+ 		ext4_std_error(dir->i_sb, err);
+@@ -2023,7 +2022,7 @@
+ 			BUG_ON(is.s.not_found);
+ 
+ 			value_len = le32_to_cpu(is.s.here->e_value_size);
+-			value = EXT4_ES_CALL(174, kmalloc(value_len, GFP_NOFS));
++			value = ({ __auto_type __efi_a0 = (value_len); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(174, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmalloc(__efi_a0, __efi_a1)); });
+ 			if (!value) {
+ 				err = -ENOMEM;
+ 				goto out_error;
+--- a/fs/ext4/inode.c
++++ b/fs/ext4/inode.c
+@@ -19,7 +19,7 @@
+  *  Assorted race fixes, rewrite of ext4_get_block() by Al Viro, 2000
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/fs.h>
+ #include <linux/mount.h>
+ #include <linux/time.h>
+@@ -415,7 +415,7 @@
+ 	if (IS_ENCRYPTED(inode) && S_ISREG(inode->i_mode))
+ 		return fscrypt_zeroout_range(inode, lblk, pblk, len);
+ 
+-	ret = EXT4_ES_CALL(183, sb_issue_zeroout(inode->i_sb, pblk, len, GFP_NOFS));
++	ret = ({ __auto_type __efi_a0 = (inode->i_sb); __auto_type __efi_a1 = (pblk); __auto_type __efi_a2 = (len); __auto_type __efi_a3 = (GFP_NOFS); EXT4_EFI_CALL(183, true, -EIO, (void)0, sb_issue_zeroout(__efi_a0, __efi_a1, __efi_a2, __efi_a3)); });
+ 	if (ret > 0)
+ 		ret = 0;
+ 
+@@ -956,7 +956,7 @@
+ 			wait_on_buffer(bhs[i]);
+ 
+ 	for (i = 0; i < bh_count; i++) {
+-		if (bhs[i] && !EXT4_ES_CALL(189, buffer_uptodate(bhs[i]))) {
++		if (bhs[i] && !({ __auto_type __efi_a0 = (bhs[i]); EXT4_EFI_CALL(189, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
+ 			err = -EIO;
+ 			goto out_brelse;
+ 		}
+@@ -1110,7 +1110,7 @@
+ 	 */
+ 	for (i = 0; i < nr_wait; i++) {
+ 		wait_on_buffer(wait[i]);
+-		if (!EXT4_ES_CALL(200, buffer_uptodate(wait[i])))
++		if (!({ __auto_type __efi_a0 = (wait[i]); EXT4_EFI_CALL(200, false, 0, (void)0, buffer_uptodate(__efi_a0)); }))
+ 			err = -EIO;
+ 	}
+ 	if (unlikely(err)) {
+@@ -1166,6 +1166,7 @@
+ 	index = pos >> PAGE_SHIFT;
+ 	from = pos & (PAGE_SIZE - 1);
+ 	to = from + len;
++
+ 	if (ext4_test_inode_state(inode, EXT4_STATE_MAY_INLINE_DATA)) {
+ 		ret = ext4_try_to_write_inline_data(mapping, inode, pos, len,
+ 						    foliop);
+@@ -1481,7 +1482,7 @@
+ 	 * us from metadata over-estimation, though we may go over by
+ 	 * a small amount in the end.  Here we just reserve for data.
+ 	 */
+-	ret = EXT4_ES_CALL(234, dquot_reserve_block(inode, EXT4_C2B(sbi, nr_resv)));
++	ret = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (EXT4_C2B(sbi, nr_resv)); EXT4_EFI_CALL(234, sb_any_quota_loaded(__efi_a0->i_sb), -EDQUOT, (void)0, dquot_reserve_block(__efi_a0, __efi_a1)); });
+ 	if (ret)
+ 		return ret;
+ 
+@@ -2926,6 +2927,7 @@
+ 		return -EIO;
+ 
+ 	index = pos >> PAGE_SHIFT;
++
+ 	if (ext4_nonda_switch(inode->i_sb) || ext4_verity_in_progress(inode)) {
+ 		*fsdata = (void *)FALL_BACK_TO_NONDELALLOC;
+ 		return ext4_write_begin(file, mapping, pos,
+@@ -3991,7 +3993,7 @@
+ 	/* Wait all existing dio workers, newcomers will block on i_rwsem */
+ 	inode_dio_wait(inode);
+ 
+-	ret = EXT4_ES_CALL(209, file_modified(file));
++	ret = ({ __auto_type __efi_a0 = (file); EXT4_EFI_CALL(209, true, -EIO, (void)0, file_modified(__efi_a0)); });
+ 	if (ret)
+ 		goto out_mutex;
+ 
+@@ -4084,7 +4086,7 @@
+ 	if (ei->jinode || !EXT4_SB(inode->i_sb)->s_journal)
+ 		return 0;
+ 
+-	jinode = EXT4_ES_CALL(210, jbd2_alloc_inode(GFP_KERNEL));
++	jinode = ({ __auto_type __efi_a0 = (GFP_KERNEL); EXT4_EFI_CALL(210, (true && !(__efi_a0 & __GFP_NOFAIL)), 0, (void)0, jbd2_alloc_inode(__efi_a0)); });
+ 	spin_lock(&inode->i_lock);
+ 	if (!ei->jinode) {
+ 		if (!jinode) {
+@@ -4520,7 +4522,7 @@
+ 	blk_finish_plug(&plug);
+ 	wait_on_buffer(bh);
+ 	ext4_simulate_fail_bh(sb, bh, EXT4_SIM_INODE_EIO);
+-	if (!EXT4_ES_CALL(216, buffer_uptodate(bh))) {
++	if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(216, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
+ 		if (ret_block)
+ 			*ret_block = block;
+ 		brelse(bh);
+@@ -4744,7 +4746,7 @@
+ 		return ERR_PTR(-EFSCORRUPTED);
+ 	}
+ 
+-	inode = EXT4_ES_CALL(217, iget_locked(sb, ino));
++	inode = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (ino); EXT4_EFI_CALL(217, true, 0, (void)0, iget_locked(__efi_a0, __efi_a1)); });
+ 	if (!inode)
+ 		return ERR_PTR(-ENOMEM);
+ 	if (!(inode->i_state & I_NEW)) {
+@@ -5246,7 +5248,7 @@
+ 		 */
+ 		if (wbc->sync_mode == WB_SYNC_ALL && !wbc->for_sync)
+ 			sync_dirty_buffer(iloc.bh);
+-		if (buffer_req(iloc.bh) && !EXT4_ES_CALL(220, buffer_uptodate(iloc.bh))) {
++		if (buffer_req(iloc.bh) && !({ __auto_type __efi_a0 = (iloc.bh); EXT4_EFI_CALL(220, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
+ 			ext4_error_inode_block(inode, iloc.bh->b_blocknr, EIO,
+ 					       "IO error syncing inode");
+ 			err = -EIO;
+@@ -5348,20 +5350,20 @@
+ 				  ATTR_GID | ATTR_TIMES_SET))))
+ 		return -EPERM;
+ 
+-	error = EXT4_ES_CALL(221, setattr_prepare(idmap, dentry, attr));
++	error = ({ __auto_type __efi_a0 = (idmap); __auto_type __efi_a1 = (dentry); __auto_type __efi_a2 = (attr); EXT4_EFI_CALL(221, true, -EINVAL, (void)0, setattr_prepare(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (error)
+ 		return error;
+ 
+-	error = EXT4_ES_CALL(222, fscrypt_prepare_setattr(dentry, attr));
++	error = ({ __auto_type __efi_a0 = (dentry); __auto_type __efi_a1 = (attr); EXT4_EFI_CALL(222, IS_ENCRYPTED(d_inode(__efi_a0)), -EOPNOTSUPP, (void)0, fscrypt_prepare_setattr(__efi_a0, __efi_a1)); });
+ 	if (error)
+ 		return error;
+ 
+-	error = EXT4_ES_CALL(223, fsverity_prepare_setattr(dentry, attr));
++	error = ({ __auto_type __efi_a0 = (dentry); __auto_type __efi_a1 = (attr); EXT4_EFI_CALL(223, IS_VERITY(d_inode(__efi_a0)), -EOPNOTSUPP, (void)0, fsverity_prepare_setattr(__efi_a0, __efi_a1)); });
+ 	if (error)
+ 		return error;
+ 
+ 	if (is_quota_modification(idmap, inode, attr)) {
+-		error = EXT4_ES_CALL(224, dquot_initialize(inode));
++		error = ({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(224, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 		if (error)
+ 			return error;
+ 	}
+@@ -5384,7 +5386,7 @@
+ 		 * counts xattr inode references.
+ 		 */
+ 		down_read(&EXT4_I(inode)->xattr_sem);
+-		error = EXT4_ES_CALL(225, dquot_transfer(idmap, inode, attr));
++		error = ({ __auto_type __efi_a0 = (idmap); __auto_type __efi_a1 = (inode); __auto_type __efi_a2 = (attr); EXT4_EFI_CALL(225, sb_any_quota_loaded(__efi_a1->i_sb), -EDQUOT, (void)0, dquot_transfer(__efi_a0, __efi_a1, __efi_a2)); });
+ 		up_read(&EXT4_I(inode)->xattr_sem);
+ 
+ 		if (error) {
+@@ -5756,8 +5758,7 @@
+  * Give this, we know that the caller already has write access to iloc->bh.
+  */
+ int ext4_mark_iloc_dirty(handle_t *handle,
+-					 struct inode *inode,
+-					 struct ext4_iloc *iloc)
++			 struct inode *inode, struct ext4_iloc *iloc)
+ {
+ 	int err = 0;
+ 
+@@ -5776,14 +5777,14 @@
+ 	return err;
+ }
+ 
+-
+ /*
+  * On success, We end up with an outstanding reference count against
+  * iloc->bh.  This _must_ be cleaned up later.
+  */
+ 
+-int ext4_reserve_inode_write(handle_t *handle, struct inode *inode,
+-				      struct ext4_iloc *iloc)
++int
++ext4_reserve_inode_write(handle_t *handle, struct inode *inode,
++			 struct ext4_iloc *iloc)
+ {
+ 	int err;
+ 
+@@ -5794,7 +5795,7 @@
+ 	if (!err) {
+ 		BUFFER_TRACE(iloc->bh, "get_write_access");
+ 		err = ext4_journal_get_write_access(handle, inode->i_sb,
+-					    iloc->bh, EXT4_JTR_NONE);
++						    iloc->bh, EXT4_JTR_NONE);
+ 		if (err) {
+ 			brelse(iloc->bh);
+ 			iloc->bh = NULL;
+@@ -5803,7 +5804,6 @@
+ 	ext4_std_error(inode->i_sb, err);
+ 	return err;
+ }
+-
+ 
+ static int __ext4_expand_extra_isize(struct inode *inode,
+ 				     unsigned int new_extra_isize,
+@@ -5984,8 +5984,6 @@
+ 	return err;
+ }
+ 
+-
+-
+ /*
+  * ext4_dirty_inode() is called from __mark_inode_dirty()
+  *
+@@ -6068,7 +6066,7 @@
+ 	if (val)
+ 		ext4_set_inode_flag(inode, EXT4_INODE_JOURNAL_DATA);
+ 	else {
+-		err = EXT4_ES_CALL(226, jbd2_journal_flush(journal, 0));
++		err = ({ __auto_type __efi_a0 = (journal); __auto_type __efi_a1 = (0); EXT4_EFI_CALL(226, false, 0, (void)0, jbd2_journal_flush(__efi_a0, __efi_a1)); });
+ 		if (err < 0) {
+ 			jbd2_journal_unlock_updates(journal);
+ 			ext4_writepages_up_write(inode->i_sb, alloc_ctx);
+--- a/fs/ext4/ioctl.c
++++ b/fs/ext4/ioctl.c
+@@ -8,7 +8,7 @@
+  * Universite Pierre et Marie Curie (Paris VI)
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/fs.h>
+ #include <linux/capability.h>
+ #include <linux/time.h>
+@@ -77,7 +77,7 @@
+ 	ext4_superblock_csum_set(sb);
+ 	unlock_buffer(bh);
+ 
+-	if (EXT4_ES_CALL(312, buffer_write_io_error(bh)) || !EXT4_ES_CALL(313, buffer_uptodate(bh))) {
++	if (({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(312, false, 0, (void)0, buffer_write_io_error(__efi_a0)); }) || !({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(313, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
+ 		ext4_msg(sbi->s_sb, KERN_ERR, "previous I/O error to "
+ 			 "superblock detected");
+ 		clear_buffer_write_io_error(bh);
+@@ -408,11 +408,11 @@
+ 	}
+ 
+ 	filemap_invalidate_lock(inode->i_mapping);
+-	err = EXT4_ES_CALL(291, filemap_write_and_wait(inode->i_mapping));
++	err = ({ __auto_type __efi_a0 = (inode->i_mapping); EXT4_EFI_CALL(291, true, -EIO, (void)0, filemap_write_and_wait(__efi_a0)); });
+ 	if (err)
+ 		goto err_out;
+ 
+-	err = EXT4_ES_CALL(292, filemap_write_and_wait(inode_bl->i_mapping));
++	err = ({ __auto_type __efi_a0 = (inode_bl->i_mapping); EXT4_EFI_CALL(292, true, -EIO, (void)0, filemap_write_and_wait(__efi_a0)); });
+ 	if (err)
+ 		goto err_out;
+ 
+@@ -451,7 +451,7 @@
+ 			memset(ei_bl->i_data, 0, sizeof(ei_bl->i_data));
+ 	}
+ 
+-	err = EXT4_ES_CALL(293, dquot_initialize(inode));
++	err = ({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(293, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (err)
+ 		goto err_out1;
+ 
+@@ -500,7 +500,7 @@
+ 	if (diff > 0)
+ 		dquot_free_space(inode, diff);
+ 	else
+-		err = EXT4_ES_CALL(294, dquot_alloc_space(inode, -1 * diff));
++		err = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (-1 * diff); EXT4_EFI_CALL(294, sb_any_quota_loaded(__efi_a0->i_sb), -EDQUOT, (void)0, dquot_alloc_space(__efi_a0, __efi_a1)); });
+ 
+ 	if (err < 0) {
+ revert:
+@@ -643,7 +643,7 @@
+ 	if (S_ISREG(inode->i_mode) && !IS_IMMUTABLE(inode) &&
+ 	    (flags & EXT4_IMMUTABLE_FL)) {
+ 		inode_dio_wait(inode);
+-		err = EXT4_ES_CALL(265, filemap_write_and_wait(inode->i_mapping));
++		err = ({ __auto_type __efi_a0 = (inode->i_mapping); EXT4_EFI_CALL(265, true, -EIO, (void)0, filemap_write_and_wait(__efi_a0)); });
+ 		if (err)
+ 			goto flags_out;
+ 	}
+@@ -745,7 +745,7 @@
+ 	if (ext4_is_quota_file(inode))
+ 		return err;
+ 
+-	err = EXT4_ES_CALL(266, dquot_initialize(inode));
++	err = ({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(266, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (err)
+ 		return err;
+ 
+@@ -824,7 +824,7 @@
+ 
+ 	switch (flags) {
+ 	case EXT4_GOING_FLAGS_DEFAULT:
+-		ret = EXT4_ES_CALL(262, bdev_freeze(sb->s_bdev));
++		ret = ({ __auto_type __efi_a0 = (sb->s_bdev); EXT4_EFI_CALL(262, true, -EIO, (void)0, bdev_freeze(__efi_a0)); });
+ 		if (ret)
+ 			return ret;
+ 		set_bit(EXT4_FLAGS_SHUTDOWN, &sbi->s_ext4_flags);
+@@ -878,8 +878,7 @@
+ 
+ 	info->gi_last_flags = xfm->fmr_flags;
+ 	ext4_fsmap_from_internal(info->gi_sb, &fm, xfm);
+-	if (EXT4_ES_CALL(311, copy_to_user(&info->gi_data->fmh_recs[info->gi_idx++], &fm,
+-			sizeof(struct fsmap))))
++	if (({ __auto_type __efi_a0 = (&info->gi_data->fmh_recs[info->gi_idx++]); __auto_type __efi_a1 = (&fm); __auto_type __efi_a2 = (sizeof(struct fsmap)); EXT4_EFI_CALL(311, (__efi_a2 > 0), __efi_a2, (void)0, copy_to_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		return -EFAULT;
+ 
+ 	return 0;
+@@ -894,7 +893,7 @@
+ 	bool aborted = false;
+ 	int error;
+ 
+-	if (EXT4_ES_CALL(285, copy_from_user(&head, arg, sizeof(struct fsmap_head))))
++	if (({ __auto_type __efi_a0 = (&head); __auto_type __efi_a1 = (arg); __auto_type __efi_a2 = (sizeof(struct fsmap_head)); EXT4_EFI_CALL(285, (__efi_a2 > 0), __efi_a2, if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2), copy_from_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		return -EFAULT;
+ 	if (memchr_inv(head.fmh_reserved, 0, sizeof(head.fmh_reserved)) ||
+ 	    memchr_inv(head.fmh_keys[0].fmr_reserved, 0,
+@@ -930,16 +929,14 @@
+ 	/* If we didn't abort, set the "last" flag in the last fmx */
+ 	if (!aborted && info.gi_idx) {
+ 		info.gi_last_flags |= FMR_OF_LAST;
+-		if (EXT4_ES_CALL(289, copy_to_user(&info.gi_data->fmh_recs[info.gi_idx - 1].fmr_flags,
+-				 &info.gi_last_flags,
+-				 sizeof(info.gi_last_flags))))
++		if (({ __auto_type __efi_a0 = (&info.gi_data->fmh_recs[info.gi_idx - 1].fmr_flags); __auto_type __efi_a1 = (&info.gi_last_flags); __auto_type __efi_a2 = (sizeof(info.gi_last_flags)); EXT4_EFI_CALL(289, (__efi_a2 > 0), __efi_a2, (void)0, copy_to_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 			return -EFAULT;
+ 	}
+ 
+ 	/* copy back header */
+ 	head.fmh_entries = xhead.fmh_entries;
+ 	head.fmh_oflags = xhead.fmh_oflags;
+-	if (EXT4_ES_CALL(290, copy_to_user(arg, &head, sizeof(struct fsmap_head))))
++	if (({ __auto_type __efi_a0 = (arg); __auto_type __efi_a1 = (&head); __auto_type __efi_a2 = (sizeof(struct fsmap_head)); EXT4_EFI_CALL(290, (__efi_a2 > 0), __efi_a2, (void)0, copy_to_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		return -EFAULT;
+ 
+ 	return 0;
+@@ -962,14 +959,14 @@
+ 		goto group_add_out;
+ 	}
+ 
+-	err = EXT4_ES_CALL(283, mnt_want_write_file(file));
++	err = ({ __auto_type __efi_a0 = (file); EXT4_EFI_CALL(283, true, -EROFS, (void)0, mnt_want_write_file(__efi_a0)); });
+ 	if (err)
+ 		goto group_add_out;
+ 
+ 	err = ext4_group_add(sb, input);
+ 	if (EXT4_SB(sb)->s_journal) {
+ 		jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
+-		err2 = EXT4_ES_CALL(284, jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0));
++		err2 = ({ __auto_type __efi_a0 = (EXT4_SB(sb)->s_journal); __auto_type __efi_a1 = (0); EXT4_EFI_CALL(284, false, 0, (void)0, jbd2_journal_flush(__efi_a0, __efi_a1)); });
+ 		jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
+ 	}
+ 	if (err == 0)
+@@ -1050,7 +1047,7 @@
+ 	struct inode *inode = file_inode(filp);
+ 	int error;
+ 
+-	if (EXT4_ES_CALL(295, copy_from_user(&fiemap, ufiemap, sizeof(fiemap))))
++	if (({ __auto_type __efi_a0 = (&fiemap); __auto_type __efi_a1 = (ufiemap); __auto_type __efi_a2 = (sizeof(fiemap)); EXT4_EFI_CALL(295, (__efi_a2 > 0), __efi_a2, if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2), copy_from_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		return -EFAULT;
+ 
+ 	if (fiemap.fm_extent_count > FIEMAP_MAX_EXTENTS)
+@@ -1064,7 +1061,7 @@
+ 			fiemap.fm_length);
+ 	fiemap.fm_flags = fieinfo.fi_flags;
+ 	fiemap.fm_mapped_extents = fieinfo.fi_extents_mapped;
+-	if (EXT4_ES_CALL(296, copy_to_user(ufiemap, &fiemap, sizeof(fiemap))))
++	if (({ __auto_type __efi_a0 = (ufiemap); __auto_type __efi_a1 = (&fiemap); __auto_type __efi_a2 = (sizeof(fiemap)); EXT4_EFI_CALL(296, (__efi_a2 > 0), __efi_a2, (void)0, copy_to_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		error = -EFAULT;
+ 
+ 	return error;
+@@ -1077,8 +1074,7 @@
+ 	unsigned int flush_flags = 0;
+ 	struct super_block *sb = file_inode(filp)->i_sb;
+ 
+-	if (EXT4_ES_CALL(297, copy_from_user(&flags, (__u32 __user *)arg,
+-				sizeof(__u32))))
++	if (({ __auto_type __efi_a0 = (&flags); __auto_type __efi_a1 = ((__u32 __user *)arg); __auto_type __efi_a2 = (sizeof(__u32)); EXT4_EFI_CALL(297, (__efi_a2 > 0), __efi_a2, if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2), copy_from_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		return -EFAULT;
+ 
+ 	if (!capable(CAP_SYS_ADMIN))
+@@ -1109,7 +1105,7 @@
+ 	}
+ 
+ 	jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
+-	err = EXT4_ES_CALL(300, jbd2_journal_flush(EXT4_SB(sb)->s_journal, flush_flags));
++	err = ({ __auto_type __efi_a0 = (EXT4_SB(sb)->s_journal); __auto_type __efi_a1 = (flush_flags); EXT4_EFI_CALL(300, false, 0, (void)0, jbd2_journal_flush(__efi_a0, __efi_a1)); });
+ 	jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
+ 
+ 	return err;
+@@ -1130,7 +1126,7 @@
+ 	 * find the required terminating null byte in order to test the
+ 	 * label length. The on disk label doesn't need to be null terminated.
+ 	 */
+-	if (EXT4_ES_CALL(302, copy_from_user(new_label, user_label, EXT4_LABEL_MAX + 1)))
++	if (({ __auto_type __efi_a0 = (new_label); __auto_type __efi_a1 = (user_label); __auto_type __efi_a2 = (EXT4_LABEL_MAX + 1); EXT4_EFI_CALL(302, (__efi_a2 > 0), __efi_a2, if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2), copy_from_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		return -EFAULT;
+ 
+ 	len = strnlen(new_label, EXT4_LABEL_MAX + 1);
+@@ -1142,7 +1138,7 @@
+ 	 */
+ 	memset(new_label + len, 0, EXT4_LABEL_MAX - len);
+ 
+-	ret = EXT4_ES_CALL(303, mnt_want_write_file(filp));
++	ret = ({ __auto_type __efi_a0 = (filp); EXT4_EFI_CALL(303, true, -EROFS, (void)0, mnt_want_write_file(__efi_a0)); });
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1167,7 +1163,7 @@
+ 	memtostr_pad(label, sbi->s_es->s_volume_name);
+ 	unlock_buffer(sbi->s_sbh);
+ 
+-	if (EXT4_ES_CALL(301, copy_to_user(user_label, label, sizeof(label))))
++	if (({ __auto_type __efi_a0 = (user_label); __auto_type __efi_a1 = (label); __auto_type __efi_a2 = (sizeof(label)); EXT4_EFI_CALL(301, (__efi_a2 > 0), __efi_a2, (void)0, copy_to_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		return -EFAULT;
+ 	return 0;
+ }
+@@ -1178,13 +1174,12 @@
+ 	struct fsuuid fsuuid;
+ 	__u8 uuid[UUID_SIZE];
+ 
+-	if (EXT4_ES_CALL(304, copy_from_user(&fsuuid, ufsuuid, sizeof(fsuuid))))
++	if (({ __auto_type __efi_a0 = (&fsuuid); __auto_type __efi_a1 = (ufsuuid); __auto_type __efi_a2 = (sizeof(fsuuid)); EXT4_EFI_CALL(304, (__efi_a2 > 0), __efi_a2, if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2), copy_from_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		return -EFAULT;
+ 
+ 	if (fsuuid.fsu_len == 0) {
+ 		fsuuid.fsu_len = UUID_SIZE;
+-		if (EXT4_ES_CALL(305, copy_to_user(&ufsuuid->fsu_len, &fsuuid.fsu_len,
+-					sizeof(fsuuid.fsu_len))))
++		if (({ __auto_type __efi_a0 = (&ufsuuid->fsu_len); __auto_type __efi_a1 = (&fsuuid.fsu_len); __auto_type __efi_a2 = (sizeof(fsuuid.fsu_len)); EXT4_EFI_CALL(305, (__efi_a2 > 0), __efi_a2, (void)0, copy_to_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 			return -EFAULT;
+ 		return 0;
+ 	}
+@@ -1197,8 +1192,8 @@
+ 	unlock_buffer(sbi->s_sbh);
+ 
+ 	fsuuid.fsu_len = UUID_SIZE;
+-	if (EXT4_ES_CALL(306, copy_to_user(ufsuuid, &fsuuid, sizeof(fsuuid))) ||
+-	    EXT4_ES_CALL(307, copy_to_user(&ufsuuid->fsu_uuid[0], uuid, UUID_SIZE)))
++	if (({ __auto_type __efi_a0 = (ufsuuid); __auto_type __efi_a1 = (&fsuuid); __auto_type __efi_a2 = (sizeof(fsuuid)); EXT4_EFI_CALL(306, (__efi_a2 > 0), __efi_a2, (void)0, copy_to_user(__efi_a0, __efi_a1, __efi_a2)); }) ||
++	    ({ __auto_type __efi_a0 = (&ufsuuid->fsu_uuid[0]); __auto_type __efi_a1 = (uuid); __auto_type __efi_a2 = (UUID_SIZE); EXT4_EFI_CALL(307, (__efi_a2 > 0), __efi_a2, (void)0, copy_to_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		return -EFAULT;
+ 	return 0;
+ }
+@@ -1223,16 +1218,16 @@
+ 		|| ext4_has_feature_stable_inodes(sb))
+ 		return -EOPNOTSUPP;
+ 
+-	if (EXT4_ES_CALL(308, copy_from_user(&fsuuid, ufsuuid, sizeof(fsuuid))))
++	if (({ __auto_type __efi_a0 = (&fsuuid); __auto_type __efi_a1 = (ufsuuid); __auto_type __efi_a2 = (sizeof(fsuuid)); EXT4_EFI_CALL(308, (__efi_a2 > 0), __efi_a2, if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2), copy_from_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		return -EFAULT;
+ 
+ 	if (fsuuid.fsu_len != UUID_SIZE || fsuuid.fsu_flags != 0)
+ 		return -EINVAL;
+ 
+-	if (EXT4_ES_CALL(309, copy_from_user(uuid, &ufsuuid->fsu_uuid[0], UUID_SIZE)))
++	if (({ __auto_type __efi_a0 = (uuid); __auto_type __efi_a1 = (&ufsuuid->fsu_uuid[0]); __auto_type __efi_a2 = (UUID_SIZE); EXT4_EFI_CALL(309, (__efi_a2 > 0), __efi_a2, if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2), copy_from_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 		return -EFAULT;
+ 
+-	ret = EXT4_ES_CALL(310, mnt_want_write_file(filp));
++	ret = ({ __auto_type __efi_a0 = (filp); EXT4_EFI_CALL(310, true, -EROFS, (void)0, mnt_want_write_file(__efi_a0)); });
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1272,7 +1267,7 @@
+ 			return -ENOTTY;
+ 		}
+ 
+-		err = EXT4_ES_CALL(267, mnt_want_write_file(filp));
++		err = ({ __auto_type __efi_a0 = (filp); EXT4_EFI_CALL(267, true, -EROFS, (void)0, mnt_want_write_file(__efi_a0)); });
+ 		if (err)
+ 			return err;
+ 		if (get_user(generation, (int __user *) arg)) {
+@@ -1321,14 +1316,14 @@
+ 			goto group_extend_out;
+ 		}
+ 
+-		err = EXT4_ES_CALL(268, mnt_want_write_file(filp));
++		err = ({ __auto_type __efi_a0 = (filp); EXT4_EFI_CALL(268, true, -EROFS, (void)0, mnt_want_write_file(__efi_a0)); });
+ 		if (err)
+ 			goto group_extend_out;
+ 
+ 		err = ext4_group_extend(sb, EXT4_SB(sb)->s_es, n_blocks_count);
+ 		if (EXT4_SB(sb)->s_journal) {
+ 			jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
+-			err2 = EXT4_ES_CALL(269, jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0));
++			err2 = ({ __auto_type __efi_a0 = (EXT4_SB(sb)->s_journal); __auto_type __efi_a1 = (0); EXT4_EFI_CALL(269, false, 0, (void)0, jbd2_journal_flush(__efi_a0, __efi_a1)); });
+ 			jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
+ 		}
+ 		if (err == 0)
+@@ -1350,8 +1345,7 @@
+ 		    !(filp->f_mode & FMODE_WRITE))
+ 			return -EBADF;
+ 
+-		if (EXT4_ES_CALL(270, copy_from_user(&me,
+-			(struct move_extent __user *)arg, sizeof(me))))
++		if (({ __auto_type __efi_a0 = (&me); __auto_type __efi_a1 = ((struct move_extent __user *)arg); __auto_type __efi_a2 = (sizeof(me)); EXT4_EFI_CALL(270, (__efi_a2 > 0), __efi_a2, if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2), copy_from_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 			return -EFAULT;
+ 		me.moved_len = 0;
+ 
+@@ -1376,7 +1370,7 @@
+ 			goto mext_out;
+ 		}
+ 
+-		err = EXT4_ES_CALL(271, mnt_want_write_file(filp));
++		err = ({ __auto_type __efi_a0 = (filp); EXT4_EFI_CALL(271, true, -EROFS, (void)0, mnt_want_write_file(__efi_a0)); });
+ 		if (err)
+ 			goto mext_out;
+ 
+@@ -1384,8 +1378,7 @@
+ 					me.donor_start, me.len, &me.moved_len);
+ 		mnt_drop_write_file(filp);
+ 
+-		if (EXT4_ES_CALL(272, copy_to_user((struct move_extent __user *)arg,
+-				 &me, sizeof(me))))
++		if (({ __auto_type __efi_a0 = ((struct move_extent __user *)arg); __auto_type __efi_a1 = (&me); __auto_type __efi_a2 = (sizeof(me)); EXT4_EFI_CALL(272, (__efi_a2 > 0), __efi_a2, (void)0, copy_to_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 			err = -EFAULT;
+ mext_out:
+ 		fdput(donor);
+@@ -1395,8 +1388,7 @@
+ 	case EXT4_IOC_GROUP_ADD: {
+ 		struct ext4_new_group_data input;
+ 
+-		if (EXT4_ES_CALL(273, copy_from_user(&input, (struct ext4_new_group_input __user *)arg,
+-				sizeof(input))))
++		if (({ __auto_type __efi_a0 = (&input); __auto_type __efi_a1 = ((struct ext4_new_group_input __user *)arg); __auto_type __efi_a2 = (sizeof(input)); EXT4_EFI_CALL(273, (__efi_a2 > 0), __efi_a2, if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2), copy_from_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 			return -EFAULT;
+ 
+ 		return ext4_ioctl_group_add(filp, &input);
+@@ -1409,7 +1401,7 @@
+ 		if (!inode_owner_or_capable(idmap, inode))
+ 			return -EACCES;
+ 
+-		err = EXT4_ES_CALL(274, mnt_want_write_file(filp));
++		err = ({ __auto_type __efi_a0 = (filp); EXT4_EFI_CALL(274, true, -EROFS, (void)0, mnt_want_write_file(__efi_a0)); });
+ 		if (err)
+ 			return err;
+ 		/*
+@@ -1437,7 +1429,7 @@
+ 		if (!inode_owner_or_capable(idmap, inode))
+ 			return -EACCES;
+ 
+-		err = EXT4_ES_CALL(275, mnt_want_write_file(filp));
++		err = ({ __auto_type __efi_a0 = (filp); EXT4_EFI_CALL(275, true, -EROFS, (void)0, mnt_want_write_file(__efi_a0)); });
+ 		if (err)
+ 			return err;
+ 		err = ext4_alloc_da_blocks(inode);
+@@ -1450,7 +1442,7 @@
+ 		int err;
+ 		if (!(filp->f_mode & FMODE_WRITE))
+ 			return -EBADF;
+-		err = EXT4_ES_CALL(276, mnt_want_write_file(filp));
++		err = ({ __auto_type __efi_a0 = (filp); EXT4_EFI_CALL(276, true, -EROFS, (void)0, mnt_want_write_file(__efi_a0)); });
+ 		if (err)
+ 			return err;
+ 		err = swap_inode_boot_loader(sb, idmap, inode);
+@@ -1463,8 +1455,7 @@
+ 		int err = 0, err2 = 0;
+ 		ext4_group_t o_group = EXT4_SB(sb)->s_groups_count;
+ 
+-		if (EXT4_ES_CALL(277, copy_from_user(&n_blocks_count, (__u64 __user *)arg,
+-				   sizeof(__u64)))) {
++		if (({ __auto_type __efi_a0 = (&n_blocks_count); __auto_type __efi_a1 = ((__u64 __user *)arg); __auto_type __efi_a2 = (sizeof(__u64)); EXT4_EFI_CALL(277, (__efi_a2 > 0), __efi_a2, if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2), copy_from_user(__efi_a0, __efi_a1, __efi_a2)); })) {
+ 			return -EFAULT;
+ 		}
+ 
+@@ -1472,7 +1463,7 @@
+ 		if (err)
+ 			return err;
+ 
+-		err = EXT4_ES_CALL(278, mnt_want_write_file(filp));
++		err = ({ __auto_type __efi_a0 = (filp); EXT4_EFI_CALL(278, true, -EROFS, (void)0, mnt_want_write_file(__efi_a0)); });
+ 		if (err)
+ 			goto resizefs_out;
+ 
+@@ -1480,7 +1471,7 @@
+ 		if (EXT4_SB(sb)->s_journal) {
+ 			ext4_fc_mark_ineligible(sb, EXT4_FC_REASON_RESIZE, NULL);
+ 			jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
+-			err2 = EXT4_ES_CALL(279, jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0));
++			err2 = ({ __auto_type __efi_a0 = (EXT4_SB(sb)->s_journal); __auto_type __efi_a1 = (0); EXT4_EFI_CALL(279, false, 0, (void)0, jbd2_journal_flush(__efi_a0, __efi_a1)); });
+ 			jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
+ 		}
+ 		if (err == 0)
+@@ -1516,16 +1507,14 @@
+ 		if (test_opt(sb, NOLOAD) && ext4_has_feature_journal(sb))
+ 			return -EROFS;
+ 
+-		if (EXT4_ES_CALL(281, copy_from_user(&range, (struct fstrim_range __user *)arg,
+-		    sizeof(range))))
++		if (({ __auto_type __efi_a0 = (&range); __auto_type __efi_a1 = ((struct fstrim_range __user *)arg); __auto_type __efi_a2 = (sizeof(range)); EXT4_EFI_CALL(281, (__efi_a2 > 0), __efi_a2, if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2), copy_from_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 			return -EFAULT;
+ 
+ 		ret = ext4_trim_fs(sb, &range);
+ 		if (ret < 0)
+ 			return ret;
+ 
+-		if (EXT4_ES_CALL(282, copy_to_user((struct fstrim_range __user *)arg, &range,
+-		    sizeof(range))))
++		if (({ __auto_type __efi_a0 = ((struct fstrim_range __user *)arg); __auto_type __efi_a1 = (&range); __auto_type __efi_a2 = (sizeof(range)); EXT4_EFI_CALL(282, (__efi_a2 > 0), __efi_a2, (void)0, copy_to_user(__efi_a0, __efi_a1, __efi_a2)); }))
+ 			return -EFAULT;
+ 
+ 		return 0;
+--- a/fs/ext4/mballoc.c
++++ b/fs/ext4/mballoc.c
+@@ -9,7 +9,7 @@
+  * mballoc.c contains the multiblocks allocation routines
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include "ext4_jbd2.h"
+ #include "mballoc.h"
+ #include <linux/log2.h>
+@@ -1308,7 +1308,7 @@
+ 	/* allocate buffer_heads to read bitmaps */
+ 	if (groups_per_page > 1) {
+ 		i = sizeof(struct buffer_head *) * groups_per_page;
+-		bh = EXT4_ES_CALL(337, kzalloc(i, gfp));
++		bh = ({ __auto_type __efi_a0 = (i); __auto_type __efi_a1 = (gfp); EXT4_EFI_CALL(337, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 		if (bh == NULL)
+ 			return -ENOMEM;
+ 	} else
+@@ -1365,7 +1365,7 @@
+ 			/* skip initialized uptodate buddy */
+ 			continue;
+ 
+-		if (!EXT4_ES_CALL(338, buffer_verified(bh[group - first_group])))
++		if (!({ __auto_type __efi_a0 = (bh[group - first_group]); EXT4_EFI_CALL(338, false, 0, (void)0, buffer_verified(__efi_a0)); }))
+ 			/* Skip faulty bitmaps */
+ 			continue;
+ 		err = 0;
+@@ -3301,7 +3301,7 @@
+ 		return 0;
+ 
+ 	size = roundup_pow_of_two(sizeof(*sbi->s_group_info) * size);
+-	new_groupinfo = EXT4_ES_CALL(315, kvzalloc(size, GFP_KERNEL));
++	new_groupinfo = ({ __auto_type __efi_a0 = (size); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(315, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kvzalloc(__efi_a0, __efi_a1)); });
+ 	if (!new_groupinfo) {
+ 		ext4_msg(sb, KERN_ERR, "can't allocate buddy meta group");
+ 		return -ENOMEM;
+@@ -3354,7 +3354,7 @@
+ 	meta_group_info = sbi_array_rcu_deref(sbi, s_group_info, idx);
+ 	i = group & (EXT4_DESC_PER_BLOCK(sb) - 1);
+ 
+-	meta_group_info[i] = EXT4_ES_CALL(316, kmem_cache_zalloc(cachep, GFP_NOFS));
++	meta_group_info[i] = ({ __auto_type __efi_a0 = (cachep); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(316, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmem_cache_zalloc(__efi_a0, __efi_a1)); });
+ 	if (meta_group_info[i] == NULL) {
+ 		ext4_msg(sb, KERN_ERR, "can't allocate buddy mem");
+ 		goto exit_group_info;
+@@ -3415,7 +3415,7 @@
+ 	if (err)
+ 		return err;
+ 
+-	sbi->s_buddy_cache = EXT4_ES_CALL(323, new_inode(sb));
++	sbi->s_buddy_cache = ({ __auto_type __efi_a0 = (sb); EXT4_EFI_CALL(323, true, 0, (void)0, new_inode(__efi_a0)); });
+ 	if (sbi->s_buddy_cache == NULL) {
+ 		ext4_msg(sb, KERN_ERR, "can't get new inode");
+ 		goto err_freesgi;
+@@ -3523,9 +3523,7 @@
+ 	slab_size = offsetof(struct ext4_group_info,
+ 				bb_counters[blocksize_bits + 2]);
+ 
+-	cachep = EXT4_ES_CALL(322, kmem_cache_create(ext4_groupinfo_slab_names[cache_index],
+-					slab_size, 0, SLAB_RECLAIM_ACCOUNT,
+-					NULL));
++	cachep = ({ __auto_type __efi_a0 = (ext4_groupinfo_slab_names[cache_index]); __auto_type __efi_a1 = (slab_size); __auto_type __efi_a2 = (0); __auto_type __efi_a3 = (SLAB_RECLAIM_ACCOUNT); __auto_type __efi_a4 = (NULL); EXT4_EFI_CALL(322, !(__efi_a3 & SLAB_PANIC), 0, (void)0, kmem_cache_create(__efi_a0, __efi_a1, __efi_a2, __efi_a3, __efi_a4)); });
+ 
+ 	ext4_groupinfo_caches[cache_index] = cachep;
+ 
+@@ -3634,15 +3632,13 @@
+ 	} while (i < MB_NUM_ORDERS(sb));
+ 
+ 	sbi->s_mb_avg_fragment_size =
+-		EXT4_ES_CALL(317, kmalloc_array(MB_NUM_ORDERS(sb), sizeof(struct list_head),
+-			GFP_KERNEL));
++		({ __auto_type __efi_a0 = (MB_NUM_ORDERS(sb)); __auto_type __efi_a1 = (sizeof(struct list_head)); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(317, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kmalloc_array(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!sbi->s_mb_avg_fragment_size) {
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
+ 	sbi->s_mb_avg_fragment_size_locks =
+-		EXT4_ES_CALL(318, kmalloc_array(MB_NUM_ORDERS(sb), sizeof(rwlock_t),
+-			GFP_KERNEL));
++		({ __auto_type __efi_a0 = (MB_NUM_ORDERS(sb)); __auto_type __efi_a1 = (sizeof(rwlock_t)); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(318, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kmalloc_array(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!sbi->s_mb_avg_fragment_size_locks) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -3652,15 +3648,13 @@
+ 		rwlock_init(&sbi->s_mb_avg_fragment_size_locks[i]);
+ 	}
+ 	sbi->s_mb_largest_free_orders =
+-		EXT4_ES_CALL(319, kmalloc_array(MB_NUM_ORDERS(sb), sizeof(struct list_head),
+-			GFP_KERNEL));
++		({ __auto_type __efi_a0 = (MB_NUM_ORDERS(sb)); __auto_type __efi_a1 = (sizeof(struct list_head)); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(319, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kmalloc_array(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!sbi->s_mb_largest_free_orders) {
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
+ 	sbi->s_mb_largest_free_orders_locks =
+-		EXT4_ES_CALL(320, kmalloc_array(MB_NUM_ORDERS(sb), sizeof(rwlock_t),
+-			GFP_KERNEL));
++		({ __auto_type __efi_a0 = (MB_NUM_ORDERS(sb)); __auto_type __efi_a1 = (sizeof(rwlock_t)); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(320, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kmalloc_array(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!sbi->s_mb_largest_free_orders_locks) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -3714,7 +3708,7 @@
+ 			sbi->s_mb_group_prealloc, EXT4_NUM_B2C(sbi, sbi->s_stripe));
+ 	}
+ 
+-	sbi->s_locality_groups = EXT4_ES_CALL(321, alloc_percpu(struct ext4_locality_group));
++	sbi->s_locality_groups = ({  EXT4_EFI_CALL(321, true, 0, (void)0, alloc_percpu(struct ext4_locality_group)); });
+ 	if (sbi->s_locality_groups == NULL) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -4236,6 +4230,7 @@
+ 		sync_dirty_buffer(bitmap_bh);
+ 		sync_dirty_buffer(gdp_bh);
+ 	}
++
+ out_err:
+ 	brelse(bitmap_bh);
+ 	if (transitioned)
+@@ -5836,7 +5831,7 @@
+ 	struct ext4_prealloc_space *pa;
+ 
+ 	BUG_ON(ext4_pspace_cachep == NULL);
+-	pa = EXT4_ES_CALL(333, kmem_cache_zalloc(ext4_pspace_cachep, GFP_NOFS));
++	pa = ({ __auto_type __efi_a0 = (ext4_pspace_cachep); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(333, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmem_cache_zalloc(__efi_a0, __efi_a1)); });
+ 	if (!pa)
+ 		return -ENOMEM;
+ 	atomic_set(&pa->pa_count, 1);
+@@ -6406,7 +6401,7 @@
+ 		}
+ 	}
+ 
+-	ac = EXT4_ES_CALL(330, kmem_cache_zalloc(ext4_ac_cachep, GFP_NOFS));
++	ac = ({ __auto_type __efi_a0 = (ext4_ac_cachep); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(330, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmem_cache_zalloc(__efi_a0, __efi_a1)); });
+ 	if (!ac) {
+ 		ar->len = 0;
+ 		*errp = -ENOMEM;
+@@ -6922,6 +6917,7 @@
+ 	err = ext4_mb_load_buddy(sb, block_group, &e4b);
+ 	if (err)
+ 		goto error_out;
++
+ 	if (!ext4_sb_block_valid(sb, NULL, block, count)) {
+ 		ext4_error(sb, "Adding blocks in system zones - "
+ 			   "Block = %llu, count = %lu",
+@@ -6929,6 +6925,7 @@
+ 		err = -EINVAL;
+ 		goto error_clean;
+ 	}
++
+ 	err = ext4_mb_mark_context(handle, sb, false, block_group, bit,
+ 				   cluster_count, EXT4_MB_BITMAP_MARKED_CHECK,
+ 				   &changed);
+--- a/fs/ext4/migrate.c
++++ b/fs/ext4/migrate.c
+@@ -439,9 +439,9 @@
+ 	alloc_ctx = ext4_writepages_down_write(inode->i_sb);
+ 
+ 	/*
+-	 * Worst case inode allocation can touch the inode bitmap, an
+-	 * uninitialized block bitmap, the group descriptor, and the inode
+-	 * table block.  Quota updates need additional credits.
++	 * Worst case we can touch the allocation bitmaps and a block
++	 * group descriptor block.  We do need to worry about
++	 * credits for modifying the quota inode.
+ 	 */
+ 	handle = ext4_journal_start(inode, EXT4_HT_MIGRATE,
+ 		3 + EXT4_MAXQUOTAS_TRANS_BLOCKS(inode->i_sb));
+--- a/fs/ext4/mmp.c
++++ b/fs/ext4/mmp.c
+@@ -1,5 +1,5 @@
+ // SPDX-License-Identifier: GPL-2.0
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/fs.h>
+ #include <linux/random.h>
+ #include <linux/buffer_head.h>
+@@ -51,7 +51,7 @@
+ 	get_bh(bh);
+ 	submit_bh(REQ_OP_WRITE | REQ_SYNC | REQ_META | REQ_PRIO, bh);
+ 	wait_on_buffer(bh);
+-	if (unlikely(!EXT4_ES_CALL(353, buffer_uptodate(bh))))
++	if (unlikely(!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(353, false, 0, (void)0, buffer_uptodate(__efi_a0)); })))
+ 		return -EIO;
+ 	return 0;
+ }
+--- a/fs/ext4/move_extent.c
++++ b/fs/ext4/move_extent.c
+@@ -5,7 +5,7 @@
+  *            Akira Fujita <a-fujita@rs.jp.nec.com>
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/fs.h>
+ #include <linux/quotaops.h>
+ #include <linux/slab.h>
+@@ -229,7 +229,7 @@
+ 		if (bh_offset(bh) > to)
+ 			break;
+ 		wait_on_buffer(bh);
+-		if (EXT4_ES_CALL(362, buffer_uptodate(bh)))
++		if (({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(362, false, 0, (void)0, buffer_uptodate(__efi_a0)); }))
+ 			continue;
+ 		return -EIO;
+ 	} while ((bh = bh->b_this_page) != head);
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -25,7 +25,7 @@
+  *	Theodore Ts'o, 2002
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/fs.h>
+ #include <linux/pagemap.h>
+ #include <linux/time.h>
+@@ -51,10 +51,9 @@
+ #define NAMEI_RA_BLOCKS  4
+ #define NAMEI_RA_SIZE	     (NAMEI_RA_CHUNKS * NAMEI_RA_BLOCKS)
+ 
+-
+-static struct buffer_head *ext4_append(
+-						handle_t *handle, struct inode *inode,
+-						ext4_lblk_t *block)
++static struct buffer_head *ext4_append(handle_t *handle,
++					struct inode *inode,
++					ext4_lblk_t *block)
+ {
+ 	struct ext4_map_blocks map;
+ 	struct buffer_head *bh;
+@@ -92,7 +91,7 @@
+ 		goto out;
+ 	BUFFER_TRACE(bh, "get_write_access");
+ 	err = ext4_journal_get_write_access(handle, inode->i_sb, bh,
+-				    EXT4_JTR_NONE);
++					    EXT4_JTR_NONE);
+ 	if (err)
+ 		goto out;
+ 	return bh;
+@@ -442,7 +441,6 @@
+ 	return ext4_handle_dirty_metadata(handle, inode, bh);
+ }
+ 
+-
+ static struct dx_countlimit *get_dx_countlimit(struct inode *inode,
+ 					       struct ext4_dir_entry *dirent,
+ 					       int *offset)
+@@ -553,7 +551,6 @@
+ 	ext4_dx_csum_set(inode, (struct ext4_dir_entry *)bh->b_data);
+ 	return ext4_handle_dirty_metadata(handle, inode, bh);
+ }
+-
+ 
+ /*
+  * p is at least 6 bytes before the end of page
+@@ -1639,7 +1636,7 @@
+ 		if ((bh = bh_use[ra_ptr++]) == NULL)
+ 			goto next;
+ 		wait_on_buffer(bh);
+-		if (!EXT4_ES_CALL(386, buffer_uptodate(bh))) {
++		if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(386, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
+ 			EXT4_ERROR_INODE_ERR(dir, EIO,
+ 					     "reading directory lblock %lu",
+ 					     (unsigned long) block);
+@@ -1961,7 +1958,7 @@
+ 
+ 	BUFFER_TRACE(*bh, "get_write_access");
+ 	err = ext4_journal_get_write_access(handle, dir->i_sb, *bh,
+-				    EXT4_JTR_NONE);
++					    EXT4_JTR_NONE);
+ 	if (err)
+ 		goto journal_error;
+ 
+@@ -2347,7 +2344,7 @@
+ 	if (retval)
+ 		goto out_frames;
+ 
+-	de = do_split(handle, dir, &bh2, frame, &fname->hinfo);
++	de = do_split(handle,dir, &bh2, frame, &fname->hinfo);
+ 	if (IS_ERR(de)) {
+ 		retval = PTR_ERR(de);
+ 		goto out_frames;
+@@ -2378,7 +2375,7 @@
+  * the entry, as someone else might have used it while you slept.
+  */
+ static int ext4_add_entry(handle_t *handle, struct dentry *dentry,
+-				  struct inode *inode)
++			  struct inode *inode)
+ {
+ 	struct inode *dir = d_inode(dentry->d_parent);
+ 	struct buffer_head *bh = NULL;
+@@ -2520,8 +2517,7 @@
+ 	}
+ 
+ 	BUFFER_TRACE(bh, "get_write_access");
+-	err = ext4_journal_get_write_access(handle, dir->i_sb, bh,
+-					    EXT4_JTR_NONE);
++	err = ext4_journal_get_write_access(handle, sb, bh, EXT4_JTR_NONE);
+ 	if (err)
+ 		goto journal_error;
+ 
+@@ -2578,7 +2574,7 @@
+ 		node2->fake.rec_len = ext4_rec_len_to_disk(sb->s_blocksize,
+ 							   sb->s_blocksize);
+ 		BUFFER_TRACE(frame->bh, "get_write_access");
+-		err = ext4_journal_get_write_access(handle, dir->i_sb, frame->bh,
++		err = ext4_journal_get_write_access(handle, sb, frame->bh,
+ 						    EXT4_JTR_NONE);
+ 		if (err)
+ 			goto journal_error;
+@@ -2589,7 +2585,8 @@
+ 				       icount1, icount2));
+ 
+ 			BUFFER_TRACE(frame->bh, "get_write_access"); /* index root */
+-			err = ext4_journal_get_write_access(handle, dir->i_sb, (frame - 1)->bh,
++			err = ext4_journal_get_write_access(handle, sb,
++							    (frame - 1)->bh,
+ 							    EXT4_JTR_NONE);
+ 			if (err)
+ 				goto journal_error;
+@@ -2615,10 +2612,11 @@
+ 				goto journal_error;
+ 			brelse (bh2);
+ 			err = ext4_handle_dirty_dx_node(handle, dir,
+-						       (frame - 1)->bh);
++						   (frame - 1)->bh);
+ 			if (err)
+ 				goto journal_error;
+-			err = ext4_handle_dirty_dx_node(handle, dir, frame->bh);
++			err = ext4_handle_dirty_dx_node(handle, dir,
++							frame->bh);
+ 			if (restart || err)
+ 				goto journal_error;
+ 		} else {
+@@ -2723,9 +2721,9 @@
+ }
+ 
+ static int ext4_delete_entry(handle_t *handle,
+-					      struct inode *dir,
+-					      struct ext4_dir_entry_2 *de_del,
+-					      struct buffer_head *bh)
++			     struct inode *dir,
++			     struct ext4_dir_entry_2 *de_del,
++			     struct buffer_head *bh)
+ {
+ 	int err, csum_size = 0;
+ 	unsigned long deleted_ino = le32_to_cpu(de_del->inode);
+@@ -2762,7 +2760,7 @@
+ 	ext4_ct_ns_record_dirent(dir->i_sb, "NAMESPACE.DIRENT.DELETE", dir,
+ 				 deleted_ino, 2, 0);
+ 
+-	err = 0;
++	return 0;
+ out:
+ 	ext4_ct_ns_record_dirent(dir->i_sb, "NAMESPACE.DIRENT.DELETE", dir,
+ 				 deleted_ino, 2, err);
+@@ -2770,8 +2768,6 @@
+ 		ext4_std_error(dir->i_sb, err);
+ 	return err;
+ }
+-
+-
+ 
+ /*
+  * Set directory link count to 1 if nlinks > EXT4_LINK_MAX, or if nlinks == 2
+@@ -2858,7 +2854,7 @@
+ 	struct inode *inode;
+ 	int err, credits, retries = 0;
+ 
+-	err = EXT4_ES_CALL(371, dquot_initialize(dir));
++	err = ({ __auto_type __efi_a0 = (dir); EXT4_EFI_CALL(371, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (err)
+ 		return err;
+ 
+@@ -2893,7 +2889,7 @@
+ 	struct inode *inode;
+ 	int err, credits, retries = 0;
+ 
+-	err = EXT4_ES_CALL(382, dquot_initialize(dir));
++	err = ({ __auto_type __efi_a0 = (dir); EXT4_EFI_CALL(382, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (err)
+ 		return err;
+ 
+@@ -2927,7 +2923,7 @@
+ 	struct inode *inode;
+ 	int err, retries = 0;
+ 
+-	err = EXT4_ES_CALL(384, dquot_initialize(dir));
++	err = ({ __auto_type __efi_a0 = (dir); EXT4_EFI_CALL(384, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (err)
+ 		return err;
+ 
+@@ -2992,7 +2988,7 @@
+ }
+ 
+ int ext4_init_new_dir(handle_t *handle, struct inode *dir,
+-					       struct inode *inode)
++			     struct inode *inode)
+ {
+ 	struct buffer_head *dir_block = NULL;
+ 	struct ext4_dir_entry_2 *de;
+@@ -3034,7 +3030,6 @@
+ 	return err;
+ }
+ 
+-
+ static int ext4_mkdir(struct mnt_idmap *idmap, struct inode *dir,
+ 		      struct dentry *dentry, umode_t mode)
+ {
+@@ -3046,7 +3041,7 @@
+ 	if (EXT4_DIR_LINK_MAX(dir))
+ 		return -EMLINK;
+ 
+-	err = EXT4_ES_CALL(379, dquot_initialize(dir));
++	err = ({ __auto_type __efi_a0 = (dir); EXT4_EFI_CALL(379, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (err)
+ 		return err;
+ 
+@@ -3075,8 +3070,14 @@
+             ext4_ct_ns_ref(inode->i_sb, "NAMESPACE.REF.REMOVE_DOT", inode->i_ino, inode->i_ino, -1);
+             ext4_ct_ns_ref(inode->i_sb, "NAMESPACE.REF.REMOVE_DOTDOT", inode->i_ino, dir->i_ino, -1);
+         }
+-		ext4_ct_nlink(inode, 0, "NAMESPACE.NLINK.ROLLBACK");
+-		clear_nlink(inode);
++		{
++			unsigned int before = inode->i_nlink;
++
++			clear_nlink(inode);
++			ext4_ct_ns_record_nlink(inode->i_sb,
++					"NAMESPACE.NLINK.ROLLBACK", inode,
++					before, inode->i_nlink, 4, 0);
++		}
+ #ifdef CONFIG_EXT4_COUNTER_TRACE
+ 		if (READ_ONCE(EXT4_SB(dir->i_sb)->s_checker_active)) {
+ 			struct ext4_dir_entry_2 *de;
+@@ -3213,10 +3214,10 @@
+ 
+ 	/* Initialize quotas before so that eventual writes go in
+ 	 * separate transaction */
+-	retval = EXT4_ES_CALL(380, dquot_initialize(dir));
++	retval = ({ __auto_type __efi_a0 = (dir); EXT4_EFI_CALL(380, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (retval)
+ 		return retval;
+-	retval = EXT4_ES_CALL(381, dquot_initialize(d_inode(dentry)));
++	retval = ({ __auto_type __efi_a0 = (d_inode(dentry)); EXT4_EFI_CALL(381, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (retval)
+ 		return retval;
+ 
+@@ -3309,7 +3310,6 @@
+ 	int retval = -ENOENT;
+ 	struct buffer_head *bh;
+ 	struct ext4_dir_entry_2 *de;
+-	struct ext4_iloc dir_iloc, inode_iloc;
+ 	handle_t *handle;
+ 	int skip_remove_dentry = 0;
+ 
+@@ -3345,22 +3345,6 @@
+ 
+ 	if (IS_DIRSYNC(dir))
+ 		ext4_handle_sync(handle);
+-
+-	/*
+-	 * Reserve the inode buffers before removing the directory entry.  If
+-	 * reading either inode table block or getting journal write access fails,
+-	 * unlink must fail before it changes the directory.
+-	 */
+-	dir_iloc.bh = NULL;
+-	inode_iloc.bh = NULL;
+-	if (!skip_remove_dentry) {
+-		retval = ext4_reserve_inode_write(handle, dir, &dir_iloc);
+-		if (retval)
+-			goto out_handle;
+-	}
+-	retval = ext4_reserve_inode_write(handle, inode, &inode_iloc);
+-	if (retval)
+-		goto out_handle;
+ 
+ 	if (!skip_remove_dentry) {
+ 		retval = ext4_delete_entry(handle, dir, de, bh);
+@@ -3390,10 +3374,6 @@
+ 	if (dentry && !retval)
+ 		ext4_fc_track_unlink(handle, dentry);
+ out_handle:
+-	if (dir_iloc.bh)
+-		brelse(dir_iloc.bh);
+-	if (inode_iloc.bh)
+-		brelse(inode_iloc.bh);
+ 	ext4_journal_stop(handle);
+ out_bh:
+ 	brelse(bh);
+@@ -3412,10 +3392,10 @@
+ 	 * Initialize quotas before so that eventual writes go
+ 	 * in separate transaction
+ 	 */
+-	retval = EXT4_ES_CALL(374, dquot_initialize(dir));
++	retval = ({ __auto_type __efi_a0 = (dir); EXT4_EFI_CALL(374, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (retval)
+ 		goto out_trace;
+-	retval = EXT4_ES_CALL(375, dquot_initialize(d_inode(dentry)));
++	retval = ({ __auto_type __efi_a0 = (d_inode(dentry)); EXT4_EFI_CALL(375, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (retval)
+ 		goto out_trace;
+ 
+@@ -3474,12 +3454,11 @@
+ 	if (unlikely(ext4_forced_shutdown(dir->i_sb)))
+ 		return -EIO;
+ 
+-	err = EXT4_ES_CALL(376, fscrypt_prepare_symlink(dir, symname, len, dir->i_sb->s_blocksize,
+-				      &disk_link));
++	err = ({ __auto_type __efi_a0 = (dir); __auto_type __efi_a1 = (symname); __auto_type __efi_a2 = (len); __auto_type __efi_a3 = (dir->i_sb->s_blocksize); __auto_type __efi_a4 = (&disk_link); EXT4_EFI_CALL(376, IS_ENCRYPTED(__efi_a0), -EOPNOTSUPP, (void)0, fscrypt_prepare_symlink(__efi_a0, __efi_a1, __efi_a2, __efi_a3, __efi_a4)); });
+ 	if (err)
+ 		return err;
+ 
+-	err = EXT4_ES_CALL(377, dquot_initialize(dir));
++	err = ({ __auto_type __efi_a0 = (dir); EXT4_EFI_CALL(377, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (err)
+ 		return err;
+ 
+@@ -3606,7 +3585,7 @@
+ 	if (inode->i_nlink >= EXT4_LINK_MAX)
+ 		return -EMLINK;
+ 
+-	err = EXT4_ES_CALL(372, fscrypt_prepare_link(old_dentry, dir, dentry));
++	err = ({ __auto_type __efi_a0 = (old_dentry); __auto_type __efi_a1 = (dir); __auto_type __efi_a2 = (dentry); EXT4_EFI_CALL(372, IS_ENCRYPTED(__efi_a1), -EOPNOTSUPP, (void)0, fscrypt_prepare_link(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (err)
+ 		return err;
+ 
+@@ -3615,7 +3594,7 @@
+ 			EXT4_I(old_dentry->d_inode)->i_projid)))
+ 		return -EXDEV;
+ 
+-	err = EXT4_ES_CALL(373, dquot_initialize(dir));
++	err = ({ __auto_type __efi_a0 = (dir); EXT4_EFI_CALL(373, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (err)
+ 		return err;
+ 	return __ext4_link(dir, inode, dentry);
+@@ -3709,8 +3688,7 @@
+ 		return -EFSCORRUPTED;
+ 	BUFFER_TRACE(ent->dir_bh, "get_write_access");
+ 	return ext4_journal_get_write_access(handle, ent->dir->i_sb,
+-						       ent->dir_bh,
+-						       EXT4_JTR_NONE);
++					     ent->dir_bh, EXT4_JTR_NONE);
+ }
+ 
+ static int ext4_rename_dir_finish(handle_t *handle, struct ext4_renament *ent,
+@@ -3733,11 +3711,11 @@
+ 	if (!ent->dir_inlined) {
+ 		if (is_dx(ent->inode)) {
+ 			retval = ext4_handle_dirty_dx_node(handle,
+-									 ent->inode,
+-									 ent->dir_bh);
++							   ent->inode,
++							   ent->dir_bh);
+ 		} else {
+-			retval = ext4_handle_dirty_dirblock(handle,
+-									 ent->inode, ent->dir_bh);
++			retval = ext4_handle_dirty_dirblock(handle, ent->inode,
++							    ent->dir_bh);
+ 		}
+ 	} else {
+ 		retval = ext4_mark_inode_dirty(handle, ent->inode);
+@@ -3755,8 +3733,8 @@
+ 	int retval, retval2;
+ 
+ 	BUFFER_TRACE(ent->bh, "get write access");
+-	retval = ext4_journal_get_write_access(handle, ent->dir->i_sb,
+-						ent->bh, EXT4_JTR_NONE);
++	retval = ext4_journal_get_write_access(handle, ent->dir->i_sb, ent->bh,
++					       EXT4_JTR_NONE);
+ 	if (retval)
+ 		return retval;
+ 	{
+@@ -3767,7 +3745,6 @@
+ 		ext4_ct_ns_ref(ent->dir->i_sb, "NAMESPACE.REF.REPLACE",
+ 			ent->dir->i_ino, ino, 1);
+ 	}
+-	ent->de->inode = cpu_to_le32(ino);
+ 	if (ext4_has_feature_filetype(ent->dir->i_sb))
+ 		ent->de->file_type = file_type;
+ 	inode_inc_iversion(ent->dir);
+@@ -3775,8 +3752,7 @@
+ 	retval = ext4_mark_inode_dirty(handle, ent->dir);
+ 	BUFFER_TRACE(ent->bh, "call ext4_handle_dirty_metadata");
+ 	if (!ent->inlined) {
+-		retval2 = ext4_handle_dirty_dirblock(handle, ent->dir,
+-								ent->bh);
++		retval2 = ext4_handle_dirty_dirblock(handle, ent->dir, ent->bh);
+ 		if (unlikely(retval2)) {
+ 			ext4_std_error(ent->dir->i_sb, retval2);
+ 			return retval2;
+@@ -3811,9 +3787,8 @@
+ 	brelse(old.bh);
+ }
+ 
+-static int ext4_find_delete_entry(handle_t *handle,
+-						    struct inode *dir,
+-						    const struct qstr *d_name)
++static int ext4_find_delete_entry(handle_t *handle, struct inode *dir,
++				  const struct qstr *d_name)
+ {
+ 	int retval = -ENOENT;
+ 	struct buffer_head *bh;
+@@ -3829,12 +3804,10 @@
+ 	return retval;
+ }
+ 
+-
+ static void ext4_rename_delete(handle_t *handle, struct ext4_renament *ent,
+ 			       int force_reread)
+ {
+ 	int retval;
+-
+ 	/*
+ 	 * ent->de could have moved from under us during htree split, so make
+ 	 * sure that we are deleting the right entry.  We might also be pointing
+@@ -3849,8 +3822,7 @@
+ 		retval = ext4_find_delete_entry(handle, ent->dir,
+ 						&ent->dentry->d_name);
+ 	} else {
+-			retval = ext4_delete_entry(handle, ent->dir, ent->de,
+-						      ent->bh);
++		retval = ext4_delete_entry(handle, ent->dir, ent->de, ent->bh);
+ 		if (retval == -ENOENT) {
+ 			retval = ext4_find_delete_entry(handle, ent->dir,
+ 							&ent->dentry->d_name);
+@@ -3950,20 +3922,20 @@
+ 			EXT4_I(old_dentry->d_inode)->i_projid)))
+ 		return -EXDEV;
+ 
+-	retval = EXT4_ES_CALL(392, dquot_initialize(old.dir));
++	retval = ({ __auto_type __efi_a0 = (old.dir); EXT4_EFI_CALL(392, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (retval)
+ 		return retval;
+-	retval = EXT4_ES_CALL(393, dquot_initialize(old.inode));
++	retval = ({ __auto_type __efi_a0 = (old.inode); EXT4_EFI_CALL(393, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (retval)
+ 		return retval;
+-	retval = EXT4_ES_CALL(394, dquot_initialize(new.dir));
++	retval = ({ __auto_type __efi_a0 = (new.dir); EXT4_EFI_CALL(394, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (retval)
+ 		return retval;
+ 
+ 	/* Initialize quotas before so that eventual writes go
+ 	 * in separate transaction */
+ 	if (new.inode) {
+-		retval = EXT4_ES_CALL(395, dquot_initialize(new.inode));
++		retval = ({ __auto_type __efi_a0 = (new.inode); EXT4_EFI_CALL(395, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 		if (retval)
+ 			return retval;
+ 	}
+@@ -4210,10 +4182,10 @@
+ 			EXT4_I(new_dentry->d_inode)->i_projid)))
+ 		return -EXDEV;
+ 
+-	retval = EXT4_ES_CALL(390, dquot_initialize(old.dir));
++	retval = ({ __auto_type __efi_a0 = (old.dir); EXT4_EFI_CALL(390, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (retval)
+ 		return retval;
+-	retval = EXT4_ES_CALL(391, dquot_initialize(new.dir));
++	retval = ({ __auto_type __efi_a0 = (new.dir); EXT4_EFI_CALL(391, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (retval)
+ 		return retval;
+ 
+@@ -4254,6 +4226,7 @@
+ 
+ 	if (IS_DIRSYNC(old.dir) || IS_DIRSYNC(new.dir))
+ 		ext4_handle_sync(handle);
++
+ 	if (S_ISDIR(old.inode->i_mode)) {
+ 		retval = ext4_rename_dir_prepare(handle, &old, new.dir != old.dir);
+ 		if (retval)
+@@ -4338,19 +4311,16 @@
+ 	if (flags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE | RENAME_WHITEOUT))
+ 		return -EINVAL;
+ 
+-	err = EXT4_ES_CALL(383, fscrypt_prepare_rename(old_dir, old_dentry, new_dir, new_dentry,
+-				     flags));
++	err = ({ __auto_type __efi_a0 = (old_dir); __auto_type __efi_a1 = (old_dentry); __auto_type __efi_a2 = (new_dir); __auto_type __efi_a3 = (new_dentry); __auto_type __efi_a4 = (flags); EXT4_EFI_CALL(383, (IS_ENCRYPTED(__efi_a0) || IS_ENCRYPTED(__efi_a2)), -EOPNOTSUPP, (void)0, fscrypt_prepare_rename(__efi_a0, __efi_a1, __efi_a2, __efi_a3, __efi_a4)); });
+ 	if (err)
+ 		return err;
+ 
+ 	if (flags & RENAME_EXCHANGE) {
+-		err = ext4_cross_rename(old_dir, old_dentry,
+-					new_dir, new_dentry);
+-	} else {
+-		err = ext4_rename(idmap, old_dir, old_dentry, new_dir,
+-				  new_dentry, flags);
+-	}
+-	return err;
++		return ext4_cross_rename(old_dir, old_dentry,
++					 new_dir, new_dentry);
++	}
++
++	return ext4_rename(idmap, old_dir, old_dentry, new_dir, new_dentry, flags);
+ }
+ 
+ /*
+--- a/fs/ext4/orphan.c
++++ b/fs/ext4/orphan.c
+@@ -1,7 +1,7 @@
+ /*
+  * Ext4 orphan inode handling
+  */
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/fs.h>
+ #include <linux/quotaops.h>
+ #include <linux/buffer_head.h>
+@@ -9,8 +9,6 @@
+ #include "ext4.h"
+ #include "ext4_jbd2.h"
+ #include "counter_trace.h"
+-
+-#define EXT4_MAX_ORPHAN_FILE_BLOCKS 512
+ 
+ #ifdef CONFIG_EXT4_COUNTER_TRACE
+ static void ext4_orphan_file_op_begin(struct ext4_orphan_info *oi)
+@@ -80,7 +78,6 @@
+ 		 */
+ 		ret = -ENOSPC;
+ 		goto ct_out;
+-		goto out_active;
+ 	}
+ 
+ 	ret = ext4_journal_get_write_access(handle, inode->i_sb,
+@@ -88,7 +85,6 @@
+ 	if (ret) {
+ 		atomic_inc(&oi->of_binfo[i].ob_free_entries);
+ 		goto ct_out;
+-		goto out_active;
+ 	}
+ 
+ 	bdata = (__le32 *)(oi->of_binfo[i].ob_bh->b_data);
+@@ -107,7 +103,6 @@
+ 				atomic_inc(&oi->of_binfo[i].ob_free_entries);
+ 				ret = -ENOSPC;
+ 				goto ct_out;
+-				goto out_active;
+ 			}
+ 			cond_resched();
+ 		}
+@@ -139,7 +134,6 @@
+ 	}
+ ct_out:
+ 	ext4_ct_exit(inode->i_sb, &ct_scope, ret);
+-out_active:
+ 	ext4_orphan_file_op_end(oi);
+ 	return ret;
+ }
+@@ -191,9 +185,8 @@
+ 		 * Fallback to normal orphan list of orphan file is
+ 		 * out of space
+ 		 */
+-		if (err != -ENOSPC) {
++		if (err != -ENOSPC)
+ 			return err;
+-		}
+ 	}
+ 
+ 	BUFFER_TRACE(sbi->s_sbh, "get_write_access");
+@@ -288,8 +281,7 @@
+ 		goto out_active;
+ 
+ 	ret = ext4_journal_get_write_access(handle, inode->i_sb,
+-						    oi->of_binfo[blk].ob_bh,
+-						    EXT4_JTR_ORPHAN_FILE);
++				oi->of_binfo[blk].ob_bh, EXT4_JTR_ORPHAN_FILE);
+ 	if (ret)
+ 		goto out_active;
+ 
+@@ -350,10 +342,8 @@
+ 
+ 	WARN_ON_ONCE(!(inode->i_state & (I_NEW | I_FREEING)) &&
+ 		     !inode_is_locked(inode));
+-	if (ext4_test_inode_state(inode, EXT4_STATE_ORPHAN_FILE)) {
+-		err = ext4_orphan_file_del(handle, inode);
+-		return err;
+-	}
++	if (ext4_test_inode_state(inode, EXT4_STATE_ORPHAN_FILE))
++		return ext4_orphan_file_del(handle, inode);
+ 
+ 	/* Do this quick check before taking global s_orphan_lock. */
+ 	if (list_empty(&ei->i_orphan))
+@@ -686,7 +676,6 @@
+ {
+ 	struct ext4_orphan_info *oi = &EXT4_SB(sb)->s_orphan_info;
+ 	struct inode *inode;
+-	u64 orphan_file_size, orphan_file_blocks;
+ 	int i, j;
+ 	int ret;
+ 	int free;
+@@ -707,27 +696,9 @@
+ 		ext4_msg(sb, KERN_ERR, "get orphan inode failed");
+ 		return PTR_ERR(inode);
+ 	}
+-	orphan_file_size = i_size_read(inode);
+-	if (!orphan_file_size ||
+-	    orphan_file_size & (sb->s_blocksize - 1)) {
+-		ext4_error(sb, "orphan file has invalid size %llu",
+-			   orphan_file_size);
+-		ret = -EFSCORRUPTED;
+-		goto out_put;
+-	}
+-	orphan_file_blocks = orphan_file_size >> sb->s_blocksize_bits;
+-	if (orphan_file_blocks > EXT4_MAX_ORPHAN_FILE_BLOCKS ||
+-	    orphan_file_blocks > INT_MAX ||
+-	    orphan_file_blocks > ext4_blocks_count(EXT4_SB(sb)->s_es)) {
+-		ext4_error(sb, "orphan file has invalid block count %llu",
+-			   orphan_file_blocks);
+-		ret = -EFSCORRUPTED;
+-		goto out_put;
+-	}
+-	oi->of_blocks = orphan_file_blocks;
++	oi->of_blocks = inode->i_size >> sb->s_blocksize_bits;
+ 	oi->of_csum_seed = EXT4_I(inode)->i_csum_seed;
+-	oi->of_binfo = EXT4_ES_CALL(406, kmalloc(oi->of_blocks*sizeof(struct ext4_orphan_block),
+-			       GFP_KERNEL));
++	oi->of_binfo = ({ __auto_type __efi_a0 = (oi->of_blocks*sizeof(struct ext4_orphan_block)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(406, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmalloc(__efi_a0, __efi_a1)); });
+ 	if (!oi->of_binfo) {
+ 		ret = -ENOMEM;
+ 		goto out_put;
+--- a/fs/ext4/page-io.c
++++ b/fs/ext4/page-io.c
+@@ -7,7 +7,7 @@
+  * Written by Theodore Ts'o, 2010.
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/fs.h>
+ #include <linux/time.h>
+ #include <linux/highuid.h>
+@@ -58,7 +58,7 @@
+ {
+ 	struct ext4_io_end_vec *io_end_vec;
+ 
+-	io_end_vec = EXT4_ES_CALL(407, kmem_cache_zalloc(io_end_vec_cachep, GFP_NOFS));
++	io_end_vec = ({ __auto_type __efi_a0 = (io_end_vec_cachep); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(407, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmem_cache_zalloc(__efi_a0, __efi_a1)); });
+ 	if (!io_end_vec)
+ 		return ERR_PTR(-ENOMEM);
+ 	INIT_LIST_HEAD(&io_end_vec->list);
+@@ -275,7 +275,7 @@
+ 
+ ext4_io_end_t *ext4_init_io_end(struct inode *inode, gfp_t flags)
+ {
+-	ext4_io_end_t *io_end = EXT4_ES_CALL(410, kmem_cache_zalloc(io_end_cachep, flags));
++	ext4_io_end_t *io_end = ({ __auto_type __efi_a0 = (io_end_cachep); __auto_type __efi_a1 = (flags); EXT4_EFI_CALL(410, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmem_cache_zalloc(__efi_a0, __efi_a1)); });
+ 
+ 	if (io_end) {
+ 		io_end->inode = inode;
+--- a/fs/ext4/readpage.c
++++ b/fs/ext4/readpage.c
+@@ -28,7 +28,7 @@
+  *
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/kernel.h>
+ #include <linux/export.h>
+ #include <linux/mm.h>
+@@ -398,8 +398,7 @@
+ 	if (!bio_post_read_ctx_cache)
+ 		goto fail;
+ 	bio_post_read_ctx_pool =
+-		EXT4_ES_CALL(431, mempool_create_slab_pool(NUM_PREALLOC_POST_READ_CTXS,
+-					 bio_post_read_ctx_cache));
++		({ __auto_type __efi_a0 = (NUM_PREALLOC_POST_READ_CTXS); __auto_type __efi_a1 = (bio_post_read_ctx_cache); EXT4_EFI_CALL(431, true, 0, (void)0, mempool_create_slab_pool(__efi_a0, __efi_a1)); });
+ 	if (!bio_post_read_ctx_pool)
+ 		goto fail_free_cache;
+ 	return 0;
+--- a/fs/ext4/resize.c
++++ b/fs/ext4/resize.c
+@@ -10,7 +10,7 @@
+  */
+ 
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/errno.h>
+ #include <linux/slab.h>
+ #include <linux/jiffies.h>
+@@ -33,7 +33,7 @@
+ 
+ void ext4_kvfree_array_rcu(void *to_free)
+ {
+-	struct ext4_rcu_ptr *ptr = EXT4_ES_CALL(432, kzalloc(sizeof(*ptr), GFP_KERNEL));
++	struct ext4_rcu_ptr *ptr = ({ __auto_type __efi_a0 = (sizeof(*ptr)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(432, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 
+ 	if (ptr) {
+ 		ptr->ptr = to_free;
+@@ -269,14 +269,11 @@
+ 	if (WARN_ON_ONCE(flex_gd->resize_bg > max_resize_bg))
+ 		flex_gd->resize_bg = max_resize_bg;
+ 
+-	flex_gd->groups = EXT4_ES_CALL(433, kmalloc_array(flex_gd->resize_bg,
+-					sizeof(struct ext4_new_group_data),
+-					GFP_NOFS));
++	flex_gd->groups = ({ __auto_type __efi_a0 = (flex_gd->resize_bg); __auto_type __efi_a1 = (sizeof(struct ext4_new_group_data)); __auto_type __efi_a2 = (GFP_NOFS); EXT4_EFI_CALL(433, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kmalloc_array(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (flex_gd->groups == NULL)
+ 		goto out2;
+ 
+-	flex_gd->bg_flags = EXT4_ES_CALL(434, kmalloc_array(flex_gd->resize_bg, sizeof(__u16),
+-					  GFP_NOFS));
++	flex_gd->bg_flags = ({ __auto_type __efi_a0 = (flex_gd->resize_bg); __auto_type __efi_a1 = (sizeof(__u16)); __auto_type __efi_a2 = (GFP_NOFS); EXT4_EFI_CALL(434, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kmalloc_array(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (flex_gd->bg_flags == NULL)
+ 		goto out1;
+ 
+@@ -435,7 +432,7 @@
+ 	struct buffer_head *bh;
+ 	int err;
+ 
+-	bh = EXT4_ES_CALL(439, sb_getblk(sb, blk));
++	bh = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (blk); EXT4_EFI_CALL(439, false, 0, (void)0, sb_getblk(__efi_a0, __efi_a1)); });
+ 	if (unlikely(!bh))
+ 		return ERR_PTR(-ENOMEM);
+ 	BUFFER_TRACE(bh, "get_write_access");
+@@ -499,7 +496,7 @@
+ 		if (err < 0)
+ 			return err;
+ 
+-		bh = EXT4_ES_CALL(440, sb_getblk(sb, flex_gd->groups[group].block_bitmap));
++		bh = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (flex_gd->groups[group].block_bitmap); EXT4_EFI_CALL(440, false, 0, (void)0, sb_getblk(__efi_a0, __efi_a1)); });
+ 		if (unlikely(!bh))
+ 			return -ENOMEM;
+ 
+@@ -596,7 +593,7 @@
+ 			if (err < 0)
+ 				goto out;
+ 
+-			gdb = EXT4_ES_CALL(435, sb_getblk(sb, block));
++			gdb = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (block); EXT4_EFI_CALL(435, false, 0, (void)0, sb_getblk(__efi_a0, __efi_a1)); });
+ 			if (unlikely(!gdb)) {
+ 				err = -ENOMEM;
+ 				goto out;
+@@ -625,8 +622,7 @@
+ 		 * table blocks
+ 		 */
+ 		if (ext4_bg_has_super(sb, group)) {
+-			err = EXT4_ES_CALL(436, sb_issue_zeroout(sb, gdblocks + start + 1,
+-					reserved_gdb, GFP_NOFS));
++			err = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (gdblocks + start + 1); __auto_type __efi_a2 = (reserved_gdb); __auto_type __efi_a3 = (GFP_NOFS); EXT4_EFI_CALL(436, true, -EIO, (void)0, sb_issue_zeroout(__efi_a0, __efi_a1, __efi_a2, __efi_a3)); });
+ 			if (err)
+ 				goto out;
+ 		}
+@@ -640,8 +636,7 @@
+ 		block = group_data[i].inode_table;
+ 		ext4_debug("clear inode table blocks %#04llx -> %#04lx\n",
+ 			   block, sbi->s_itb_per_group);
+-		err = EXT4_ES_CALL(437, sb_issue_zeroout(sb, block, sbi->s_itb_per_group,
+-				       GFP_NOFS));
++		err = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (block); __auto_type __efi_a2 = (sbi->s_itb_per_group); __auto_type __efi_a3 = (GFP_NOFS); EXT4_EFI_CALL(437, true, -EIO, (void)0, sb_issue_zeroout(__efi_a0, __efi_a1, __efi_a2, __efi_a3)); });
+ 		if (err)
+ 			goto out;
+ 
+@@ -887,22 +882,18 @@
+ 	}
+ 
+ 	BUFFER_TRACE(EXT4_SB(sb)->s_sbh, "get_write_access");
+-	/* The group-add superblock hook covers this buffer. Keep the descriptor
+-	 * access hook scoped to the GDT and resize-inode descriptor pointers. */
+ 	err = ext4_journal_get_write_access(handle, sb, EXT4_SB(sb)->s_sbh,
+ 					    EXT4_JTR_NONE);
+ 	if (unlikely(err))
+ 		goto errout;
+ 
+ 	BUFFER_TRACE(gdb_bh, "get_write_access");
+-	err = ext4_journal_get_write_access(handle, sb, gdb_bh,
+-						    EXT4_JTR_NONE);
++	err = ext4_journal_get_write_access(handle, sb, gdb_bh, EXT4_JTR_NONE);
+ 	if (unlikely(err))
+ 		goto errout;
+ 
+ 	BUFFER_TRACE(dind, "get_write_access");
+-	err = ext4_journal_get_write_access(handle, sb, dind,
+-						    EXT4_JTR_NONE);
++	err = ext4_journal_get_write_access(handle, sb, dind, EXT4_JTR_NONE);
+ 	if (unlikely(err)) {
+ 		ext4_std_error(sb, err);
+ 		goto errout;
+@@ -913,8 +904,7 @@
+ 	if (unlikely(err))
+ 		goto errout;
+ 
+-	n_group_desc = EXT4_ES_CALL(443, kvmalloc((gdb_num + 1) * sizeof(struct buffer_head *),
+-				GFP_KERNEL));
++	n_group_desc = ({ __auto_type __efi_a0 = ((gdb_num + 1) * sizeof(struct buffer_head *)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(443, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kvmalloc(__efi_a0, __efi_a1)); });
+ 	if (!n_group_desc) {
+ 		err = -ENOMEM;
+ 		ext4_warning(sb, "not enough memory for %lu groups",
+@@ -999,8 +989,7 @@
+ 	gdb_bh = ext4_sb_bread(sb, gdblock, 0);
+ 	if (IS_ERR(gdb_bh))
+ 		return PTR_ERR(gdb_bh);
+-	n_group_desc = EXT4_ES_CALL(442, kvmalloc((gdb_num + 1) * sizeof(struct buffer_head *),
+-				GFP_KERNEL));
++	n_group_desc = ({ __auto_type __efi_a0 = ((gdb_num + 1) * sizeof(struct buffer_head *)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(442, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kvmalloc(__efi_a0, __efi_a1)); });
+ 	if (!n_group_desc) {
+ 		brelse(gdb_bh);
+ 		err = -ENOMEM;
+@@ -1017,8 +1006,7 @@
+ 	n_group_desc[gdb_num] = gdb_bh;
+ 
+ 	BUFFER_TRACE(gdb_bh, "get_write_access");
+-	err = ext4_journal_get_write_access(handle, sb, gdb_bh,
+-						    EXT4_JTR_NONE);
++	err = ext4_journal_get_write_access(handle, sb, gdb_bh, EXT4_JTR_NONE);
+ 	if (err) {
+ 		kvfree(n_group_desc);
+ 		brelse(gdb_bh);
+@@ -1059,7 +1047,7 @@
+ 	int res, i;
+ 	int err;
+ 
+-	primary = EXT4_ES_CALL(441, kmalloc_array(reserved_gdb, sizeof(*primary), GFP_NOFS));
++	primary = ({ __auto_type __efi_a0 = (reserved_gdb); __auto_type __efi_a1 = (sizeof(*primary)); __auto_type __efi_a2 = (GFP_NOFS); EXT4_EFI_CALL(441, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kmalloc_array(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!primary)
+ 		return -ENOMEM;
+ 
+@@ -1104,8 +1092,8 @@
+ 
+ 	for (i = 0; i < reserved_gdb; i++) {
+ 		BUFFER_TRACE(primary[i], "get_write_access");
+-		if ((err = ext4_journal_get_write_access(handle, sb,
+-							 primary[i], EXT4_JTR_NONE)))
++		if ((err = ext4_journal_get_write_access(handle, sb, primary[i],
++							 EXT4_JTR_NONE)))
+ 			goto exit_bh;
+ 	}
+ 
+@@ -1211,7 +1199,7 @@
+ 		else
+ 			backup_block = first_block + has_super;
+ 
+-		bh = EXT4_ES_CALL(438, sb_getblk(sb, backup_block));
++		bh = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (backup_block); EXT4_EFI_CALL(438, false, 0, (void)0, sb_getblk(__efi_a0, __efi_a1)); });
+ 		if (unlikely(!bh)) {
+ 			err = -ENOMEM;
+ 			break;
+@@ -1306,8 +1294,8 @@
+ 			gdb_bh = sbi_array_rcu_deref(sbi, s_group_desc,
+ 						     gdb_num);
+ 			BUFFER_TRACE(gdb_bh, "get_write_access");
+-			err = ext4_journal_get_write_access(handle, sb,
+-							    gdb_bh, EXT4_JTR_NONE);
++			err = ext4_journal_get_write_access(handle, sb, gdb_bh,
++							    EXT4_JTR_NONE);
+ 
+ 			if (!err && reserved_gdb && ext4_bg_num_gdb(sb, group))
+ 				err = reserve_backup_gdb(handle, resize_inode, group);
+@@ -1324,7 +1312,7 @@
+ 
+ static struct buffer_head *ext4_get_bitmap(struct super_block *sb, __u64 block)
+ {
+-	struct buffer_head *bh = EXT4_ES_CALL(444, sb_getblk(sb, block));
++	struct buffer_head *bh = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (block); EXT4_EFI_CALL(444, false, 0, (void)0, sb_getblk(__efi_a0, __efi_a1)); });
+ 	if (unlikely(!bh))
+ 		return NULL;
+ 	if (!bh_uptodate_or_lock(bh)) {
+@@ -1339,7 +1327,7 @@
+ 
+ static int ext4_set_bitmap_checksums(struct super_block *sb,
+ 				     struct ext4_group_desc *gdp,
+-					     struct ext4_new_group_data *group_data)
++				     struct ext4_new_group_data *group_data)
+ {
+ 	struct buffer_head *bh;
+ 
+@@ -1644,7 +1632,7 @@
+ 
+ 	BUFFER_TRACE(sbi->s_sbh, "get_write_access");
+ 	err = ext4_journal_get_write_access(handle, sb, sbi->s_sbh,
+-						    EXT4_JTR_NONE);
++					    EXT4_JTR_NONE);
+ 	if (err)
+ 		goto exit_journal;
+ 
+@@ -1858,9 +1846,8 @@
+ 	}
+ 
+ 	BUFFER_TRACE(EXT4_SB(sb)->s_sbh, "get_write_access");
+-	err = ext4_journal_get_write_access(handle, sb,
+-						    EXT4_SB(sb)->s_sbh,
+-						    EXT4_JTR_NONE);
++	err = ext4_journal_get_write_access(handle, sb, EXT4_SB(sb)->s_sbh,
++					    EXT4_JTR_NONE);
+ 	if (err) {
+ 		ext4_warning(sb, "error %d on journal write access", err);
+ 		goto errout;
+--- a/fs/ext4/super.c
++++ b/fs/ext4/super.c
+@@ -17,7 +17,7 @@
+  *        David S. Miller (davem@caip.rutgers.edu), 1995
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/module.h>
+ #include <linux/string.h>
+ #include <linux/fs.h>
+@@ -200,7 +200,7 @@
+ 	__ext4_read_bh(bh, op_flags, end_io);
+ 
+ 	wait_on_buffer(bh);
+-	if (EXT4_ES_CALL(450, buffer_uptodate(bh)))
++	if (({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(450, false, 0, (void)0, buffer_uptodate(__efi_a0)); }))
+ 		return 0;
+ 	return -EIO;
+ }
+@@ -228,7 +228,7 @@
+ 	struct buffer_head *bh;
+ 	int ret;
+ 
+-	bh = EXT4_ES_CALL(453, sb_getblk_gfp(sb, block, gfp));
++	bh = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (block); __auto_type __efi_a2 = (gfp); EXT4_EFI_CALL(453, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, sb_getblk_gfp(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (bh == NULL)
+ 		return ERR_PTR(-ENOMEM);
+ 	if (ext4_buffer_uptodate(bh))
+@@ -401,7 +401,7 @@
+ }
+ 
+ void ext4_free_inodes_set(struct super_block *sb,
+-				struct ext4_group_desc *bg, __u32 count)
++			  struct ext4_group_desc *bg, __u32 count)
+ {
+ 	bg->bg_free_inodes_count_lo = cpu_to_le16((__u16)count);
+ 	if (EXT4_DESC_SIZE(sb) >= EXT4_MIN_DESC_SIZE_64BIT)
+@@ -409,7 +409,7 @@
+ }
+ 
+ void ext4_used_dirs_set(struct super_block *sb,
+-				struct ext4_group_desc *bg, __u32 count)
++			  struct ext4_group_desc *bg, __u32 count)
+ {
+ 	bg->bg_used_dirs_count_lo = cpu_to_le16((__u16)count);
+ 	if (EXT4_DESC_SIZE(sb) >= EXT4_MIN_DESC_SIZE_64BIT)
+@@ -787,7 +787,7 @@
+ 		ext4_checker_tx_event(sbi->s_sb, EXT4_CHECKER_EVENT_TX_BEGIN,
+ 				      NULL, handle, EXT4_CHECKER_TX_SUPER_BEGIN,
+ 				      __LINE__);
+-		if (EXT4_ES_CALL(494, jbd2_journal_get_write_access(handle, sbh))) {
++		if (({ __auto_type __efi_a0 = (handle); __auto_type __efi_a1 = (sbh); EXT4_EFI_CALL(494, false, 0, (void)0, jbd2_journal_get_write_access(__efi_a0, __efi_a1)); })) {
+ 			ext4_checker_tx_event(sbi->s_sb,
+ 				      EXT4_CHECKER_EVENT_TX_END, NULL, handle,
+ 				      EXT4_CHECKER_TX_SUPER_END, __LINE__);
+@@ -799,14 +799,14 @@
+ 			call_notify_err = true;
+ 
+ 		ext4_update_super(sbi->s_sb);
+-		if (EXT4_ES_CALL(495, buffer_write_io_error(sbh)) || !EXT4_ES_CALL(496, buffer_uptodate(sbh))) {
++		if (({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(495, false, 0, (void)0, buffer_write_io_error(__efi_a0)); }) || !({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(496, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
+ 			ext4_msg(sbi->s_sb, KERN_ERR, "previous I/O error to "
+ 				 "superblock detected");
+ 			clear_buffer_write_io_error(sbh);
+ 			set_buffer_uptodate(sbh);
+ 		}
+ 
+-		if (EXT4_ES_CALL(497, jbd2_journal_dirty_metadata(handle, sbh))) {
++		if (({ __auto_type __efi_a0 = (handle); __auto_type __efi_a1 = (sbh); EXT4_EFI_CALL(497, false, 0, (void)0, jbd2_journal_dirty_metadata(__efi_a0, __efi_a1)); })) {
+ 			ext4_checker_tx_event(sbi->s_sb,
+ 				      EXT4_CHECKER_EVENT_TX_END, NULL, handle,
+ 				      EXT4_CHECKER_TX_SUPER_END, __LINE__);
+@@ -1265,8 +1265,7 @@
+ 	ext4_ct_record(sbi->s_sb, "MOUNT.SUPER.BLOCKS", "P-SB", 0, ~0U,
+ 		__LINE__, ext4_free_blocks_count(sbi->s_es), EXT4_C2B(sbi, block),
+ 		0, EXT4_CT_CONSISTENT, "mount_descriptor_summary_copy");
+-	err = EXT4_ES_CALL(502, percpu_counter_init(&sbi->s_freeclusters_counter, block,
+-				  GFP_KERNEL));
++	err = ({ __auto_type __efi_a0 = (&sbi->s_freeclusters_counter); __auto_type __efi_a1 = (block); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(502, true, -ENOMEM, (void)0, percpu_counter_init(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!err)
+ 		ext4_ct_record(sbi->s_sb, "MOUNT.GLOBAL.INIT", "INIT-GLOBAL-B", 0,
+ 			~0U, __LINE__, block, 0, block, EXT4_CT_RAW, "percpu_init");
+@@ -1276,27 +1275,24 @@
+ 		ext4_ct_record(sbi->s_sb, "MOUNT.SUPER.INODES", "P-SB", 0, ~0U,
+ 			__LINE__, le32_to_cpu(sbi->s_es->s_free_inodes_count), freei,
+ 			0, EXT4_CT_CONSISTENT, "mount_descriptor_summary_copy");
+-		err = EXT4_ES_CALL(503, percpu_counter_init(&sbi->s_freeinodes_counter, freei,
+-					  GFP_KERNEL));
++		err = ({ __auto_type __efi_a0 = (&sbi->s_freeinodes_counter); __auto_type __efi_a1 = (freei); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(503, true, -ENOMEM, (void)0, percpu_counter_init(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (!err)
+ 			ext4_ct_record(sbi->s_sb, "MOUNT.GLOBAL.INIT", "INIT-GLOBAL-I", 0,
+ 				~0U, __LINE__, freei, 0, freei, EXT4_CT_RAW, "percpu_init");
+ 	}
+ 	if (!err) {
+ 		unsigned long dirs = ext4_count_dirs(sbi->s_sb);
+-		err = EXT4_ES_CALL(504, percpu_counter_init(&sbi->s_dirs_counter, dirs, GFP_KERNEL));
++		err = ({ __auto_type __efi_a0 = (&sbi->s_dirs_counter); __auto_type __efi_a1 = (dirs); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(504, true, -ENOMEM, (void)0, percpu_counter_init(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (!err)
+ 			ext4_ct_record(sbi->s_sb, "MOUNT.GLOBAL.INIT", "INIT-GLOBAL-U", 0,
+ 				~0U, __LINE__, dirs, 0, dirs, EXT4_CT_RAW, "percpu_init");
+ 	}
+ 	if (!err)
+-		err = EXT4_ES_CALL(505, percpu_counter_init(&sbi->s_dirtyclusters_counter, 0,
+-					  GFP_KERNEL));
++		err = ({ __auto_type __efi_a0 = (&sbi->s_dirtyclusters_counter); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(505, true, -ENOMEM, (void)0, percpu_counter_init(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!err)
+-		err = EXT4_ES_CALL(506, percpu_counter_init(&sbi->s_sra_exceeded_retry_limit, 0,
+-					  GFP_KERNEL));
++		err = ({ __auto_type __efi_a0 = (&sbi->s_sra_exceeded_retry_limit); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(506, true, -ENOMEM, (void)0, percpu_counter_init(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!err)
+-		err = EXT4_ES_CALL(507, percpu_init_rwsem(&sbi->s_writepages_rwsem));
++		err = ({ __auto_type __efi_a0 = (&sbi->s_writepages_rwsem); EXT4_EFI_CALL(507, true, -ENOMEM, (void)0, percpu_init_rwsem(__efi_a0)); });
+ 
+ 	if (err)
+ 		ext4_msg(sbi->s_sb, KERN_ERR, "insufficient memory");
+@@ -1463,7 +1459,7 @@
+ {
+ 	struct ext4_inode_info *ei;
+ 
+-	ei = EXT4_ES_CALL(514, alloc_inode_sb(sb, ext4_inode_cachep, GFP_NOFS));
++	ei = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (ext4_inode_cachep); __auto_type __efi_a2 = (GFP_NOFS); EXT4_EFI_CALL(514, true, 0, (void)0, alloc_inode_sb(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!ei)
+ 		return NULL;
+ 
+@@ -1561,12 +1557,7 @@
+ 
+ static int __init init_inodecache(void)
+ {
+-	ext4_inode_cachep = EXT4_ES_CALL(547, kmem_cache_create_usercopy("ext4_inode_cache",
+-				sizeof(struct ext4_inode_info), 0,
+-				SLAB_RECLAIM_ACCOUNT | SLAB_ACCOUNT,
+-				offsetof(struct ext4_inode_info, i_data),
+-				sizeof_field(struct ext4_inode_info, i_data),
+-				init_once));
++	ext4_inode_cachep = ({ __auto_type __efi_a0 = ("ext4_inode_cache"); __auto_type __efi_a1 = (sizeof(struct ext4_inode_info)); __auto_type __efi_a2 = (0); __auto_type __efi_a3 = (SLAB_RECLAIM_ACCOUNT | SLAB_ACCOUNT); __auto_type __efi_a4 = (offsetof(struct ext4_inode_info, i_data)); __auto_type __efi_a5 = (sizeof_field(struct ext4_inode_info, i_data)); __auto_type __efi_a6 = (init_once); EXT4_EFI_CALL(547, !(__efi_a3 & SLAB_PANIC), 0, (void)0, kmem_cache_create_usercopy(__efi_a0, __efi_a1, __efi_a2, __efi_a3, __efi_a4, __efi_a5, __efi_a6)); });
+ 	if (ext4_inode_cachep == NULL)
+ 		return -ENOMEM;
+ 	return 0;
+@@ -2079,7 +2070,7 @@
+ {
+ 	struct ext4_fs_context *ctx;
+ 
+-	ctx = EXT4_ES_CALL(478, kzalloc(sizeof(struct ext4_fs_context), GFP_KERNEL));
++	ctx = ({ __auto_type __efi_a0 = (sizeof(struct ext4_fs_context)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(478, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	if (!ctx)
+ 		return -ENOMEM;
+ 
+@@ -2118,7 +2109,7 @@
+ 		return 0;
+ 	}
+ 
+-	qname = EXT4_ES_CALL(483, kmemdup_nul(param->string, param->size, GFP_KERNEL));
++	qname = ({ __auto_type __efi_a0 = (param->string); __auto_type __efi_a1 = (param->size); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(483, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kmemdup_nul(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!qname) {
+ 		ext4_msg(NULL, KERN_ERR,
+ 			 "Not enough memory for storing quotafile name");
+@@ -2208,7 +2199,7 @@
+ 	int is_remount;
+ 	int token;
+ 
+-	token = EXT4_ES_CALL(479, fs_parse(fc, ext4_param_specs, param, &result));
++	token = ({ __auto_type __efi_a0 = (fc); __auto_type __efi_a1 = (ext4_param_specs); __auto_type __efi_a2 = (param); __auto_type __efi_a3 = (&result); EXT4_EFI_CALL(479, true, -EINVAL, (void)0, fs_parse(__efi_a0, __efi_a1, __efi_a2, __efi_a3)); });
+ 	if (token < 0)
+ 		return token;
+ 	is_remount = fc->purpose == FS_CONTEXT_FOR_RECONFIGURE;
+@@ -2218,7 +2209,6 @@
+ 			break;
+ 
+ 	ctx->opt_flags |= m->flags;
+-
+ 
+ 	if (m->flags & MOPT_EXPLICIT) {
+ 		if (m->mount_opt & EXT4_MOUNT_DELALLOC) {
+@@ -2376,7 +2366,7 @@
+ 			return -EINVAL;
+ 		}
+ 
+-		error = EXT4_ES_CALL(480, fs_lookup_param(fc, param, 1, LOOKUP_FOLLOW, &path));
++		error = ({ __auto_type __efi_a0 = (fc); __auto_type __efi_a1 = (param); __auto_type __efi_a2 = (1); __auto_type __efi_a3 = (LOOKUP_FOLLOW); __auto_type __efi_a4 = (&path); EXT4_EFI_CALL(480, true, -EINVAL, (void)0, fs_lookup_param(__efi_a0, __efi_a1, __efi_a2, __efi_a3, __efi_a4)); });
+ 		if (error) {
+ 			ext4_msg(NULL, KERN_ERR, "error: could not find "
+ 				 "journal device path");
+@@ -2518,8 +2508,7 @@
+ 
+ 				*value++ = 0;
+ 				v_len = strlen(value);
+-				param.string = EXT4_ES_CALL(510, kmemdup_nul(value, v_len,
+-							   GFP_KERNEL));
++				param.string = ({ __auto_type __efi_a0 = (value); __auto_type __efi_a1 = (v_len); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(510, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kmemdup_nul(__efi_a0, __efi_a1, __efi_a2)); });
+ 				if (!param.string)
+ 					return -ENOMEM;
+ 				param.type = fs_value_is_string;
+@@ -2554,17 +2543,15 @@
+ 	if (!sbi->s_es->s_mount_opts[0])
+ 		return 0;
+ 
+-	s_mount_opts = EXT4_ES_CALL(489, kstrndup(sbi->s_es->s_mount_opts,
+-				sizeof(sbi->s_es->s_mount_opts),
+-				GFP_KERNEL));
++	s_mount_opts = ({ __auto_type __efi_a0 = (sbi->s_es->s_mount_opts); __auto_type __efi_a1 = (sizeof(sbi->s_es->s_mount_opts)); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(489, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kstrndup(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!s_mount_opts)
+ 		return ret;
+ 
+-	fc = EXT4_ES_CALL(490, kzalloc(sizeof(struct fs_context), GFP_KERNEL));
++	fc = ({ __auto_type __efi_a0 = (sizeof(struct fs_context)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(490, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	if (!fc)
+ 		goto out_free;
+ 
+-	s_ctx = EXT4_ES_CALL(491, kzalloc(sizeof(struct ext4_fs_context), GFP_KERNEL));
++	s_ctx = ({ __auto_type __efi_a0 = (sizeof(struct ext4_fs_context)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(491, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	if (!s_ctx)
+ 		goto out_free;
+ 
+@@ -3196,17 +3183,16 @@
+ 	if (size <= sbi->s_flex_groups_allocated)
+ 		return 0;
+ 
+-	new_groups = EXT4_ES_CALL(468, kvzalloc(roundup_pow_of_two(size *
+-			      sizeof(*sbi->s_flex_groups)), GFP_KERNEL));
++	new_groups = ({ __auto_type __efi_a0 = (roundup_pow_of_two(size *
++			      sizeof(*sbi->s_flex_groups))); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(468, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kvzalloc(__efi_a0, __efi_a1)); });
+ 	if (!new_groups) {
+ 		ext4_msg(sb, KERN_ERR,
+ 			 "not enough memory for %d flex group pointers", size);
+ 		return -ENOMEM;
+ 	}
+ 	for (i = sbi->s_flex_groups_allocated; i < size; i++) {
+-		new_groups[i] = EXT4_ES_CALL(469, kvzalloc(roundup_pow_of_two(
+-					 sizeof(struct flex_groups)),
+-					 GFP_KERNEL));
++		new_groups[i] = ({ __auto_type __efi_a0 = (roundup_pow_of_two(
++					 sizeof(struct flex_groups))); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(469, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kvzalloc(__efi_a0, __efi_a1)); });
+ 		if (!new_groups[i]) {
+ 			for (j = sbi->s_flex_groups_allocated; j < i; j++)
+ 				kvfree(new_groups[j]);
+@@ -4000,7 +3986,7 @@
+ {
+ 	struct ext4_lazy_init *eli = NULL;
+ 
+-	eli = EXT4_ES_CALL(471, kzalloc(sizeof(*eli), GFP_KERNEL));
++	eli = ({ __auto_type __efi_a0 = (sizeof(*eli)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(471, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	if (!eli)
+ 		return -ENOMEM;
+ 
+@@ -4019,7 +4005,7 @@
+ {
+ 	struct ext4_li_request *elr;
+ 
+-	elr = EXT4_ES_CALL(470, kzalloc(sizeof(*elr), GFP_KERNEL));
++	elr = ({ __auto_type __efi_a0 = (sizeof(*elr)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(470, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	if (!elr)
+ 		return NULL;
+ 
+@@ -4241,7 +4227,7 @@
+ 	unsigned int j_blocks, j_inum = le32_to_cpu(es->s_journal_inum);
+ 	ext4_group_t i, ngroups = ext4_get_groups_count(sb);
+ 	ext4_fsblk_t overhead = 0;
+-	char *buf = (char *) EXT4_ES_CALL(472, get_zeroed_page(GFP_NOFS));
++	char *buf = (char *) ({ __auto_type __efi_a0 = (GFP_NOFS); EXT4_EFI_CALL(472, (true && !(__efi_a0 & __GFP_NOFAIL)), 0, (void)0, get_zeroed_page(__efi_a0)); });
+ 
+ 	if (!buf)
+ 		return -ENOMEM;
+@@ -4366,7 +4352,7 @@
+ {
+ 	struct ext4_sb_info *sbi;
+ 
+-	sbi = EXT4_ES_CALL(485, kzalloc(sizeof(*sbi), GFP_KERNEL));
++	sbi = ({ __auto_type __efi_a0 = (sizeof(*sbi)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(485, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	if (!sbi)
+ 		return NULL;
+ 
+@@ -4374,7 +4360,7 @@
+ 					   NULL, NULL);
+ 
+ 	sbi->s_blockgroup_lock =
+-		EXT4_ES_CALL(486, kzalloc(sizeof(struct blockgroup_lock), GFP_KERNEL));
++		({ __auto_type __efi_a0 = (sizeof(struct blockgroup_lock)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(486, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 
+ 	if (!sbi->s_blockgroup_lock)
+ 		goto err_out;
+@@ -4810,8 +4796,7 @@
+ 	 * Test whether we have more sectors than will fit in sector_t,
+ 	 * and whether the max offset is addressable by the page cache.
+ 	 */
+-	err = EXT4_ES_CALL(492, generic_check_addressable(sb->s_blocksize_bits,
+-					ext4_blocks_count(es)));
++	err = ({ __auto_type __efi_a0 = (sb->s_blocksize_bits); __auto_type __efi_a1 = (ext4_blocks_count(es)); EXT4_EFI_CALL(492, true, -EINVAL, (void)0, generic_check_addressable(__efi_a0, __efi_a1)); });
+ 	if (err) {
+ 		ext4_msg(sb, KERN_ERR, "filesystem"
+ 			 " too large to mount safely on this system");
+@@ -4894,9 +4879,7 @@
+ 		}
+ 	}
+ 	rcu_assign_pointer(sbi->s_group_desc,
+-			   EXT4_ES_CALL(498, kvmalloc_array(db_count,
+-					  sizeof(struct buffer_head *),
+-					  GFP_KERNEL)));
++			   ({ __auto_type __efi_a0 = (db_count); __auto_type __efi_a1 = (sizeof(struct buffer_head *)); __auto_type __efi_a2 = (GFP_KERNEL); EXT4_EFI_CALL(498, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kvmalloc_array(__efi_a0, __efi_a1, __efi_a2)); }));
+ 	if (sbi->s_group_desc == NULL) {
+ 		ext4_msg(sb, KERN_ERR, "not enough memory");
+ 		return -ENOMEM;
+@@ -5420,7 +5403,6 @@
+ 			  ext4_has_feature_orphan_present(sb) ||
+ 			  ext4_has_feature_journal_needs_recovery(sb));
+ 
+-
+ 	if (ext4_has_feature_mmp(sb) && !sb_rdonly(sb)) {
+ 		err = ext4_multi_mount_protect(sb, le64_to_cpu(es->s_mmp_block));
+ 		if (err)
+@@ -5547,7 +5529,7 @@
+ 	}
+ 
+ 	generic_set_sb_d_ops(sb);
+-	sb->s_root = EXT4_ES_CALL(487, d_make_root(root));
++	sb->s_root = ({ __auto_type __efi_a0 = (root); EXT4_EFI_CALL(487, true, 0, iput(__efi_a0), d_make_root(__efi_a0)); });
+ 	if (!sb->s_root) {
+ 		ext4_msg(sb, KERN_ERR, "get root dentry failed");
+ 		err = -ENOMEM;
+@@ -5607,6 +5589,7 @@
+ 	err = ext4_percpu_param_init(sbi);
+ 	if (err)
+ 		goto failed_mount6;
++
+ 	if (ext4_has_feature_flex_bg(sb))
+ 		if (!ext4_fill_flex_info(sb)) {
+ 			ext4_msg(sb, KERN_ERR,
+@@ -5943,7 +5926,7 @@
+ 	sb_block = EXT4_MIN_BLOCK_SIZE / blocksize;
+ 	offset = EXT4_MIN_BLOCK_SIZE % blocksize;
+ 	set_blocksize(bdev_file, blocksize);
+-	bh = EXT4_ES_CALL(537, __bread(bdev, sb_block, blocksize));
++	bh = ({ __auto_type __efi_a0 = (bdev); __auto_type __efi_a1 = (sb_block); __auto_type __efi_a2 = (blocksize); EXT4_EFI_CALL(537, true, 0, (void)0, __bread(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (!bh) {
+ 		ext4_msg(sb, KERN_ERR, "couldn't read superblock of "
+ 		       "external journal");
+@@ -6098,7 +6081,7 @@
+ 		ext4_msg(sb, KERN_INFO, "barriers disabled");
+ 
+ 	if (!ext4_has_feature_journal_needs_recovery(sb))
+-		err = EXT4_ES_CALL(533, jbd2_journal_wipe(journal, !really_read_only));
++		err = ({ __auto_type __efi_a0 = (journal); __auto_type __efi_a1 = (!really_read_only); EXT4_EFI_CALL(533, false, 0, (void)0, jbd2_journal_wipe(__efi_a0, __efi_a1)); });
+ 	if (!err) {
+ 		char *save = kmalloc(EXT4_S_ERR_LEN, GFP_KERNEL);
+ 		__le16 orig_state;
+@@ -6107,7 +6090,7 @@
+ 		if (save)
+ 			memcpy(save, ((char *) es) +
+ 			       EXT4_S_ERR_START, EXT4_S_ERR_LEN);
+-		err = EXT4_ES_CALL(534, jbd2_journal_load(journal));
++		err = ({ __auto_type __efi_a0 = (journal); EXT4_EFI_CALL(534, false, 0, (void)0, jbd2_journal_load(__efi_a0)); });
+ 		if (save && memcmp(((char *) es) + EXT4_S_ERR_START,
+ 				   save, EXT4_S_ERR_LEN)) {
+ 			memcpy(((char *) es) + EXT4_S_ERR_START,
+@@ -6263,7 +6246,7 @@
+ 		return -EIO;
+ 	}
+ 
+-	if (EXT4_ES_CALL(475, buffer_write_io_error(sbh)) || !EXT4_ES_CALL(476, buffer_uptodate(sbh))) {
++	if (({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(475, false, 0, (void)0, buffer_write_io_error(__efi_a0)); }) || !({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(476, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
+ 		/*
+ 		 * Oh, dear.  A previous attempt to write the
+ 		 * superblock failed.  This could happen because the
+@@ -6284,7 +6267,7 @@
+ 	submit_bh(REQ_OP_WRITE | REQ_SYNC |
+ 		  (test_opt(sb, BARRIER) ? REQ_FUA : 0), sbh);
+ 	wait_on_buffer(sbh);
+-	if (EXT4_ES_CALL(477, buffer_write_io_error(sbh))) {
++	if (({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(477, false, 0, (void)0, buffer_write_io_error(__efi_a0)); })) {
+ 		ext4_msg(sb, KERN_ERR, "I/O error while writing "
+ 		       "superblock");
+ 		clear_buffer_write_io_error(sbh);
+@@ -6314,7 +6297,7 @@
+ 		return 0;
+ 	}
+ 	jbd2_journal_lock_updates(journal);
+-	err = EXT4_ES_CALL(508, jbd2_journal_flush(journal, 0));
++	err = ({ __auto_type __efi_a0 = (journal); __auto_type __efi_a1 = (0); EXT4_EFI_CALL(508, false, 0, (void)0, jbd2_journal_flush(__efi_a0, __efi_a1)); });
+ 	if (err < 0)
+ 		goto out;
+ 
+@@ -6358,7 +6341,7 @@
+ 	 * journal by a prior ext4_error() or ext4_abort()
+ 	 */
+ 
+-	j_errno = EXT4_ES_CALL(536, jbd2_journal_errno(journal));
++	j_errno = ({ __auto_type __efi_a0 = (journal); EXT4_EFI_CALL(536, false, 0, (void)0, jbd2_journal_errno(__efi_a0)); });
+ 	if (j_errno) {
+ 		char nbuf[16];
+ 
+@@ -6454,7 +6437,7 @@
+ 		 * Don't clear the needs_recovery flag if we failed to
+ 		 * flush the journal.
+ 		 */
+-		error = EXT4_ES_CALL(524, jbd2_journal_flush(journal, 0));
++		error = ({ __auto_type __efi_a0 = (journal); __auto_type __efi_a1 = (0); EXT4_EFI_CALL(524, false, 0, (void)0, jbd2_journal_flush(__efi_a0, __efi_a1)); });
+ 		if (error < 0)
+ 			goto out;
+ 
+@@ -6947,7 +6930,7 @@
+ 				    EXT4_QUOTA_TRANS_BLOCKS(dquot->dq_sb));
+ 	if (IS_ERR(handle))
+ 		return PTR_ERR(handle);
+-	ret = EXT4_ES_CALL(526, dquot_commit(dquot));
++	ret = ({ __auto_type __efi_a0 = (dquot); EXT4_EFI_CALL(526, true, -EIO, (void)0, dquot_commit(__efi_a0)); });
+ 	if (ret < 0)
+ 		ext4_error_err(dquot->dq_sb, -ret,
+ 			       "Failed to commit dquot type %d",
+@@ -6967,7 +6950,7 @@
+ 				    EXT4_QUOTA_INIT_BLOCKS(dquot->dq_sb));
+ 	if (IS_ERR(handle))
+ 		return PTR_ERR(handle);
+-	ret = EXT4_ES_CALL(527, dquot_acquire(dquot));
++	ret = ({ __auto_type __efi_a0 = (dquot); EXT4_EFI_CALL(527, true, -EIO, (void)0, dquot_acquire(__efi_a0)); });
+ 	if (ret < 0)
+ 		ext4_error_err(dquot->dq_sb, -ret,
+ 			      "Failed to acquire dquot type %d",
+@@ -7022,7 +7005,7 @@
+ 	handle = ext4_journal_start_sb(sb, EXT4_HT_QUOTA, 2);
+ 	if (IS_ERR(handle))
+ 		return PTR_ERR(handle);
+-	ret = EXT4_ES_CALL(528, dquot_commit_info(sb, type));
++	ret = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (type); EXT4_EFI_CALL(528, true, -EIO, (void)0, dquot_commit_info(__efi_a0, __efi_a1)); });
+ 	err = ext4_journal_stop(handle);
+ 	if (!ret)
+ 		ret = err;
+@@ -7079,7 +7062,7 @@
+ 	}
+ 
+ 	lockdep_set_quota_inode(path->dentry->d_inode, I_DATA_SEM_QUOTA);
+-	err = EXT4_ES_CALL(529, dquot_quota_on(sb, type, format_id, path));
++	err = ({ __auto_type __efi_a0 = (sb); __auto_type __efi_a1 = (type); __auto_type __efi_a2 = (format_id); __auto_type __efi_a3 = (path); EXT4_EFI_CALL(529, true, -EINVAL, (void)0, dquot_quota_on(__efi_a0, __efi_a1, __efi_a2, __efi_a3)); });
+ 	if (!err) {
+ 		struct inode *inode = d_inode(path->dentry);
+ 		handle_t *handle;
+--- a/fs/ext4/sysfs.c
++++ b/fs/ext4/sysfs.c
+@@ -8,7 +8,7 @@
+  *
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/time.h>
+ #include <linux/fs.h>
+ #include <linux/seq_file.h>
+@@ -90,7 +90,7 @@
+ 	unsigned long t;
+ 	int ret;
+ 
+-	ret = EXT4_ES_CALL(557, kstrtoul(skip_spaces(buf), 0, &t));
++	ret = ({ __auto_type __efi_a0 = (skip_spaces(buf)); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (&t); EXT4_EFI_CALL(557, true, -EINVAL, (void)0, kstrtoul(__efi_a0, __efi_a1, __efi_a2)); });
+ 	if (ret)
+ 		return ret;
+ 
+@@ -475,7 +475,7 @@
+ 
+ 	switch (a->attr_id) {
+ 	case attr_pointer_pi:
+-		ret = EXT4_ES_CALL(558, kstrtouint(skip_spaces(buf), 0, &t));
++		ret = ({ __auto_type __efi_a0 = (skip_spaces(buf)); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (&t); EXT4_EFI_CALL(558, true, -EINVAL, (void)0, kstrtouint(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (ret)
+ 			return ret;
+ 		if ((int)t < 0)
+@@ -483,7 +483,7 @@
+ 		*((unsigned int *) ptr) = t;
+ 		return len;
+ 	case attr_pointer_ui:
+-		ret = EXT4_ES_CALL(559, kstrtouint(skip_spaces(buf), 0, &t));
++		ret = ({ __auto_type __efi_a0 = (skip_spaces(buf)); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (&t); EXT4_EFI_CALL(559, true, -EINVAL, (void)0, kstrtouint(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (ret)
+ 			return ret;
+ 		if (a->attr_ptr == ptr_ext4_super_block_offset)
+@@ -492,7 +492,7 @@
+ 			*((unsigned int *) ptr) = t;
+ 		return len;
+ 	case attr_mb_order:
+-		ret = EXT4_ES_CALL(560, kstrtouint(skip_spaces(buf), 0, &t));
++		ret = ({ __auto_type __efi_a0 = (skip_spaces(buf)); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (&t); EXT4_EFI_CALL(560, true, -EINVAL, (void)0, kstrtouint(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (ret)
+ 			return ret;
+ 		if (t > 64)
+@@ -500,7 +500,7 @@
+ 		*((unsigned int *) ptr) = t;
+ 		return len;
+ 	case attr_clusters_in_group:
+-		ret = EXT4_ES_CALL(561, kstrtouint(skip_spaces(buf), 0, &t));
++		ret = ({ __auto_type __efi_a0 = (skip_spaces(buf)); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (&t); EXT4_EFI_CALL(561, true, -EINVAL, (void)0, kstrtouint(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (ret)
+ 			return ret;
+ 		if (t > sbi->s_clusters_per_group)
+@@ -508,7 +508,7 @@
+ 		*((unsigned int *) ptr) = t;
+ 		return len;
+ 	case attr_pointer_ul:
+-		ret = EXT4_ES_CALL(562, kstrtoul(skip_spaces(buf), 0, &lt));
++		ret = ({ __auto_type __efi_a0 = (skip_spaces(buf)); __auto_type __efi_a1 = (0); __auto_type __efi_a2 = (&lt); EXT4_EFI_CALL(562, true, -EINVAL, (void)0, kstrtoul(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (ret)
+ 			return ret;
+ 		*((unsigned long *) ptr) = lt;
+@@ -581,8 +581,7 @@
+ 	int err;
+ 
+ 	init_completion(&sbi->s_kobj_unregister);
+-	err = EXT4_ES_CALL(551, kobject_init_and_add(&sbi->s_kobj, &ext4_sb_ktype, ext4_root,
+-				   "%s", sb->s_id));
++	err = ({ __auto_type __efi_a0 = (&sbi->s_kobj); __auto_type __efi_a1 = (&ext4_sb_ktype); __auto_type __efi_a2 = (ext4_root); __auto_type __efi_a3 = ("%s"); __auto_type __efi_a4 = (sb->s_id); EXT4_EFI_CALL(551, false, 0, (void)0, kobject_init_and_add(__efi_a0, __efi_a1, __efi_a2, __efi_a3, __efi_a4)); });
+ 	if (err) {
+ 		kobject_put(&sbi->s_kobj);
+ 		wait_for_completion(&sbi->s_kobj_unregister);
+@@ -622,18 +621,17 @@
+ {
+ 	int ret;
+ 
+-	ext4_root = EXT4_ES_CALL(553, kobject_create_and_add("ext4", fs_kobj));
++	ext4_root = ({ __auto_type __efi_a0 = ("ext4"); __auto_type __efi_a1 = (fs_kobj); EXT4_EFI_CALL(553, true, 0, (void)0, kobject_create_and_add(__efi_a0, __efi_a1)); });
+ 	if (!ext4_root)
+ 		return -ENOMEM;
+ 
+-	ext4_feat = EXT4_ES_CALL(554, kzalloc(sizeof(*ext4_feat), GFP_KERNEL));
++	ext4_feat = ({ __auto_type __efi_a0 = (sizeof(*ext4_feat)); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(554, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	if (!ext4_feat) {
+ 		ret = -ENOMEM;
+ 		goto root_err;
+ 	}
+ 
+-	ret = EXT4_ES_CALL(555, kobject_init_and_add(ext4_feat, &ext4_feat_ktype,
+-				   ext4_root, "features"));
++	ret = ({ __auto_type __efi_a0 = (ext4_feat); __auto_type __efi_a1 = (&ext4_feat_ktype); __auto_type __efi_a2 = (ext4_root); __auto_type __efi_a3 = ("features"); EXT4_EFI_CALL(555, false, 0, (void)0, kobject_init_and_add(__efi_a0, __efi_a1, __efi_a2, __efi_a3)); });
+ 	if (ret)
+ 		goto feat_err;
+ 
+--- a/fs/ext4/xattr.c
++++ b/fs/ext4/xattr.c
+@@ -51,7 +51,7 @@
+  * by the buffer lock.
+  */
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/init.h>
+ #include <linux/fs.h>
+ #include <linux/slab.h>
+@@ -202,11 +202,6 @@
+ 		if (BHDR(bh)->h_magic != cpu_to_le32(EXT4_XATTR_MAGIC) ||
+ 		    BHDR(bh)->h_blocks != cpu_to_le32(1)) {
+ 			err_str = "invalid header";
+-			goto errout;
+-		}
+-		if (le32_to_cpu(BHDR(bh)->h_refcount) == 0 ||
+-		    le32_to_cpu(BHDR(bh)->h_refcount) > EXT4_XATTR_REFCOUNT_MAX) {
+-			err_str = "invalid reference count";
+ 			goto errout;
+ 		}
+ 		if (buffer_verified(bh))
+@@ -467,7 +462,7 @@
+ 	int i, ret;
+ 
+ 	if (bh_count > ARRAY_SIZE(bhs_inline)) {
+-		bhs = EXT4_ES_CALL(576, kmalloc_array(bh_count, sizeof(*bhs), GFP_NOFS));
++		bhs = ({ __auto_type __efi_a0 = (bh_count); __auto_type __efi_a1 = (sizeof(*bhs)); __auto_type __efi_a2 = (GFP_NOFS); EXT4_EFI_CALL(576, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kmalloc_array(__efi_a0, __efi_a1, __efi_a2)); });
+ 		if (!bhs)
+ 			return -ENOMEM;
+ 	}
+@@ -1007,10 +1002,10 @@
+ {
+ 	int err;
+ 
+-	err = EXT4_ES_CALL(577, dquot_alloc_inode(inode));
++	err = ({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(577, sb_any_quota_loaded(__efi_a0->i_sb), -EDQUOT, (void)0, dquot_alloc_inode(__efi_a0)); });
+ 	if (err)
+ 		return err;
+-	err = EXT4_ES_CALL(578, dquot_alloc_space_nodirty(inode, round_up_cluster(inode, len)));
++	err = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (round_up_cluster(inode, len)); EXT4_EFI_CALL(578, sb_any_quota_loaded(__efi_a0->i_sb), -EDQUOT, (void)0, dquot_alloc_space_nodirty(__efi_a0, __efi_a1)); });
+ 	if (err)
+ 		dquot_free_inode(inode);
+ 	return err;
+@@ -1322,7 +1317,7 @@
+ 								"reget_write_access");
+ 				ext4_warning_inode(ea_inode,
+ 						"Re-get write access err=%d",
+-							err);
++						err);
+ 				continue;
+ 			}
+ 		}
+@@ -1405,7 +1400,7 @@
+ 
+ 	BUFFER_TRACE(bh, "get_write_access");
+ 	error = ext4_journal_get_write_access(handle, inode->i_sb, bh,
+-						      EXT4_JTR_NONE);
++					      EXT4_JTR_NONE);
+ 	if (error)
+ 		goto out;
+ 
+@@ -1486,7 +1481,7 @@
+ 		if (ext4_handle_valid(handle))
+ 			error = ext4_handle_dirty_metadata(handle, inode, bh);
+ 		unlock_buffer(bh);
+-		if (!error && !ext4_handle_valid(handle))
++		if (!ext4_handle_valid(handle))
+ 			error = ext4_handle_dirty_metadata(handle, inode, bh);
+ 		if (IS_SYNC(inode))
+ 			ext4_handle_sync(handle);
+@@ -1681,7 +1676,7 @@
+ 	WARN_ON_ONCE(ext4_handle_valid(journal_current_handle()) &&
+ 		     !(current->flags & PF_MEMALLOC_NOFS));
+ 
+-	ea_data = EXT4_ES_CALL(579, kvmalloc(value_len, GFP_KERNEL));
++	ea_data = ({ __auto_type __efi_a0 = (value_len); __auto_type __efi_a1 = (GFP_KERNEL); EXT4_EFI_CALL(579, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kvmalloc(__efi_a0, __efi_a1)); });
+ 	if (!ea_data) {
+ 		mb_cache_entry_put(ea_inode_cache, ce);
+ 		return NULL;
+@@ -2121,7 +2116,7 @@
+ clone_block:
+ 		unlock_buffer(bs->bh);
+ 		ea_bdebug(bs->bh, "cloning");
+-		s->base = EXT4_ES_CALL(566, kmemdup(BHDR(bs->bh), bs->bh->b_size, GFP_NOFS));
++		s->base = ({ __auto_type __efi_a0 = (BHDR(bs->bh)); __auto_type __efi_a1 = (bs->bh->b_size); __auto_type __efi_a2 = (GFP_NOFS); EXT4_EFI_CALL(566, (true && !(__efi_a2 & __GFP_NOFAIL)), 0, (void)0, kmemdup(__efi_a0, __efi_a1, __efi_a2)); });
+ 		error = -ENOMEM;
+ 		if (s->base == NULL)
+ 			goto cleanup;
+@@ -2161,7 +2156,7 @@
+ 		}
+ 	} else {
+ 		/* Allocate a buffer where we construct the new block. */
+-		s->base = EXT4_ES_CALL(567, kzalloc(sb->s_blocksize, GFP_NOFS));
++		s->base = ({ __auto_type __efi_a0 = (sb->s_blocksize); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(567, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 		error = -ENOMEM;
+ 		if (s->base == NULL)
+ 			goto cleanup;
+@@ -2196,14 +2191,12 @@
+ 			else {
+ 				u32 ref;
+ 
+-
+ #ifdef EXT4_XATTR_DEBUG
+ 				WARN_ON_ONCE(dquot_initialize_needed(inode));
+ #endif
+ 				/* The old block is released after updating
+ 				   the inode. */
+-				error = EXT4_ES_CALL(568, dquot_alloc_block(inode,
+-						EXT4_C2B(EXT4_SB(sb), 1)));
++				error = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (EXT4_C2B(EXT4_SB(sb), 1)); EXT4_EFI_CALL(568, sb_any_quota_loaded(__efi_a0->i_sb), -EDQUOT, (void)0, dquot_alloc_block(__efi_a0, __efi_a1)); });
+ 				if (error)
+ 					goto cleanup;
+ 				BUFFER_TRACE(new_bh, "get_write_access");
+@@ -2714,7 +2707,7 @@
+ 	int error, retries = 0;
+ 	int credits;
+ 
+-	error = EXT4_ES_CALL(571, dquot_initialize(inode));
++	error = ({ __auto_type __efi_a0 = (inode); EXT4_EFI_CALL(571, sb_any_quota_loaded(__efi_a0->i_sb), -ENOMEM, (void)0, dquot_initialize(__efi_a0)); });
+ 	if (error)
+ 		return error;
+ 
+@@ -2792,8 +2785,8 @@
+ 	int needs_kvfree = 0;
+ 	int error;
+ 
+-	is = EXT4_ES_CALL(585, kzalloc(sizeof(struct ext4_xattr_ibody_find), GFP_NOFS));
+-	bs = EXT4_ES_CALL(586, kzalloc(sizeof(struct ext4_xattr_block_find), GFP_NOFS));
++	is = ({ __auto_type __efi_a0 = (sizeof(struct ext4_xattr_ibody_find)); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(585, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
++	bs = ({ __auto_type __efi_a0 = (sizeof(struct ext4_xattr_block_find)); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(586, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kzalloc(__efi_a0, __efi_a1)); });
+ 	b_entry_name = kmalloc(entry->e_name_len + 1, GFP_NOFS);
+ 	if (!is || !bs || !b_entry_name) {
+ 		error = -ENOMEM;
+@@ -2807,7 +2800,7 @@
+ 
+ 	/* Save the entry name and the entry value */
+ 	if (entry->e_value_inum) {
+-		buffer = EXT4_ES_CALL(587, kvmalloc(value_size, GFP_NOFS));
++		buffer = ({ __auto_type __efi_a0 = (value_size); __auto_type __efi_a1 = (GFP_NOFS); EXT4_EFI_CALL(587, (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kvmalloc(__efi_a0, __efi_a1)); });
+ 		if (!buffer) {
+ 			error = -ENOMEM;
+ 			goto out;
+@@ -3417,3 +3410,4 @@
+ 	if (cache)
+ 		mb_cache_destroy(cache);
+ }
++
+--- a/fs/jbd2/journal.c
++++ b/fs/jbd2/journal.c
+@@ -3187,3 +3187,4 @@
+ MODULE_LICENSE("GPL");
+ module_init(journal_init);
+ module_exit(journal_exit);
++
+--- /dev/null
++++ b/include/linux/ext4_efi.h
+@@ -0,0 +1,50 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _LINUX_EXT4_EFI_H
++#define _LINUX_EXT4_EFI_H
++#include <linux/ext4_error_site.h>
++struct super_block;
++struct ext4_efi_decision {
++	u64 run, order, context;
++	u32 call, occurrence;
++	bool eligible, allowed, inject, tracked;
++};
++#ifdef CONFIG_EXT4_ERROR_SITE_TRACE
++struct ext4_efi_decision ext4_efi_before(u32 site, bool allowed);
++void ext4_efi_after(u32 site, struct ext4_efi_decision *d, long result, bool pointer);
++void ext4_efi_formula(struct super_block *sb, const char *point, const char *formula);
++#else
++static inline void ext4_efi_formula(struct super_block *sb, const char *p, const char *f) {}
++#endif
++
++#if defined(CONFIG_EXT4_ERROR_SITE_TRACE) && EXT4_ERROR_SITE_TU
++/* Arguments are evaluated by the generated outer wrapper before this macro.
++ * A skipped call never acquires a resource. Per-API cleanup models consuming
++ * input references (d_make_root) even on failure. */
++#define EXT4_EFI_CALL(id, allowed, failure, cleanup, expression) ({ \
++	const u32 __efi_id = (id); \
++	u64 __efi_inv = 0; \
++	struct ext4_efi_decision __efi_d = {0}; \
++	if (__efi_id) { \
++		if (READ_ONCE(ext4_error_site_enabled)) \
++			__efi_inv = ext4_error_site_enter(__efi_id); \
++		__efi_d = ext4_efi_before(__efi_id, (allowed)); \
++	} \
++	__typeof__(expression) __efi_result; \
++	if (__efi_d.inject) { \
++		cleanup; \
++		__efi_result = (__typeof__(expression))(failure); \
++	} else { \
++		__efi_result = (expression); \
++	} \
++	if (__efi_inv) \
++		ext4_error_site_return(__efi_id, __efi_inv, (long)__efi_result, \
++			__builtin_classify_type(__efi_result) == 5); \
++	if (__efi_d.tracked) \
++		ext4_efi_after(__efi_id, &__efi_d, (long)__efi_result, \
++			__builtin_classify_type(__efi_result) == 5); \
++	__efi_result; \
++})
++#else
++#define EXT4_EFI_CALL(id, allowed, failure, cleanup, expression) (expression)
++#endif
++#endif
+--- a/include/linux/fs.h
++++ b/include/linux/fs.h
+@@ -2,7 +2,7 @@
+ #ifndef _LINUX_FS_H
+ #define _LINUX_FS_H
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/linkage.h>
+ #include <linux/wait_bit.h>
+ #include <linux/kdev_t.h>
+@@ -838,7 +838,7 @@
+ 
+ static inline int inode_trylock_shared(struct inode *inode)
+ {
+-	return EXT4_ES_CALL((EXT4_ERROR_SITE_TU == 9 ? 124 : 0), down_read_trylock(&inode->i_rwsem));
++	return ({ __auto_type __efi_a0 = (&inode->i_rwsem); EXT4_EFI_CALL((EXT4_ERROR_SITE_TU == 9 ? 124 : 0), true, 0, (void)0, down_read_trylock(__efi_a0)); });
+ }
+ 
+ static inline int inode_is_locked(struct inode *inode)
+--- a/include/linux/quotaops.h
++++ b/include/linux/quotaops.h
+@@ -8,7 +8,7 @@
+ #ifndef _LINUX_QUOTAOPS_
+ #define _LINUX_QUOTAOPS_
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/fs.h>
+ 
+ #define DQUOT_SPACE_WARN	0x1
+@@ -310,7 +310,7 @@
+ {
+ 	int ret;
+ 
+-	ret = EXT4_ES_CALL((EXT4_ERROR_SITE_TU == 28 ? 584 : 0), dquot_alloc_space_nodirty(inode, nr));
++	ret = ({ __auto_type __efi_a0 = (inode); __auto_type __efi_a1 = (nr); EXT4_EFI_CALL((EXT4_ERROR_SITE_TU == 28 ? 584 : 0), sb_any_quota_loaded(__efi_a0->i_sb), -EDQUOT, (void)0, dquot_alloc_space_nodirty(__efi_a0, __efi_a1)); });
+ 	if (!ret) {
+ 		/*
+ 		 * Mark inode fully dirty. Since we are allocating blocks, inode
+--- a/include/linux/slab.h
++++ b/include/linux/slab.h
+@@ -12,7 +12,7 @@
+ #ifndef _LINUX_SLAB_H
+ #define	_LINUX_SLAB_H
+ 
+-#include <linux/ext4_error_site.h>
++#include <linux/ext4_efi.h>
+ #include <linux/cache.h>
+ #include <linux/gfp.h>
+ #include <linux/overflow.h>
+@@ -1012,7 +1012,7 @@
+  */
+ static inline __alloc_size(1) void *kzalloc_noprof(size_t size, gfp_t flags)
+ {
+-	return EXT4_ES_CALL((EXT4_ERROR_SITE_TU == 14 ? 176 : 0), kmalloc_noprof(size, flags | __GFP_ZERO));
++	return ({ __auto_type __efi_a0 = (size); __auto_type __efi_a1 = (flags | __GFP_ZERO); EXT4_EFI_CALL((EXT4_ERROR_SITE_TU == 14 ? 176 : 0), (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kmalloc_noprof(__efi_a0, __efi_a1)); });
+ }
+ #define kzalloc(...)				alloc_hooks(kzalloc_noprof(__VA_ARGS__))
+ #define kzalloc_node(_size, _flags, _node)	kmalloc_node(_size, (_flags)|__GFP_ZERO, _node)
+@@ -1038,7 +1038,7 @@
+ 	if (unlikely(check_mul_overflow(n, size, &bytes)))
+ 		return NULL;
+ 
+-	return EXT4_ES_CALL((EXT4_ERROR_SITE_TU == 25 ? 513 : 0), kvmalloc_node_noprof(bytes, flags, node));
++	return ({ __auto_type __efi_a0 = (bytes); __auto_type __efi_a1 = (flags); __auto_type __efi_a2 = (node); EXT4_EFI_CALL((EXT4_ERROR_SITE_TU == 25 ? 513 : 0), (true && !(__efi_a1 & __GFP_NOFAIL)), 0, (void)0, kvmalloc_node_noprof(__efi_a0, __efi_a1, __efi_a2)); });
+ }
+ 
+ #define kvmalloc_array_noprof(...)		kvmalloc_array_node_noprof(__VA_ARGS__, NUMA_NO_NODE)
+--- /dev/null
++++ b/include/trace/events/ext4_efi.h
+@@ -0,0 +1,51 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM ext4_efi
++#if !defined(_TRACE_EXT4_EFI_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_EXT4_EFI_H
++#include <linux/tracepoint.h>
++TRACE_EVENT(efi_site,
++	TP_PROTO(u64 run, u64 order, u32 call, u32 site, u32 occurrence,
++		 u64 context, bool eligible, bool allowed, bool injected,
++		 bool returned, long result, bool pointer),
++	TP_ARGS(run, order, call, site, occurrence, context, eligible, allowed,
++		injected, returned, result, pointer),
++	TP_STRUCT__entry(
++		__field(u64, run) __field(u64, order) __field(u32, call)
++		__field(u32, site) __field(u32, occurrence) __field(u64, context)
++		__field(bool, eligible) __field(bool, allowed) __field(bool, injected)
++		__field(bool, returned) __field(long, result) __field(bool, pointer)
++	),
++	TP_fast_assign(
++		__entry->run = run; __entry->order = order; __entry->call = call;
++		__entry->site = site; __entry->occurrence = occurrence;
++		__entry->context = context; __entry->eligible = eligible;
++		__entry->allowed = allowed; __entry->injected = injected;
++		__entry->returned = returned; __entry->result = result;
++		__entry->pointer = pointer;
++	),
++	TP_printk("run=%llu order=%llu call=%u site_id=%u occurrence=%u context=%llu eligible=%u allowed=%u injected=%u phase=%s result=%ld pointer=%u",
++		__entry->run, __entry->order, __entry->call, __entry->site,
++		__entry->occurrence, __entry->context, __entry->eligible,
++		__entry->allowed, __entry->injected,
++		__entry->returned ? "return" : "enter", __entry->result, __entry->pointer)
++);
++TRACE_EVENT(efi_formula,
++	TP_PROTO(u64 run, u64 order, u32 call, dev_t dev, const char *point, const char *formula),
++	TP_ARGS(run, order, call, dev, point, formula),
++	TP_STRUCT__entry(
++		__field(u64, run) __field(u64, order) __field(u32, call)
++		__field(dev_t, dev) __string(point, point) __string(formula, formula)
++	),
++	TP_fast_assign(
++		__entry->run = run; __entry->order = order; __entry->call = call;
++		__entry->dev = dev; __assign_str(point); __assign_str(formula);
++	),
++	TP_printk("run=%llu order=%llu call=%u dev=%u,%u point=%s formula=%s",
++		__entry->run, __entry->order, __entry->call,
++		MAJOR(__entry->dev), MINOR(__entry->dev), __get_str(point), __get_str(formula))
++);
++#endif
++#undef TRACE_INCLUDE_FILE
++#define TRACE_INCLUDE_FILE ext4_efi
++#include <trace/define_trace.h>

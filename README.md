@@ -84,6 +84,12 @@ to control compilation parallelism and `EXT4_CT_PORT` or
 The [checker documentation](experiments/ext4-counter-trace/README.md) describes
 the unified checker and its research build.
 
+The [counter-trace + fault injection experiment](experiments/ext4-counter-trace-fault-injection/README.md)
+adds per-site execution tracing for all 265 reviewed ext4 error-site records,
+formula-gated fault injection for 215 of them, and program-level fault-sequence
+mutation on one continuously mounted filesystem. The isolated kernel build,
+native syscall correlation, checker integration, and QEMU regression harness are included.
+
 ## Repository scope
 
 Linux source is downloaded from kernel.org and verified against the checked-in

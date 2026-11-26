@@ -1,0 +1,3112 @@
+--- a/fs/ext4/Kconfig
++++ b/fs/ext4/Kconfig
+@@ -127,3 +127,10 @@
+ 
+ 	  If unsure, say N.
+ 
++
++config EXT4_ERROR_SITE_TRACE
++	bool "Trace reviewed ext4 error sites"
++	depends on EXT4_COUNTER_TRACE && EXT4_FS=y
++	help
++	  Observe reviewed call sites, return values and per-site hit counts.
++	  Tracing is disabled at runtime by default. This does not inject faults.
+--- a/fs/ext4/Makefile
++++ b/fs/ext4/Makefile
+@@ -19,3 +19,36 @@
+ obj-$(CONFIG_EXT4_KUNIT_TESTS)		+= ext4-inode-test.o
+ ext4-$(CONFIG_FS_VERITY)		+= verity.o
+ ext4-$(CONFIG_FS_ENCRYPTION)		+= crypto.o
++
++# Reviewed error-site identity for calls in shared inline headers.
++ext4-$(CONFIG_EXT4_ERROR_SITE_TRACE) += error_site_trace.o
++ifeq ($(CONFIG_EXT4_ERROR_SITE_TRACE),y)
++CFLAGS_acl.o += -DEXT4_ERROR_SITE_TU=1
++CFLAGS_balloc.o += -DEXT4_ERROR_SITE_TU=2
++CFLAGS_block_validity.o += -DEXT4_ERROR_SITE_TU=3
++CFLAGS_dir.o += -DEXT4_ERROR_SITE_TU=4
++CFLAGS_ext4_jbd2.o += -DEXT4_ERROR_SITE_TU=5
++CFLAGS_extents.o += -DEXT4_ERROR_SITE_TU=6
++CFLAGS_extents_status.o += -DEXT4_ERROR_SITE_TU=7
++CFLAGS_fast_commit.o += -DEXT4_ERROR_SITE_TU=8
++CFLAGS_file.o += -DEXT4_ERROR_SITE_TU=9
++CFLAGS_fsmap.o += -DEXT4_ERROR_SITE_TU=10
++CFLAGS_fsync.o += -DEXT4_ERROR_SITE_TU=11
++CFLAGS_ialloc.o += -DEXT4_ERROR_SITE_TU=12
++CFLAGS_indirect.o += -DEXT4_ERROR_SITE_TU=13
++CFLAGS_inline.o += -DEXT4_ERROR_SITE_TU=14
++CFLAGS_inode.o += -DEXT4_ERROR_SITE_TU=15
++CFLAGS_ioctl.o += -DEXT4_ERROR_SITE_TU=16
++CFLAGS_mballoc.o += -DEXT4_ERROR_SITE_TU=17
++CFLAGS_mmp.o += -DEXT4_ERROR_SITE_TU=18
++CFLAGS_move_extent.o += -DEXT4_ERROR_SITE_TU=19
++CFLAGS_namei.o += -DEXT4_ERROR_SITE_TU=20
++CFLAGS_orphan.o += -DEXT4_ERROR_SITE_TU=21
++CFLAGS_page-io.o += -DEXT4_ERROR_SITE_TU=22
++CFLAGS_readpage.o += -DEXT4_ERROR_SITE_TU=23
++CFLAGS_resize.o += -DEXT4_ERROR_SITE_TU=24
++CFLAGS_super.o += -DEXT4_ERROR_SITE_TU=25
++CFLAGS_symlink.o += -DEXT4_ERROR_SITE_TU=26
++CFLAGS_sysfs.o += -DEXT4_ERROR_SITE_TU=27
++CFLAGS_xattr.o += -DEXT4_ERROR_SITE_TU=28
++endif
+--- a/fs/ext4/acl.c
++++ b/fs/ext4/acl.c
+@@ -5,6 +5,7 @@
+  * Copyright (C) 2001-2003 Andreas Gruenbacher, <agruen@suse.de>
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/quotaops.h>
+ #include "ext4_jbd2.h"
+ #include "ext4.h"
+@@ -35,7 +36,7 @@
+ 		return ERR_PTR(-EINVAL);
+ 	if (count == 0)
+ 		return NULL;
+-	acl = posix_acl_alloc(count, GFP_NOFS);
++	acl = EXT4_ES_CALL(2, posix_acl_alloc(count, GFP_NOFS));
+ 	if (!acl)
+ 		return ERR_PTR(-ENOMEM);
+ 	for (n = 0; n < count; n++) {
+@@ -96,8 +97,8 @@
+ 	size_t n;
+ 
+ 	*size = ext4_acl_size(acl->a_count);
+-	ext_acl = kmalloc(sizeof(ext4_acl_header) + acl->a_count *
+-			sizeof(ext4_acl_entry), GFP_NOFS);
++	ext_acl = EXT4_ES_CALL(6, kmalloc(sizeof(ext4_acl_header) + acl->a_count *
++			sizeof(ext4_acl_entry), GFP_NOFS));
+ 	if (!ext_acl)
+ 		return ERR_PTR(-ENOMEM);
+ 	ext_acl->a_version = cpu_to_le32(EXT4_ACL_VERSION);
+@@ -165,7 +166,7 @@
+ 	}
+ 	retval = ext4_xattr_get(inode, name_index, "", NULL, 0);
+ 	if (retval > 0) {
+-		value = kmalloc(retval, GFP_NOFS);
++		value = EXT4_ES_CALL(1, kmalloc(retval, GFP_NOFS));
+ 		if (!value)
+ 			return ERR_PTR(-ENOMEM);
+ 		retval = ext4_xattr_get(inode, name_index, "", value, retval);
+@@ -236,7 +237,7 @@
+ 	umode_t mode = inode->i_mode;
+ 	int update_mode = 0;
+ 
+-	error = dquot_initialize(inode);
++	error = EXT4_ES_CALL(3, dquot_initialize(inode));
+ 	if (error)
+ 		return error;
+ retry:
+@@ -282,7 +283,7 @@
+ 	struct posix_acl *default_acl, *acl;
+ 	int error;
+ 
+-	error = posix_acl_create(dir, &inode->i_mode, &default_acl, &acl);
++	error = EXT4_ES_CALL(5, posix_acl_create(dir, &inode->i_mode, &default_acl, &acl));
+ 	if (error)
+ 		return error;
+ 
+--- a/fs/ext4/balloc.c
++++ b/fs/ext4/balloc.c
+@@ -12,6 +12,7 @@
+  *        David S. Miller (davem@caip.rutgers.edu), 1995
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/time.h>
+ #include <linux/capability.h>
+ #include <linux/fs.h>
+@@ -582,7 +583,7 @@
+ 		return -EFSCORRUPTED;
+ 	wait_on_buffer(bh);
+ 	ext4_simulate_fail_bh(sb, bh, EXT4_SIM_BBITMAP_EIO);
+-	if (!buffer_uptodate(bh)) {
++	if (!EXT4_ES_CALL(16, buffer_uptodate(bh))) {
+ 		ext4_error_err(sb, EIO, "Cannot read block bitmap - "
+ 			       "block_group = %u, block_bitmap = %llu",
+ 			       block_group, (unsigned long long) bh->b_blocknr);
+--- a/fs/ext4/block_validity.c
++++ b/fs/ext4/block_validity.c
+@@ -9,6 +9,7 @@
+  * should never be used as data blocks by files or directories.
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/time.h>
+ #include <linux/fs.h>
+ #include <linux/namei.h>
+@@ -85,8 +86,8 @@
+ 			return -EFSCORRUPTED;
+ 	}
+ 
+-	new_entry = kmem_cache_alloc(ext4_system_zone_cachep,
+-				     GFP_KERNEL);
++	new_entry = EXT4_ES_CALL(22, kmem_cache_alloc(ext4_system_zone_cachep,
++				     GFP_KERNEL));
+ 	if (!new_entry)
+ 		return -ENOMEM;
+ 	new_entry->start_blk = start_blk;
+@@ -217,7 +218,7 @@
+ 	ext4_group_t i;
+ 	int ret;
+ 
+-	system_blks = kzalloc(sizeof(*system_blks), GFP_KERNEL);
++	system_blks = EXT4_ES_CALL(21, kzalloc(sizeof(*system_blks), GFP_KERNEL));
+ 	if (!system_blks)
+ 		return -ENOMEM;
+ 
+--- a/fs/ext4/dir.c
++++ b/fs/ext4/dir.c
+@@ -22,6 +22,7 @@
+  *
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/fs.h>
+ #include <linux/buffer_head.h>
+ #include <linux/slab.h>
+@@ -135,7 +136,7 @@
+ 	struct fscrypt_str fstr = FSTR_INIT(NULL, 0);
+ 	struct dir_private_info *info = file->private_data;
+ 
+-	err = fscrypt_prepare_readdir(inode);
++	err = EXT4_ES_CALL(25, fscrypt_prepare_readdir(inode));
+ 	if (err)
+ 		return err;
+ 
+@@ -478,7 +479,7 @@
+ 
+ 	/* Create and allocate the fname structure */
+ 	len = sizeof(struct fname) + ent_name->len + 1;
+-	new_fn = kzalloc(len, GFP_KERNEL);
++	new_fn = EXT4_ES_CALL(24, kzalloc(len, GFP_KERNEL));
+ 	if (!new_fn)
+ 		return -ENOMEM;
+ 	new_fn->hash = hash;
+@@ -670,7 +671,7 @@
+ {
+ 	struct dir_private_info *info;
+ 
+-	info = kzalloc(sizeof(*info), GFP_KERNEL);
++	info = EXT4_ES_CALL(31, kzalloc(sizeof(*info), GFP_KERNEL));
+ 	if (!info)
+ 		return -ENOMEM;
+ 	file->private_data = info;
+--- /dev/null
++++ b/fs/ext4/error_site_table.h
+@@ -0,0 +1,269 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/* Generated by instrument-sites.py; do not edit. */
++static const struct ext4_error_site_desc ext4_error_sites[588] = {
++	[1] = { "fs/ext4/acl.c", "fs/ext4/acl.c", 167, 11, "ext4_get_acl", "kmalloc_noprof" },
++	[2] = { "fs/ext4/acl.c", "fs/ext4/acl.c", 37, 8, "ext4_acl_from_disk", "posix_acl_alloc" },
++	[3] = { "fs/ext4/acl.c", "fs/ext4/acl.c", 238, 10, "ext4_set_acl", "dquot_initialize" },
++	[5] = { "fs/ext4/acl.c", "fs/ext4/acl.c", 284, 10, "ext4_init_acl", "posix_acl_create" },
++	[6] = { "fs/ext4/acl.c", "fs/ext4/acl.c", 98, 12, "ext4_acl_to_disk", "kmalloc_noprof" },
++	[16] = { "fs/ext4/balloc.c", "fs/ext4/balloc.c", 581, 7, "ext4_wait_block_bitmap", "buffer_uptodate" },
++	[21] = { "fs/ext4/block_validity.c", "fs/ext4/block_validity.c", 220, 16, "ext4_setup_system_zone", "kzalloc_noprof" },
++	[22] = { "fs/ext4/block_validity.c", "fs/ext4/block_validity.c", 88, 14, "add_system_zone", "kmem_cache_alloc_noprof" },
++	[24] = { "fs/ext4/dir.c", "fs/ext4/dir.c", 481, 11, "ext4_htree_store_dirent", "kzalloc_noprof" },
++	[25] = { "fs/ext4/dir.c", "fs/ext4/dir.c", 138, 8, "ext4_readdir", "fscrypt_prepare_readdir" },
++	[31] = { "fs/ext4/dir.c", "fs/ext4/dir.c", 673, 9, "ext4_dir_open", "kzalloc_noprof" },
++	[32] = { "fs/ext4/ext4_jbd2.c", "fs/ext4/ext4_jbd2.c", 161, 8, "__ext4_journal_start_reserved", "jbd2_journal_start_reserved" },
++	[33] = { "fs/ext4/ext4_jbd2.c", "fs/ext4/ext4_jbd2.c", 172, 6, "__ext4_journal_ensure_credits", "is_handle_aborted" },
++	[34] = { "fs/ext4/ext4_jbd2.c", "fs/ext4/ext4_jbd2.c", 239, 9, "__ext4_journal_get_write_access", "jbd2_journal_get_write_access" },
++	[36] = { "fs/ext4/ext4_jbd2.c", "fs/ext4/ext4_jbd2.c", 307, 8, "__ext4_forget", "jbd2_journal_revoke" },
++	[37] = { "fs/ext4/ext4_jbd2.c", "fs/ext4/ext4_jbd2.c", 328, 8, "__ext4_journal_get_create_access", "jbd2_journal_get_create_access" },
++	[38] = { "fs/ext4/ext4_jbd2.c", "fs/ext4/ext4_jbd2.c", 354, 9, "__ext4_handle_dirty_metadata", "jbd2_journal_dirty_metadata" },
++	[41] = { "fs/ext4/ext4_jbd2.c", "fs/ext4/ext4_jbd2.c", 387, 27, "__ext4_handle_dirty_metadata", "buffer_uptodate" },
++	[42] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 623, 9, "ext4_ext_precache", "kmalloc_array_noprof" },
++	[43] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 565, 7, "__read_extent_tree_block", "sb_getblk_gfp" },
++	[46] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 916, 10, "ext4_find_extent", "kmalloc_array_noprof" },
++	[50] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 4805, 9, "ext4_fallocate", "inode_newsize_ok" },
++	[51] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 4813, 8, "ext4_fallocate", "file_modified" },
++	[52] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 5372, 8, "ext4_collapse_range", "file_modified" },
++	[53] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 5515, 8, "ext4_insert_range", "file_modified" },
++	[54] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 4616, 9, "ext4_zero_range", "inode_newsize_ok" },
++	[55] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 4626, 8, "ext4_zero_range", "file_modified" },
++	[56] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 5057, 10, "ext4_get_es_cache", "fiemap_prep" },
++	[57] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 2230, 9, "ext4_fill_es_cache_info", "fiemap_fill_next_extent" },
++	[63] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 1105, 12, "ext4_ext_split", "kmalloc_array_noprof" },
++	[64] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 1126, 7, "ext4_ext_split", "sb_getblk_gfp" },
++	[67] = { "fs/ext4/extents.c", "fs/ext4/extents.c", 1334, 7, "ext4_ext_grow_indepth", "sb_getblk_gfp" },
++	[69] = { "fs/ext4/extents_status.c", "fs/ext4/extents_status.c", 483, 10, "__es_alloc_extent", "kmem_cache_alloc_noprof" },
++	[71] = { "fs/ext4/extents_status.c", "fs/ext4/extents_status.c", 457, 10, "__alloc_pending", "kmem_cache_alloc_noprof" },
++	[73] = { "fs/ext4/extents_status.c", "fs/ext4/extents_status.c", 1727, 8, "ext4_es_register_shrinker", "__percpu_counter_init_many" },
++	[74] = { "fs/ext4/extents_status.c", "fs/ext4/extents_status.c", 1731, 8, "ext4_es_register_shrinker", "__percpu_counter_init_many" },
++	[75] = { "fs/ext4/extents_status.c", "fs/ext4/extents_status.c", 1737, 8, "ext4_es_register_shrinker", "__percpu_counter_init_many" },
++	[76] = { "fs/ext4/extents_status.c", "fs/ext4/extents_status.c", 1740, 8, "ext4_es_register_shrinker", "__percpu_counter_init_many" },
++	[77] = { "fs/ext4/extents_status.c", "fs/ext4/extents_status.c", 1744, 23, "ext4_es_register_shrinker", "shrinker_alloc" },
++	[96] = { "fs/ext4/fast_commit.c", "fs/ext4/fast_commit.c", 444, 9, "__track_dentry_update", "kmem_cache_alloc_noprof" },
++	[97] = { "fs/ext4/fast_commit.c", "fs/ext4/fast_commit.c", 455, 25, "__track_dentry_update", "kmalloc_noprof" },
++	[100] = { "fs/ext4/fast_commit.c", "fs/ext4/fast_commit.c", 1222, 8, "ext4_fc_commit", "jbd2_fc_begin_commit" },
++	[103] = { "fs/ext4/fast_commit.c", "fs/ext4/fast_commit.c", 1257, 8, "ext4_fc_commit", "jbd2_fc_wait_bufs" },
++	[104] = { "fs/ext4/fast_commit.c", "fs/ext4/fast_commit.c", 1723, 16, "ext4_fc_record_regions", "krealloc_noprof" },
++	[110] = { "fs/ext4/fast_commit.c", "fs/ext4/fast_commit.c", 1000, 9, "ext4_fc_submit_inode_data_all", "jbd2_submit_inode_data" },
++	[111] = { "fs/ext4/fast_commit.c", "fs/ext4/fast_commit.c", 1025, 9, "ext4_fc_wait_inode_data_all", "jbd2_wait_inode_data" },
++	[114] = { "fs/ext4/fast_commit.c", "fs/ext4/fast_commit.c", 723, 9, "ext4_fc_reserve_space", "jbd2_fc_get_buf" },
++	[115] = { "fs/ext4/fast_commit.c", "fs/ext4/fast_commit.c", 753, 8, "ext4_fc_reserve_space", "jbd2_fc_get_buf" },
++	[116] = { "fs/ext4/fast_commit.c", "fs/ext4/fast_commit.c", 1455, 17, "ext4_fc_replay_link_internal", "d_alloc" },
++	[117] = { "fs/ext4/fast_commit.c", "fs/ext4/fast_commit.c", 1529, 24, "ext4_fc_record_modified_inode", "krealloc_noprof" },
++	[119] = { "fs/ext4/file.c", "fs/ext4/file.c", 912, 12, "ext4_llseek", "iomap_seek_hole" },
++	[120] = { "fs/ext4/file.c", "fs/ext4/file.c", 918, 12, "ext4_llseek", "iomap_seek_data" },
++	[121] = { "fs/ext4/file.c", "fs/ext4/file.c", 869, 8, "ext4_file_open", "fscrypt_file_open" },
++	[122] = { "fs/ext4/file.c", "fs/ext4/file.c", 873, 8, "ext4_file_open", "fsverity_file_open" },
++	[123] = { "fs/ext4/file.c", "fs/ext4/file.c", 75, 8, "ext4_dio_read_iter", "inode_trylock_shared" },
++	[124] = { "fs/ext4/file.c", "include/linux/fs.h", 840, 9, "inode_trylock_shared", "down_read_trylock" },
++	[125] = { "fs/ext4/file.c", "fs/ext4/file.c", 520, 9, "ext4_dio_write_iter", "inode_trylock_shared" },
++	[126] = { "fs/ext4/file.c", "fs/ext4/file.c", 523, 9, "ext4_dio_write_iter", "inode_trylock" },
++	[127] = { "fs/ext4/file.c", "fs/ext4/file.c", 485, 8, "ext4_dio_write_checks", "file_modified" },
++	[129] = { "fs/ext4/file.c", "fs/ext4/file.c", 252, 8, "ext4_generic_write_checks", "generic_write_checks" },
++	[131] = { "fs/ext4/file.c", "fs/ext4/file.c", 279, 8, "ext4_write_checks", "file_modified" },
++	[133] = { "fs/ext4/fsmap.c", "fs/ext4/fsmap.c", 297, 8, "ext4_getfsmap_fill", "kmalloc_noprof" },
++	[134] = { "fs/ext4/fsync.c", "fs/ext4/fsync.c", 158, 8, "ext4_sync_file", "file_write_and_wait_range" },
++	[135] = { "fs/ext4/fsync.c", "fs/ext4/fsync.c", 88, 8, "ext4_fsync_nojournal", "generic_buffers_fsync_noflush" },
++	[138] = { "fs/ext4/fsync.c", "fs/ext4/fsync.c", 71, 9, "ext4_sync_parent", "sync_mapping_buffers" },
++	[139] = { "fs/ext4/fsync.c", "fs/ext4/fsync.c", 74, 9, "ext4_sync_parent", "sync_inode_metadata" },
++	[144] = { "fs/ext4/ialloc.c", "fs/ext4/ialloc.c", 198, 7, "ext4_read_inode_bitmap", "buffer_uptodate" },
++	[147] = { "fs/ext4/ialloc.c", "fs/ext4/ialloc.c", 958, 10, "__ext4_new_inode", "new_inode" },
++	[148] = { "fs/ext4/ialloc.c", "fs/ext4/ialloc.c", 986, 9, "__ext4_new_inode", "fscrypt_prepare_new_inode" },
++	[149] = { "fs/ext4/ialloc.c", "fs/ext4/ialloc.c", 991, 8, "__ext4_new_inode", "dquot_initialize" },
++	[151] = { "fs/ext4/ialloc.c", "fs/ext4/ialloc.c", 1269, 6, "__ext4_new_inode", "insert_inode_locked" },
++	[152] = { "fs/ext4/ialloc.c", "fs/ext4/ialloc.c", 1303, 8, "__ext4_new_inode", "dquot_alloc_inode" },
++	[154] = { "fs/ext4/ialloc.c", "fs/ext4/ialloc.c", 872, 24, "ext4_xattr_credits_for_new_inode", "get_inode_acl" },
++	[158] = { "fs/ext4/ialloc.c", "fs/ext4/ialloc.c", 1595, 8, "ext4_init_inode_table", "sb_issue_zeroout" },
++	[165] = { "fs/ext4/indirect.c", "fs/ext4/indirect.c", 166, 8, "ext4_get_branch", "sb_getblk" },
++	[168] = { "fs/ext4/indirect.c", "fs/ext4/indirect.c", 977, 40, "ext4_free_data", "bh2jh" },
++	[169] = { "fs/ext4/inline.c", "fs/ext4/inline.c", 1182, 8, "ext4_convert_inline_data_nolock", "kmalloc_noprof" },
++	[171] = { "fs/ext4/inline.c", "fs/ext4/inline.c", 1359, 12, "ext4_inlinedir_to_tree", "kmalloc_noprof" },
++	[172] = { "fs/ext4/inline.c", "fs/ext4/inline.c", 1478, 12, "ext4_read_inline_dir", "kmalloc_noprof" },
++	[173] = { "fs/ext4/inline.c", "fs/ext4/inline.c", 1594, 9, "ext4_read_inline_link", "kmalloc_noprof" },
++	[174] = { "fs/ext4/inline.c", "fs/ext4/inline.c", 1973, 12, "ext4_inline_data_truncate", "kmalloc_noprof" },
++	[175] = { "fs/ext4/inline.c", "fs/ext4/inline.c", 355, 10, "ext4_update_inline_data", "kzalloc_noprof" },
++	[176] = { "fs/ext4/inline.c", "include/linux/slab.h", 1014, 9, "kzalloc_noprof", "kmalloc_noprof" },
++	[183] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 408, 8, "ext4_issue_zeroout", "sb_issue_zeroout" },
++	[187] = { "fs/ext4/inode.c", "fs/ext4/ext4.h", 3853, 6, "ext4_buffer_uptodate", "buffer_write_io_error" },
++	[189] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 947, 18, "ext4_bread_batch", "buffer_uptodate" },
++	[200] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 1101, 8, "ext4_block_write_begin", "buffer_uptodate" },
++	[209] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 3977, 8, "ext4_punch_hole", "file_modified" },
++	[210] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 4070, 11, "ext4_inode_attach_jinode", "kmem_cache_alloc_noprof" },
++	[216] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 4504, 7, "__ext4_get_inode_loc", "buffer_uptodate" },
++	[217] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 4728, 10, "__ext4_iget", "iget_locked" },
++	[220] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 5230, 31, "ext4_write_inode", "buffer_uptodate" },
++	[221] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 5332, 10, "ext4_setattr", "setattr_prepare" },
++	[222] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 5336, 10, "ext4_setattr", "fscrypt_prepare_setattr" },
++	[223] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 5340, 10, "ext4_setattr", "fsverity_prepare_setattr" },
++	[224] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 5345, 11, "ext4_setattr", "dquot_initialize" },
++	[225] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 5368, 11, "ext4_setattr", "dquot_transfer" },
++	[226] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 6045, 9, "ext4_change_inode_journal_flag", "jbd2_journal_flush" },
++	[234] = { "fs/ext4/inode.c", "fs/ext4/inode.c", 1473, 8, "ext4_da_reserve_space", "dquot_reserve_block" },
++	[262] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 822, 9, "ext4_force_shutdown", "bdev_freeze" },
++	[265] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 644, 9, "ext4_ioctl_setflags", "filemap_write_and_wait" },
++	[266] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 743, 8, "ext4_ioctl_setproject", "dquot_initialize" },
++	[267] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1262, 9, "__ext4_ioctl", "mnt_want_write_file" },
++	[268] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1311, 9, "__ext4_ioctl", "mnt_want_write_file" },
++	[269] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1318, 11, "__ext4_ioctl", "jbd2_journal_flush" },
++	[270] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1340, 7, "__ext4_ioctl", "copy_from_user" },
++	[271] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1366, 9, "__ext4_ioctl", "mnt_want_write_file" },
++	[272] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1374, 7, "__ext4_ioctl", "copy_to_user" },
++	[273] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1385, 7, "__ext4_ioctl", "copy_from_user" },
++	[274] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1398, 9, "__ext4_ioctl", "mnt_want_write_file" },
++	[275] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1420, 9, "__ext4_ioctl", "mnt_want_write_file" },
++	[276] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1433, 9, "__ext4_ioctl", "mnt_want_write_file" },
++	[277] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1446, 7, "__ext4_ioctl", "copy_from_user" },
++	[278] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1455, 9, "__ext4_ioctl", "mnt_want_write_file" },
++	[279] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1463, 11, "__ext4_ioctl", "jbd2_journal_flush" },
++	[281] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1499, 7, "__ext4_ioctl", "copy_from_user" },
++	[282] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1507, 7, "__ext4_ioctl", "copy_to_user" },
++	[283] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 960, 8, "ext4_ioctl_group_add", "mnt_want_write_file" },
++	[284] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 967, 10, "ext4_ioctl_group_add", "jbd2_journal_flush" },
++	[285] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 892, 6, "ext4_ioc_getfsmap", "copy_from_user" },
++	[289] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 928, 7, "ext4_ioc_getfsmap", "copy_to_user" },
++	[290] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 937, 6, "ext4_ioc_getfsmap", "copy_to_user" },
++	[291] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 409, 8, "swap_inode_boot_loader", "filemap_write_and_wait" },
++	[292] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 413, 8, "swap_inode_boot_loader", "filemap_write_and_wait" },
++	[293] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 452, 8, "swap_inode_boot_loader", "dquot_initialize" },
++	[294] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 501, 9, "swap_inode_boot_loader", "dquot_alloc_space" },
++	[295] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1040, 6, "ext4_ioctl_get_es_cache", "copy_from_user" },
++	[296] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1054, 6, "ext4_ioctl_get_es_cache", "copy_to_user" },
++	[297] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1067, 6, "ext4_ioctl_checkpoint", "copy_from_user" },
++	[300] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1099, 8, "ext4_ioctl_checkpoint", "jbd2_journal_flush" },
++	[301] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1157, 6, "ext4_ioctl_getlabel", "copy_to_user" },
++	[302] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1120, 6, "ext4_ioctl_setlabel", "copy_from_user" },
++	[303] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1132, 8, "ext4_ioctl_setlabel", "mnt_want_write_file" },
++	[304] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1168, 6, "ext4_ioctl_getuuid", "copy_from_user" },
++	[305] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1173, 7, "ext4_ioctl_getuuid", "copy_to_user" },
++	[306] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1187, 6, "ext4_ioctl_getuuid", "copy_to_user" },
++	[307] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1188, 6, "ext4_ioctl_getuuid", "copy_to_user" },
++	[308] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1213, 6, "ext4_ioctl_setuuid", "copy_from_user" },
++	[309] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1219, 6, "ext4_ioctl_setuuid", "copy_from_user" },
++	[310] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 1222, 8, "ext4_ioctl_setuuid", "mnt_want_write_file" },
++	[311] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 876, 6, "ext4_getfsmap_format", "copy_to_user" },
++	[312] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 78, 6, "ext4_update_primary_sb", "buffer_write_io_error" },
++	[313] = { "fs/ext4/ioctl.c", "fs/ext4/ioctl.c", 78, 36, "ext4_update_primary_sb", "buffer_uptodate" },
++	[315] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 3303, 18, "ext4_mb_alloc_groupinfo", "__kvmalloc_node_noprof" },
++	[316] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 3356, 23, "ext4_mb_add_groupinfo", "kmem_cache_alloc_noprof" },
++	[317] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 3636, 3, "ext4_mb_init", "kmalloc_array_noprof" },
++	[318] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 3643, 3, "ext4_mb_init", "kmalloc_array_noprof" },
++	[319] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 3654, 3, "ext4_mb_init", "kmalloc_array_noprof" },
++	[320] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 3661, 3, "ext4_mb_init", "kmalloc_array_noprof" },
++	[321] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 3714, 27, "ext4_mb_init", "pcpu_alloc_noprof" },
++	[322] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 3525, 11, "ext4_groupinfo_create_slab", "__kmem_cache_create" },
++	[323] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 3417, 23, "ext4_mb_init_backend", "new_inode" },
++	[330] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 6197, 7, "ext4_mb_new_blocks", "kmem_cache_alloc_noprof" },
++	[333] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 5627, 7, "ext4_mb_pa_alloc", "kmem_cache_alloc_noprof" },
++	[337] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 1310, 8, "ext4_mb_init_cache", "kzalloc_noprof" },
++	[338] = { "fs/ext4/mballoc.c", "fs/ext4/mballoc.c", 1367, 8, "ext4_mb_init_cache", "buffer_verified" },
++	[353] = { "fs/ext4/mmp.c", "fs/ext4/mmp.c", 53, 6, "write_mmp_block_thawed", "buffer_uptodate" },
++	[362] = { "fs/ext4/move_extent.c", "fs/ext4/move_extent.c", 231, 7, "mext_page_mkuptodate", "buffer_uptodate" },
++	[371] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 2827, 8, "ext4_create", "dquot_initialize" },
++	[372] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3500, 8, "ext4_link", "fscrypt_prepare_link" },
++	[373] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3509, 8, "ext4_link", "dquot_initialize" },
++	[374] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3313, 11, "ext4_unlink", "dquot_initialize" },
++	[375] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3316, 11, "ext4_unlink", "dquot_initialize" },
++	[376] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3375, 8, "ext4_symlink", "fscrypt_prepare_symlink" },
++	[377] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3380, 8, "ext4_symlink", "dquot_initialize" },
++	[379] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3010, 8, "ext4_mkdir", "dquot_initialize" },
++	[380] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3152, 11, "ext4_rmdir", "dquot_initialize" },
++	[381] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3155, 11, "ext4_rmdir", "dquot_initialize" },
++	[382] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 2862, 8, "ext4_mknod", "dquot_initialize" },
++	[383] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 4199, 8, "ext4_rename2", "fscrypt_prepare_rename" },
++	[384] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 2896, 8, "ext4_tmpfile", "dquot_initialize" },
++	[386] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 1638, 8, "__ext4_find_entry", "buffer_uptodate" },
++	[390] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 4070, 11, "ext4_cross_rename", "dquot_initialize" },
++	[391] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 4073, 11, "ext4_cross_rename", "dquot_initialize" },
++	[392] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3823, 11, "ext4_rename", "dquot_initialize" },
++	[393] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3826, 11, "ext4_rename", "dquot_initialize" },
++	[394] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3829, 11, "ext4_rename", "dquot_initialize" },
++	[395] = { "fs/ext4/namei.c", "fs/ext4/namei.c", 3836, 12, "ext4_rename", "dquot_initialize" },
++	[406] = { "fs/ext4/orphan.c", "fs/ext4/orphan.c", 593, 17, "ext4_init_orphan_info", "kmalloc_noprof" },
++	[407] = { "fs/ext4/page-io.c", "fs/ext4/page-io.c", 60, 15, "ext4_alloc_io_end_vec", "kmem_cache_alloc_noprof" },
++	[410] = { "fs/ext4/page-io.c", "fs/ext4/page-io.c", 277, 26, "ext4_init_io_end", "kmem_cache_alloc_noprof" },
++	[431] = { "fs/ext4/readpage.c", "fs/ext4/readpage.c", 400, 3, "ext4_init_post_read_processing", "mempool_create_node_noprof" },
++	[432] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 35, 29, "ext4_kvfree_array_rcu", "kzalloc_noprof" },
++	[433] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 263, 20, "alloc_flex_gd", "kmalloc_array_noprof" },
++	[434] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 269, 22, "alloc_flex_gd", "kmalloc_array_noprof" },
++	[435] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 582, 10, "setup_new_flex_group_blocks", "sb_getblk" },
++	[436] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 611, 10, "setup_new_flex_group_blocks", "sb_issue_zeroout" },
++	[437] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 626, 9, "setup_new_flex_group_blocks", "sb_issue_zeroout" },
++	[438] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 1186, 8, "update_backups", "sb_getblk" },
++	[439] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 429, 7, "bclean", "sb_getblk" },
++	[440] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 493, 8, "set_flexbg_block_bitmap", "sb_getblk" },
++	[441] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 1034, 12, "reserve_backup_gdb", "kmalloc_array_noprof" },
++	[442] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 975, 17, "add_new_gdb_meta_bg", "__kvmalloc_node_noprof" },
++	[443] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 889, 17, "add_new_gdb", "__kvmalloc_node_noprof" },
++	[444] = { "fs/ext4/resize.c", "fs/ext4/resize.c", 1299, 27, "ext4_get_bitmap", "sb_getblk" },
++	[447] = { "fs/ext4/super.c", "fs/ext4/ext4.h", 3853, 6, "ext4_buffer_uptodate", "buffer_write_io_error" },
++	[450] = { "fs/ext4/super.c", "fs/ext4/super.c", 202, 6, "ext4_read_bh", "buffer_uptodate" },
++	[453] = { "fs/ext4/super.c", "fs/ext4/super.c", 230, 7, "__ext4_sb_bread_gfp", "sb_getblk_gfp" },
++	[468] = { "fs/ext4/super.c", "fs/ext4/super.c", 3124, 15, "ext4_alloc_flex_bg_array", "__kvmalloc_node_noprof" },
++	[469] = { "fs/ext4/super.c", "fs/ext4/super.c", 3132, 19, "ext4_alloc_flex_bg_array", "__kvmalloc_node_noprof" },
++	[470] = { "fs/ext4/super.c", "fs/ext4/super.c", 3947, 8, "ext4_li_request_new", "kzalloc_noprof" },
++	[471] = { "fs/ext4/super.c", "fs/ext4/super.c", 3928, 8, "ext4_li_info_new", "kzalloc_noprof" },
++	[472] = { "fs/ext4/super.c", "fs/ext4/super.c", 4169, 23, "ext4_calculate_overhead", "get_zeroed_page_noprof" },
++	[475] = { "fs/ext4/super.c", "fs/ext4/super.c", 6171, 6, "ext4_commit_super", "buffer_write_io_error" },
++	[476] = { "fs/ext4/super.c", "fs/ext4/super.c", 6171, 37, "ext4_commit_super", "buffer_uptodate" },
++	[477] = { "fs/ext4/super.c", "fs/ext4/super.c", 6192, 6, "ext4_commit_super", "buffer_write_io_error" },
++	[478] = { "fs/ext4/super.c", "fs/ext4/super.c", 2008, 8, "ext4_init_fs_context", "kzalloc_noprof" },
++	[479] = { "fs/ext4/super.c", "fs/ext4/super.c", 2137, 10, "ext4_parse_param", "fs_parse" },
++	[480] = { "fs/ext4/super.c", "fs/ext4/super.c", 2304, 11, "ext4_parse_param", "fs_lookup_param" },
++	[483] = { "fs/ext4/super.c", "fs/ext4/super.c", 2047, 10, "note_qf_name", "kmemdup_nul" },
++	[485] = { "fs/ext4/super.c", "fs/ext4/super.c", 4294, 8, "ext4_alloc_sbi", "kzalloc_noprof" },
++	[486] = { "fs/ext4/super.c", "fs/ext4/super.c", 4302, 3, "ext4_alloc_sbi", "kzalloc_noprof" },
++	[487] = { "fs/ext4/super.c", "fs/ext4/super.c", 5473, 15, "__ext4_fill_super", "d_make_root" },
++	[489] = { "fs/ext4/super.c", "fs/ext4/super.c", 2482, 17, "parse_apply_sb_mount_options", "kstrndup" },
++	[490] = { "fs/ext4/super.c", "fs/ext4/super.c", 2488, 7, "parse_apply_sb_mount_options", "kzalloc_noprof" },
++	[491] = { "fs/ext4/super.c", "fs/ext4/super.c", 2492, 10, "parse_apply_sb_mount_options", "kzalloc_noprof" },
++	[492] = { "fs/ext4/super.c", "fs/ext4/super.c", 4737, 8, "ext4_check_geometry", "generic_check_addressable" },
++	[494] = { "fs/ext4/super.c", "fs/ext4/super.c", 768, 7, "update_super_work", "jbd2_journal_get_write_access" },
++	[495] = { "fs/ext4/super.c", "fs/ext4/super.c", 777, 7, "update_super_work", "buffer_write_io_error" },
++	[496] = { "fs/ext4/super.c", "fs/ext4/super.c", 777, 38, "update_super_work", "buffer_uptodate" },
++	[497] = { "fs/ext4/super.c", "fs/ext4/super.c", 784, 7, "update_super_work", "jbd2_journal_dirty_metadata" },
++	[498] = { "fs/ext4/super.c", "fs/ext4/super.c", 4820, 2, "ext4_group_desc_init", "kvmalloc_array_node_noprof" },
++	[502] = { "fs/ext4/super.c", "fs/ext4/super.c", 1212, 8, "ext4_percpu_param_init", "__percpu_counter_init_many" },
++	[503] = { "fs/ext4/super.c", "fs/ext4/super.c", 1217, 9, "ext4_percpu_param_init", "__percpu_counter_init_many" },
++	[504] = { "fs/ext4/super.c", "fs/ext4/super.c", 1221, 9, "ext4_percpu_param_init", "__percpu_counter_init_many" },
++	[505] = { "fs/ext4/super.c", "fs/ext4/super.c", 1224, 9, "ext4_percpu_param_init", "__percpu_counter_init_many" },
++	[506] = { "fs/ext4/super.c", "fs/ext4/super.c", 1227, 9, "ext4_percpu_param_init", "__percpu_counter_init_many" },
++	[507] = { "fs/ext4/super.c", "fs/ext4/super.c", 1230, 9, "ext4_percpu_param_init", "__percpu_init_rwsem" },
++	[508] = { "fs/ext4/super.c", "fs/ext4/super.c", 6222, 8, "ext4_mark_recovery_complete", "jbd2_journal_flush" },
++	[510] = { "fs/ext4/super.c", "fs/ext4/super.c", 2446, 20, "parse_options", "kmemdup_nul" },
++	[513] = { "fs/ext4/super.c", "include/linux/slab.h", 1040, 9, "kvmalloc_array_node_noprof", "__kvmalloc_node_noprof" },
++	[514] = { "fs/ext4/super.c", "fs/ext4/super.c", 1396, 7, "ext4_alloc_inode", "kmem_cache_alloc_lru_noprof" },
++	[524] = { "fs/ext4/super.c", "fs/ext4/super.c", 6362, 11, "ext4_freeze", "jbd2_journal_flush" },
++	[526] = { "fs/ext4/super.c", "fs/ext4/super.c", 6855, 8, "ext4_write_dquot", "dquot_commit" },
++	[527] = { "fs/ext4/super.c", "fs/ext4/super.c", 6875, 8, "ext4_acquire_dquot", "dquot_acquire" },
++	[528] = { "fs/ext4/super.c", "fs/ext4/super.c", 6930, 8, "ext4_write_info", "dquot_commit_info" },
++	[529] = { "fs/ext4/super.c", "fs/ext4/super.c", 6987, 8, "ext4_quota_on", "dquot_quota_on" },
++	[533] = { "fs/ext4/super.c", "fs/ext4/super.c", 6019, 9, "ext4_load_journal", "jbd2_journal_wipe" },
++	[534] = { "fs/ext4/super.c", "fs/ext4/super.c", 6028, 9, "ext4_load_journal", "jbd2_journal_load" },
++	[536] = { "fs/ext4/super.c", "fs/ext4/super.c", 6266, 12, "ext4_clear_journal_err", "jbd2_journal_errno" },
++	[537] = { "fs/ext4/super.c", "fs/ext4/super.c", 5864, 7, "ext4_get_journal_blkdev", "__bread" },
++	[547] = { "fs/ext4/super.c", "fs/ext4/super.c", 1490, 22, "init_inodecache", "kmem_cache_create_usercopy" },
++	[550] = { "fs/ext4/symlink.c", "fs/ext4/ext4.h", 3853, 6, "ext4_buffer_uptodate", "buffer_write_io_error" },
++	[551] = { "fs/ext4/sysfs.c", "fs/ext4/sysfs.c", 567, 8, "ext4_register_sysfs", "kobject_init_and_add" },
++	[553] = { "fs/ext4/sysfs.c", "fs/ext4/sysfs.c", 608, 14, "ext4_init_sysfs", "kobject_create_and_add" },
++	[554] = { "fs/ext4/sysfs.c", "fs/ext4/sysfs.c", 612, 14, "ext4_init_sysfs", "kzalloc_noprof" },
++	[555] = { "fs/ext4/sysfs.c", "fs/ext4/sysfs.c", 618, 8, "ext4_init_sysfs", "kobject_init_and_add" },
++	[557] = { "fs/ext4/sysfs.c", "fs/ext4/sysfs.c", 90, 8, "inode_readahead_blks_store", "kstrtoul" },
++	[558] = { "fs/ext4/sysfs.c", "fs/ext4/sysfs.c", 461, 9, "ext4_generic_attr_store", "kstrtouint" },
++	[559] = { "fs/ext4/sysfs.c", "fs/ext4/sysfs.c", 469, 9, "ext4_generic_attr_store", "kstrtouint" },
++	[560] = { "fs/ext4/sysfs.c", "fs/ext4/sysfs.c", 478, 9, "ext4_generic_attr_store", "kstrtouint" },
++	[561] = { "fs/ext4/sysfs.c", "fs/ext4/sysfs.c", 486, 9, "ext4_generic_attr_store", "kstrtouint" },
++	[562] = { "fs/ext4/sysfs.c", "fs/ext4/sysfs.c", 494, 9, "ext4_generic_attr_store", "kstrtoul" },
++	[566] = { "fs/ext4/xattr.c", "fs/ext4/xattr.c", 1976, 13, "ext4_xattr_block_set", "kmemdup_noprof" },
++	[567] = { "fs/ext4/xattr.c", "fs/ext4/xattr.c", 2016, 13, "ext4_xattr_block_set", "kzalloc_noprof" },
++	[568] = { "fs/ext4/xattr.c", "fs/ext4/xattr.c", 2056, 13, "ext4_xattr_block_set", "dquot_alloc_block" },
++	[571] = { "fs/ext4/xattr.c", "fs/ext4/xattr.c", 2544, 10, "ext4_xattr_set", "dquot_initialize" },
++	[576] = { "fs/ext4/xattr.c", "fs/ext4/xattr.c", 392, 9, "ext4_xattr_inode_read", "kmalloc_array_noprof" },
++	[577] = { "fs/ext4/xattr.c", "fs/ext4/xattr.c", 932, 8, "ext4_xattr_inode_alloc_quota", "dquot_alloc_inode" },
++	[578] = { "fs/ext4/xattr.c", "fs/ext4/xattr.c", 935, 8, "ext4_xattr_inode_alloc_quota", "dquot_alloc_space_nodirty" },
++	[579] = { "fs/ext4/xattr.c", "fs/ext4/xattr.c", 1541, 12, "ext4_xattr_inode_cache_find", "__kvmalloc_node_noprof" },
++	[584] = { "fs/ext4/xattr.c", "include/linux/quotaops.h", 312, 8, "dquot_alloc_space", "dquot_alloc_space_nodirty" },
++	[585] = { "fs/ext4/xattr.c", "fs/ext4/xattr.c", 2622, 7, "ext4_xattr_move_to_block", "kzalloc_noprof" },
++	[586] = { "fs/ext4/xattr.c", "fs/ext4/xattr.c", 2623, 7, "ext4_xattr_move_to_block", "kzalloc_noprof" },
++	[587] = { "fs/ext4/xattr.c", "fs/ext4/xattr.c", 2637, 12, "ext4_xattr_move_to_block", "__kvmalloc_node_noprof" },
++};
+--- /dev/null
++++ b/fs/ext4/error_site_trace.c
+@@ -0,0 +1,87 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Observational probes for the reviewed Linux 6.12.1 ext4 error sites. */
++#include <linux/atomic.h>
++#include <linux/debugfs.h>
++#include <linux/err.h>
++#include <linux/ext4_error_site.h>
++#include <linux/init.h>
++#include <linux/moduleparam.h>
++#include <linux/seq_file.h>
++
++#define CREATE_TRACE_POINTS
++#include <trace/events/ext4_error_site.h>
++
++struct ext4_error_site_desc {
++	const char *translation_unit;
++	const char *source;
++	unsigned int line, column;
++	const char *caller;
++	const char *callee;
++};
++
++#include "error_site_table.h"
++
++bool ext4_error_site_enabled;
++module_param_named(trace_error_sites, ext4_error_site_enabled, bool, 0644);
++MODULE_PARM_DESC(trace_error_sites, "Observe reviewed ext4 error sites (no fault injection)");
++
++static atomic64_t ext4_es_invocation = ATOMIC64_INIT(0);
++static atomic64_t ext4_es_hits[ARRAY_SIZE(ext4_error_sites)];
++static atomic64_t ext4_es_returns[ARRAY_SIZE(ext4_error_sites)];
++
++u64 ext4_error_site_enter(unsigned int site_id)
++{
++	u64 invocation;
++
++	if (WARN_ON_ONCE(site_id >= ARRAY_SIZE(ext4_error_sites) ||
++			 !ext4_error_sites[site_id].source))
++		return 0;
++	invocation = atomic64_inc_return(&ext4_es_invocation);
++	atomic64_inc(&ext4_es_hits[site_id]);
++	trace_error_site(site_id, invocation, false, 0, false);
++	return invocation;
++}
++
++void ext4_error_site_return(unsigned int site_id, u64 invocation,
++			    long result, bool is_pointer)
++{
++	/* Keep NULL and ERR_PTR results; expose successful pointers as 1. */
++	if (is_pointer && result && !IS_ERR_VALUE((unsigned long)result))
++		result = 1;
++	atomic64_inc(&ext4_es_returns[site_id]);
++	trace_error_site(site_id, invocation, true, result, is_pointer);
++}
++
++static int ext4_es_stats_show(struct seq_file *m, void *unused)
++{
++	unsigned int id;
++
++	seq_puts(m, "site_id\thits\treturns\ttranslation_unit\tsource\tline\tcolumn\tcaller\tcallee\n");
++	for (id = 1; id < ARRAY_SIZE(ext4_error_sites); id++) {
++		const struct ext4_error_site_desc *site = &ext4_error_sites[id];
++
++		if (!site->source)
++			continue;
++		seq_printf(m, "%u\t%lld\t%lld\t%s\t%s\t%u\t%u\t%s\t%s\n",
++			   id, atomic64_read(&ext4_es_hits[id]),
++			   atomic64_read(&ext4_es_returns[id]),
++			   site->translation_unit, site->source,
++			   site->line, site->column, site->caller, site->callee);
++	}
++	return 0;
++}
++DEFINE_SHOW_ATTRIBUTE(ext4_es_stats);
++
++static int __init ext4_error_site_init(void)
++{
++	struct dentry *root;
++
++	root = debugfs_create_dir("ext4_error_sites", NULL);
++	if (IS_ERR(root))
++		return PTR_ERR(root);
++	debugfs_create_bool("enabled", 0600, root, &ext4_error_site_enabled);
++	debugfs_create_file("stats", 0400, root, NULL, &ext4_es_stats_fops);
++	return 0;
++}
++/* CONFIG_EXT4_ERROR_SITE_TRACE requires built-in ext4. */
++late_initcall(ext4_error_site_init);
+--- a/fs/ext4/ext4.h
++++ b/fs/ext4/ext4.h
+@@ -17,6 +17,7 @@
+ #ifndef _EXT4_H
+ #define _EXT4_H
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/refcount.h>
+ #include <linux/types.h>
+ #include <linux/blkdev.h>
+@@ -4290,7 +4291,7 @@
+ 	 * have to read the block because we may read the old data
+ 	 * successfully.
+ 	 */
+-	if (buffer_write_io_error(bh))
++	if (EXT4_ES_CALL((EXT4_ERROR_SITE_TU == 15 ? 187 : EXT4_ERROR_SITE_TU == 25 ? 447 : EXT4_ERROR_SITE_TU == 26 ? 550 : 0), buffer_write_io_error(bh)))
+ 		set_buffer_uptodate(bh);
+ 	return buffer_uptodate(bh);
+ }
+--- a/fs/ext4/ext4_jbd2.c
++++ b/fs/ext4/ext4_jbd2.c
+@@ -3,6 +3,7 @@
+  * Interface between ext4 and JBD
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include "ext4_jbd2.h"
+ 
+ #include <trace/events/ext4.h>
+@@ -178,7 +179,7 @@
+ 		return ERR_PTR(err);
+ 	}
+ 
+-	err = jbd2_journal_start_reserved(handle, type, line);
++	err = EXT4_ES_CALL(32, jbd2_journal_start_reserved(handle, type, line));
+ 	if (err < 0)
+ 		return ERR_PTR(err);
+ 	ext4_checker_tx_event(sb, EXT4_CHECKER_EVENT_TX_BEGIN, NULL,
+@@ -191,7 +192,7 @@
+ {
+ 	if (!ext4_handle_valid(handle))
+ 		return 0;
+-	if (is_handle_aborted(handle))
++	if (EXT4_ES_CALL(33, is_handle_aborted(handle)))
+ 		return -EROFS;
+ 	if (jbd2_handle_buffer_credits(handle) >= check_cred &&
+ 	    handle->h_revoke_credits >= revoke_cred)
+@@ -258,7 +259,7 @@
+ 	might_sleep();
+ 
+ 	if (ext4_handle_valid(handle)) {
+-		err = jbd2_journal_get_write_access(handle, bh);
++		err = EXT4_ES_CALL(34, jbd2_journal_get_write_access(handle, bh));
+ 		if (err) {
+ 			ext4_journal_abort_handle(where, line, __func__, bh,
+ 						  handle, err);
+@@ -327,7 +328,7 @@
+ 	 * data!=journal && (is_metadata || should_journal_data(inode))
+ 	 */
+ 	BUFFER_TRACE(bh, "call jbd2_journal_revoke");
+-	err = jbd2_journal_revoke(handle, blocknr, bh);
++	err = EXT4_ES_CALL(36, jbd2_journal_revoke(handle, blocknr, bh));
+ 	if (err) {
+ 		ext4_journal_abort_handle(where, line, __func__,
+ 					  bh, handle, err);
+@@ -348,7 +349,7 @@
+ 	if (!ext4_handle_valid(handle))
+ 		return 0;
+ 
+-	err = jbd2_journal_get_create_access(handle, bh);
++	err = EXT4_ES_CALL(37, jbd2_journal_get_create_access(handle, bh));
+ 	if (err) {
+ 		ext4_journal_abort_handle(where, line, __func__, bh, handle,
+ 					  err);
+@@ -404,7 +405,7 @@
+ 	set_buffer_prio(bh);
+ 	set_buffer_uptodate(bh);
+ 	if (ext4_handle_valid(handle)) {
+-		err = jbd2_journal_dirty_metadata(handle, bh);
++		err = EXT4_ES_CALL(38, jbd2_journal_dirty_metadata(handle, bh));
+ 		return ext4_handle_dirty_metadata_error(where, line, handle,
+ 							inode, bh, err);
+ 	}
+@@ -415,7 +416,7 @@
+ 		mark_buffer_dirty(bh);
+ 	if (inode && inode_needs_sync(inode)) {
+ 		sync_dirty_buffer(bh);
+-		if (buffer_req(bh) && !buffer_uptodate(bh)) {
++		if (buffer_req(bh) && !EXT4_ES_CALL(41, buffer_uptodate(bh))) {
+ 			ext4_error_inode_err(inode, where, line, bh->b_blocknr,
+ 					     EIO, "IO error syncing itable block");
+ 			err = -EIO;
+--- a/fs/ext4/extents.c
++++ b/fs/ext4/extents.c
+@@ -17,6 +17,7 @@
+  *   - smart tree reduction
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/fs.h>
+ #include <linux/time.h>
+ #include <linux/jbd2.h>
+@@ -566,7 +567,7 @@
+ 		gfp_flags |= __GFP_NOFAIL;
+ 
+ 	pblk = ext4_idx_pblock(idx);
+-	bh = sb_getblk_gfp(inode->i_sb, pblk, gfp_flags);
++	bh = EXT4_ES_CALL(43, sb_getblk_gfp(inode->i_sb, pblk, gfp_flags));
+ 	if (unlikely(!bh))
+ 		return ERR_PTR(-ENOMEM);
+ 
+@@ -624,8 +625,8 @@
+ 		return ret;
+ 	}
+ 
+-	path = kcalloc(depth + 1, sizeof(struct ext4_ext_path),
+-		       GFP_NOFS);
++	path = EXT4_ES_CALL(42, kcalloc(depth + 1, sizeof(struct ext4_ext_path),
++		       GFP_NOFS));
+ 	if (path == NULL) {
+ 		up_read(&ei->i_data_sem);
+ 		return -ENOMEM;
+@@ -917,8 +918,8 @@
+ 	}
+ 	if (!path) {
+ 		/* account possible depth increase */
+-		path = kcalloc(depth + 2, sizeof(struct ext4_ext_path),
+-				gfp_flags);
++		path = EXT4_ES_CALL(46, kcalloc(depth + 2, sizeof(struct ext4_ext_path),
++				gfp_flags));
+ 		if (unlikely(!path))
+ 			return ERR_PTR(-ENOMEM);
+ 		path[0].p_maxdepth = depth + 1;
+@@ -1106,7 +1107,7 @@
+ 	 * We need this to handle errors and free blocks
+ 	 * upon them.
+ 	 */
+-	ablocks = kcalloc(depth, sizeof(ext4_fsblk_t), gfp_flags);
++	ablocks = EXT4_ES_CALL(63, kcalloc(depth, sizeof(ext4_fsblk_t), gfp_flags));
+ 	if (!ablocks)
+ 		return -ENOMEM;
+ 
+@@ -1131,7 +1132,7 @@
+ 		err = -EFSCORRUPTED;
+ 		goto cleanup;
+ 	}
+-	bh = sb_getblk_gfp(inode->i_sb, newblock, __GFP_MOVABLE | GFP_NOFS);
++	bh = EXT4_ES_CALL(64, sb_getblk_gfp(inode->i_sb, newblock, __GFP_MOVABLE | GFP_NOFS));
+ 	if (unlikely(!bh)) {
+ 		err = -ENOMEM;
+ 		goto cleanup;
+@@ -1339,7 +1340,7 @@
+ 	if (newblock == 0)
+ 		return err;
+ 
+-	bh = sb_getblk_gfp(inode->i_sb, newblock, __GFP_MOVABLE | GFP_NOFS);
++	bh = EXT4_ES_CALL(67, sb_getblk_gfp(inode->i_sb, newblock, __GFP_MOVABLE | GFP_NOFS));
+ 	if (unlikely(!bh)) {
+ 		ext4_free_blocks(handle, inode, NULL, newblock, 1,
+ 				 EXT4_FREE_BLOCKS_METADATA |
+@@ -2245,11 +2246,11 @@
+ 			es.es_pblk = 0;
+ 		else
+ 			es.es_pblk = ext4_es_pblock(&es);
+-		err = fiemap_fill_next_extent(fieinfo,
++		err = EXT4_ES_CALL(57, fiemap_fill_next_extent(fieinfo,
+ 				(__u64)es.es_lblk << blksize_bits,
+ 				(__u64)es.es_pblk << blksize_bits,
+ 				(__u64)es.es_len << blksize_bits,
+-				flags);
++				flags));
+ 		if (next == 0)
+ 			break;
+ 		block = next;
+@@ -4661,7 +4662,7 @@
+ 	    (offset + len > inode->i_size ||
+ 	     offset + len > EXT4_I(inode)->i_disksize)) {
+ 		new_size = offset + len;
+-		ret = inode_newsize_ok(inode, new_size);
++		ret = EXT4_ES_CALL(54, inode_newsize_ok(inode, new_size));
+ 		if (ret)
+ 			goto out_mutex;
+ 	}
+@@ -4671,7 +4672,7 @@
+ 	/* Wait all existing dio workers, newcomers will block on i_rwsem */
+ 	inode_dio_wait(inode);
+ 
+-	ret = file_modified(file);
++	ret = EXT4_ES_CALL(55, file_modified(file));
+ 	if (ret)
+ 		goto out_mutex;
+ 
+@@ -4850,7 +4851,7 @@
+ 	    (offset + len > inode->i_size ||
+ 	     offset + len > EXT4_I(inode)->i_disksize)) {
+ 		new_size = offset + len;
+-		ret = inode_newsize_ok(inode, new_size);
++		ret = EXT4_ES_CALL(50, inode_newsize_ok(inode, new_size));
+ 		if (ret)
+ 			goto out;
+ 	}
+@@ -4858,7 +4859,7 @@
+ 	/* Wait all existing dio workers, newcomers will block on i_rwsem */
+ 	inode_dio_wait(inode);
+ 
+-	ret = file_modified(file);
++	ret = EXT4_ES_CALL(51, file_modified(file));
+ 	if (ret)
+ 		goto out;
+ 
+@@ -5102,7 +5103,7 @@
+ 		fieinfo->fi_flags &= ~FIEMAP_FLAG_CACHE;
+ 	}
+ 
+-	error = fiemap_prep(inode, fieinfo, start, &len, 0);
++	error = EXT4_ES_CALL(56, fiemap_prep(inode, fieinfo, start, &len, 0));
+ 	if (error)
+ 		return error;
+ 
+@@ -5417,7 +5418,7 @@
+ 	/* Wait for existing dio to complete */
+ 	inode_dio_wait(inode);
+ 
+-	ret = file_modified(file);
++	ret = EXT4_ES_CALL(52, file_modified(file));
+ 	if (ret)
+ 		goto out_mutex;
+ 
+@@ -5560,7 +5561,7 @@
+ 	/* Wait for existing dio to complete */
+ 	inode_dio_wait(inode);
+ 
+-	ret = file_modified(file);
++	ret = EXT4_ES_CALL(53, file_modified(file));
+ 	if (ret)
+ 		goto out_mutex;
+ 
+--- a/fs/ext4/extents_status.c
++++ b/fs/ext4/extents_status.c
+@@ -10,6 +10,7 @@
+  *
+  * Ext4 extents status tree core functions.
+  */
++#include <linux/ext4_error_site.h>
+ #include <linux/list_sort.h>
+ #include <linux/proc_fs.h>
+ #include <linux/seq_file.h>
+@@ -454,7 +455,7 @@
+ static inline struct pending_reservation *__alloc_pending(bool nofail)
+ {
+ 	if (!nofail) {
+-		return kmem_cache_alloc(ext4_pending_cachep, GFP_ATOMIC);
++		return EXT4_ES_CALL(71, kmem_cache_alloc(ext4_pending_cachep, GFP_ATOMIC));
+ 	}
+ 
+ 	return kmem_cache_zalloc(ext4_pending_cachep, GFP_KERNEL | __GFP_NOFAIL);
+@@ -481,7 +482,7 @@
+ static inline struct extent_status *__es_alloc_extent(bool nofail)
+ {
+ 	if (!nofail)
+-		return kmem_cache_alloc(ext4_es_cachep, GFP_ATOMIC);
++		return EXT4_ES_CALL(69, kmem_cache_alloc(ext4_es_cachep, GFP_ATOMIC));
+ 
+ 	return kmem_cache_zalloc(ext4_es_cachep, GFP_KERNEL | __GFP_NOFAIL);
+ }
+@@ -1765,24 +1766,24 @@
+ 	sbi->s_es_nr_inode = 0;
+ 	spin_lock_init(&sbi->s_es_lock);
+ 	sbi->s_es_stats.es_stats_shrunk = 0;
+-	err = percpu_counter_init(&sbi->s_es_stats.es_stats_cache_hits, 0,
+-				  GFP_KERNEL);
++	err = EXT4_ES_CALL(73, percpu_counter_init(&sbi->s_es_stats.es_stats_cache_hits, 0,
++				  GFP_KERNEL));
+ 	if (err)
+ 		return err;
+-	err = percpu_counter_init(&sbi->s_es_stats.es_stats_cache_misses, 0,
+-				  GFP_KERNEL);
++	err = EXT4_ES_CALL(74, percpu_counter_init(&sbi->s_es_stats.es_stats_cache_misses, 0,
++				  GFP_KERNEL));
+ 	if (err)
+ 		goto err1;
+ 	sbi->s_es_stats.es_stats_scan_time = 0;
+ 	sbi->s_es_stats.es_stats_max_scan_time = 0;
+-	err = percpu_counter_init(&sbi->s_es_stats.es_stats_all_cnt, 0, GFP_KERNEL);
++	err = EXT4_ES_CALL(75, percpu_counter_init(&sbi->s_es_stats.es_stats_all_cnt, 0, GFP_KERNEL));
+ 	if (err)
+ 		goto err2;
+-	err = percpu_counter_init(&sbi->s_es_stats.es_stats_shk_cnt, 0, GFP_KERNEL);
++	err = EXT4_ES_CALL(76, percpu_counter_init(&sbi->s_es_stats.es_stats_shk_cnt, 0, GFP_KERNEL));
+ 	if (err)
+ 		goto err3;
+ 
+-	sbi->s_es_shrinker = shrinker_alloc(0, "ext4-es:%s", sbi->s_sb->s_id);
++	sbi->s_es_shrinker = EXT4_ES_CALL(77, shrinker_alloc(0, "ext4-es:%s", sbi->s_sb->s_id));
+ 	if (!sbi->s_es_shrinker) {
+ 		err = -ENOMEM;
+ 		goto err4;
+--- a/fs/ext4/fast_commit.c
++++ b/fs/ext4/fast_commit.c
+@@ -7,6 +7,7 @@
+  *
+  * Ext4 fast commits routines.
+  */
++#include <linux/ext4_error_site.h>
+ #include "ext4.h"
+ #include "ext4_jbd2.h"
+ #include "ext4_extents.h"
+@@ -441,7 +442,7 @@
+ 		return -EOPNOTSUPP;
+ 	}
+ 
+-	node = kmem_cache_alloc(ext4_fc_dentry_cachep, GFP_NOFS);
++	node = EXT4_ES_CALL(96, kmem_cache_alloc(ext4_fc_dentry_cachep, GFP_NOFS));
+ 	if (!node) {
+ 		ext4_fc_mark_ineligible(sb, EXT4_FC_REASON_NOMEM, handle);
+ 		mutex_lock(&ei->i_fc_lock);
+@@ -452,7 +453,7 @@
+ 	node->fcd_parent = dir->i_ino;
+ 	node->fcd_ino = inode->i_ino;
+ 	if (dentry->d_name.len > DNAME_INLINE_LEN) {
+-		node->fcd_name.name = kmalloc(dentry->d_name.len, GFP_NOFS);
++		node->fcd_name.name = EXT4_ES_CALL(97, kmalloc(dentry->d_name.len, GFP_NOFS));
+ 		if (!node->fcd_name.name) {
+ 			kmem_cache_free(ext4_fc_dentry_cachep, node);
+ 			ext4_fc_mark_ineligible(sb, EXT4_FC_REASON_NOMEM, handle);
+@@ -720,7 +721,7 @@
+ 		return NULL;
+ 
+ 	if (!sbi->s_fc_bh) {
+-		ret = jbd2_fc_get_buf(EXT4_SB(sb)->s_journal, &bh);
++		ret = EXT4_ES_CALL(114, jbd2_fc_get_buf(EXT4_SB(sb)->s_journal, &bh));
+ 		if (ret)
+ 			return NULL;
+ 		sbi->s_fc_bh = bh;
+@@ -750,7 +751,7 @@
+ 
+ 	ext4_fc_submit_bh(sb, false);
+ 
+-	ret = jbd2_fc_get_buf(EXT4_SB(sb)->s_journal, &bh);
++	ret = EXT4_ES_CALL(115, jbd2_fc_get_buf(EXT4_SB(sb)->s_journal, &bh));
+ 	if (ret)
+ 		return NULL;
+ 	sbi->s_fc_bh = bh;
+@@ -997,7 +998,7 @@
+ 			finish_wait(&ei->i_fc_wait, &wait);
+ 		}
+ 		spin_unlock(&sbi->s_fc_lock);
+-		ret = jbd2_submit_inode_data(journal, ei->jinode);
++		ret = EXT4_ES_CALL(110, jbd2_submit_inode_data(journal, ei->jinode));
+ 		if (ret)
+ 			return ret;
+ 		spin_lock(&sbi->s_fc_lock);
+@@ -1022,7 +1023,7 @@
+ 			continue;
+ 		spin_unlock(&sbi->s_fc_lock);
+ 
+-		ret = jbd2_wait_inode_data(journal, pos->jinode);
++		ret = EXT4_ES_CALL(111, jbd2_wait_inode_data(journal, pos->jinode));
+ 		if (ret)
+ 			return ret;
+ 		spin_lock(&sbi->s_fc_lock);
+@@ -1219,7 +1220,7 @@
+ 	start_time = ktime_get();
+ 
+ restart_fc:
+-	ret = jbd2_fc_begin_commit(journal, commit_tid);
++	ret = EXT4_ES_CALL(100, jbd2_fc_begin_commit(journal, commit_tid));
+ 	if (ret == -EALREADY) {
+ 		/* There was an ongoing commit, check if we need to restart */
+ 		if (atomic_read(&sbi->s_fc_subtid) <= subtid &&
+@@ -1254,7 +1255,7 @@
+ 		goto fallback;
+ 	}
+ 	nblks = (sbi->s_fc_bytes + bsize - 1) / bsize - fc_bufs_before;
+-	ret = jbd2_fc_wait_bufs(journal, nblks);
++	ret = EXT4_ES_CALL(103, jbd2_fc_wait_bufs(journal, nblks));
+ 	if (ret < 0) {
+ 		status = EXT4_FC_STATUS_FAILED;
+ 		goto fallback;
+@@ -1452,7 +1453,7 @@
+ 		goto out;
+ 	}
+ 
+-	dentry_inode = d_alloc(dentry_dir, &qstr_dname);
++	dentry_inode = EXT4_ES_CALL(116, d_alloc(dentry_dir, &qstr_dname));
+ 	if (!dentry_inode) {
+ 		ext4_debug("Inode dentry not created.");
+ 		ret = -ENOMEM;
+@@ -1526,10 +1527,10 @@
+ 	if (state->fc_modified_inodes_used == state->fc_modified_inodes_size) {
+ 		int *fc_modified_inodes;
+ 
+-		fc_modified_inodes = krealloc(state->fc_modified_inodes,
++		fc_modified_inodes = EXT4_ES_CALL(117, krealloc(state->fc_modified_inodes,
+ 				sizeof(int) * (state->fc_modified_inodes_size +
+ 				EXT4_FC_REPLAY_REALLOC_INCREMENT),
+-				GFP_KERNEL);
++				GFP_KERNEL));
+ 		if (!fc_modified_inodes)
+ 			return -ENOMEM;
+ 		state->fc_modified_inodes = fc_modified_inodes;
+@@ -1727,11 +1728,11 @@
+ 	if (state->fc_regions_used == state->fc_regions_size) {
+ 		struct ext4_fc_alloc_region *fc_regions;
+ 
+-		fc_regions = krealloc(state->fc_regions,
++		fc_regions = EXT4_ES_CALL(104, krealloc(state->fc_regions,
+ 				      sizeof(struct ext4_fc_alloc_region) *
+ 				      (state->fc_regions_size +
+ 				       EXT4_FC_REPLAY_REALLOC_INCREMENT),
+-				      GFP_KERNEL);
++				      GFP_KERNEL));
+ 		if (!fc_regions)
+ 			return -ENOMEM;
+ 		state->fc_regions_size +=
+--- a/fs/ext4/file.c
++++ b/fs/ext4/file.c
+@@ -19,6 +19,7 @@
+  *	(jj@sunsite.ms.mff.cuni.cz)
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/time.h>
+ #include <linux/fs.h>
+ #include <linux/iomap.h>
+@@ -72,7 +73,7 @@
+ 	struct inode *inode = file_inode(iocb->ki_filp);
+ 
+ 	if (iocb->ki_flags & IOCB_NOWAIT) {
+-		if (!inode_trylock_shared(inode))
++		if (!EXT4_ES_CALL(123, inode_trylock_shared(inode)))
+ 			return -EAGAIN;
+ 	} else {
+ 		inode_lock_shared(inode);
+@@ -255,7 +256,7 @@
+ 	if (unlikely(IS_IMMUTABLE(inode)))
+ 		return -EPERM;
+ 
+-	ret = generic_write_checks(iocb, from);
++	ret = EXT4_ES_CALL(129, generic_write_checks(iocb, from));
+ 	if (ret <= 0)
+ 		return ret;
+ 
+@@ -282,7 +283,7 @@
+ 	if (count <= 0)
+ 		return count;
+ 
+-	ret = file_modified(iocb->ki_filp);
++	ret = EXT4_ES_CALL(131, file_modified(iocb->ki_filp));
+ 	if (ret)
+ 		return ret;
+ 	return count;
+@@ -488,7 +489,7 @@
+ 		*dio_flags = IOMAP_DIO_FORCE_WAIT;
+ 	}
+ 
+-	ret = file_modified(file);
++	ret = EXT4_ES_CALL(127, file_modified(file));
+ 	if (ret < 0)
+ 		goto out;
+ 
+@@ -523,10 +524,10 @@
+ 
+ 	if (iocb->ki_flags & IOCB_NOWAIT) {
+ 		if (ilock_shared) {
+-			if (!inode_trylock_shared(inode))
++			if (!EXT4_ES_CALL(125, inode_trylock_shared(inode)))
+ 				return -EAGAIN;
+ 		} else {
+-			if (!inode_trylock(inode))
++			if (!EXT4_ES_CALL(126, inode_trylock(inode)))
+ 				return -EAGAIN;
+ 		}
+ 	} else {
+@@ -872,11 +873,11 @@
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = fscrypt_file_open(inode, filp);
++	ret = EXT4_ES_CALL(121, fscrypt_file_open(inode, filp));
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = fsverity_file_open(inode, filp);
++	ret = EXT4_ES_CALL(122, fsverity_file_open(inode, filp));
+ 	if (ret)
+ 		return ret;
+ 
+@@ -915,14 +916,14 @@
+ 						maxbytes, i_size_read(inode));
+ 	case SEEK_HOLE:
+ 		inode_lock_shared(inode);
+-		offset = iomap_seek_hole(inode, offset,
+-					 &ext4_iomap_report_ops);
++		offset = EXT4_ES_CALL(119, iomap_seek_hole(inode, offset,
++					 &ext4_iomap_report_ops));
+ 		inode_unlock_shared(inode);
+ 		break;
+ 	case SEEK_DATA:
+ 		inode_lock_shared(inode);
+-		offset = iomap_seek_data(inode, offset,
+-					 &ext4_iomap_report_ops);
++		offset = EXT4_ES_CALL(120, iomap_seek_data(inode, offset,
++					 &ext4_iomap_report_ops));
+ 		inode_unlock_shared(inode);
+ 		break;
+ 	}
+--- a/fs/ext4/fsmap.c
++++ b/fs/ext4/fsmap.c
+@@ -4,6 +4,7 @@
+  *
+  * Author: Darrick J. Wong <darrick.wong@oracle.com>
+  */
++#include <linux/ext4_error_site.h>
+ #include "ext4.h"
+ #include <linux/fsmap.h>
+ #include "fsmap.h"
+@@ -294,7 +295,7 @@
+ {
+ 	struct ext4_fsmap *fsm;
+ 
+-	fsm = kmalloc(sizeof(*fsm), GFP_NOFS);
++	fsm = EXT4_ES_CALL(133, kmalloc(sizeof(*fsm), GFP_NOFS));
+ 	if (!fsm)
+ 		return -ENOMEM;
+ 	fsm->fmr_device = 0;
+--- a/fs/ext4/fsync.c
++++ b/fs/ext4/fsync.c
+@@ -23,6 +23,7 @@
+  * we can depend on generic_block_fdatasync() to sync the data blocks.
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/time.h>
+ #include <linux/fs.h>
+ #include <linux/sched.h>
+@@ -68,10 +69,10 @@
+ 		 * through ext4_evict_inode()) and so we are safe to flush
+ 		 * metadata blocks and the inode.
+ 		 */
+-		ret = sync_mapping_buffers(inode->i_mapping);
++		ret = EXT4_ES_CALL(138, sync_mapping_buffers(inode->i_mapping));
+ 		if (ret)
+ 			break;
+-		ret = sync_inode_metadata(inode, 1);
++		ret = EXT4_ES_CALL(139, sync_inode_metadata(inode, 1));
+ 		if (ret)
+ 			break;
+ 	}
+@@ -85,7 +86,7 @@
+ 	struct inode *inode = file->f_inode;
+ 	int ret;
+ 
+-	ret = generic_buffers_fsync_noflush(file, start, end, datasync);
++	ret = EXT4_ES_CALL(135, generic_buffers_fsync_noflush(file, start, end, datasync));
+ 	if (!ret)
+ 		ret = ext4_sync_parent(inode);
+ 	if (test_opt(inode->i_sb, BARRIER))
+@@ -155,7 +156,7 @@
+ 		goto out;
+ 	}
+ 
+-	ret = file_write_and_wait_range(file, start, end);
++	ret = EXT4_ES_CALL(134, file_write_and_wait_range(file, start, end));
+ 	if (ret)
+ 		goto out;
+ 
+--- a/fs/ext4/ialloc.c
++++ b/fs/ext4/ialloc.c
+@@ -13,6 +13,7 @@
+  *        David S. Miller (davem@caip.rutgers.edu), 1995
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/time.h>
+ #include <linux/fs.h>
+ #include <linux/stat.h>
+@@ -199,7 +200,7 @@
+ 	trace_ext4_load_inode_bitmap(sb, block_group);
+ 	ext4_read_bh(bh, REQ_META | REQ_PRIO, ext4_end_bitmap_read);
+ 	ext4_simulate_fail_bh(sb, bh, EXT4_SIM_IBITMAP_EIO);
+-	if (!buffer_uptodate(bh)) {
++	if (!EXT4_ES_CALL(144, buffer_uptodate(bh))) {
+ 		put_bh(bh);
+ 		ext4_error_err(sb, EIO, "Cannot read inode bitmap - "
+ 			       "block_group = %u, inode_bitmap = %llu",
+@@ -984,7 +985,7 @@
+ 	struct super_block *sb = dir->i_sb;
+ 	int nblocks = 0;
+ #ifdef CONFIG_EXT4_FS_POSIX_ACL
+-	struct posix_acl *p = get_inode_acl(dir, ACL_TYPE_DEFAULT);
++	struct posix_acl *p = EXT4_ES_CALL(154, get_inode_acl(dir, ACL_TYPE_DEFAULT));
+ 
+ 	if (IS_ERR(p))
+ 		return PTR_ERR(p);
+@@ -1074,7 +1075,7 @@
+ 
+ 	ngroups = ext4_get_groups_count(sb);
+ 	trace_ext4_request_inode(dir, mode);
+-	inode = new_inode(sb);
++	inode = EXT4_ES_CALL(147, new_inode(sb));
+ 	if (!inode)
+ 		return ERR_PTR(-ENOMEM);
+ 	ext4_ct_enter(sb, &ct_scope, "INODE.ALLOC");
+@@ -1103,12 +1104,12 @@
+ 		ei->i_projid = make_kprojid(&init_user_ns, EXT4_DEF_PROJID);
+ 
+ 	if (!(i_flags & EXT4_EA_INODE_FL)) {
+-		err = fscrypt_prepare_new_inode(dir, inode, &encrypt);
++		err = EXT4_ES_CALL(148, fscrypt_prepare_new_inode(dir, inode, &encrypt));
+ 		if (err)
+ 			goto out;
+ 	}
+ 
+-	err = dquot_initialize(inode);
++	err = EXT4_ES_CALL(149, dquot_initialize(inode));
+ 	if (err)
+ 		goto out;
+ 
+@@ -1446,7 +1447,7 @@
+ 	ext4_set_inode_flags(inode, true);
+ 	if (IS_DIRSYNC(inode))
+ 		ext4_handle_sync(handle);
+-	if (insert_inode_locked(inode) < 0) {
++	if (EXT4_ES_CALL(151, insert_inode_locked(inode)) < 0) {
+ 		/*
+ 		 * Likely a bitmap corruption causing inode to be allocated
+ 		 * twice.
+@@ -1481,7 +1482,7 @@
+ 	    (!(ei->i_flags & EXT4_DAX_FL) || S_ISDIR(mode)))
+ 		ext4_set_inode_state(inode, EXT4_STATE_MAY_INLINE_DATA);
+ 	ret = inode;
+-	err = dquot_alloc_inode(inode);
++	err = EXT4_ES_CALL(152, dquot_alloc_inode(inode));
+ 	if (err)
+ 		goto fail_drop;
+ 
+@@ -1789,7 +1790,7 @@
+ 
+ 	ext4_debug("going to zero out inode table in group %d\n",
+ 		   group);
+-	ret = sb_issue_zeroout(sb, blk, num, GFP_NOFS);
++	ret = EXT4_ES_CALL(158, sb_issue_zeroout(sb, blk, num, GFP_NOFS));
+ 	if (ret < 0)
+ 		goto err_out;
+ 	if (barrier)
+--- a/fs/ext4/indirect.c
++++ b/fs/ext4/indirect.c
+@@ -21,6 +21,7 @@
+  *	(sct@redhat.com), 1993, 1998
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include "ext4_jbd2.h"
+ #include "truncate.h"
+ #include <linux/dax.h>
+@@ -163,7 +164,7 @@
+ 			ret = -EFSCORRUPTED;
+ 			goto failure;
+ 		}
+-		bh = sb_getblk(sb, key);
++		bh = EXT4_ES_CALL(165, sb_getblk(sb, key));
+ 		if (unlikely(!bh)) {
+ 			ret = -ENOMEM;
+ 			goto failure;
+@@ -974,7 +975,7 @@
+ 		 * block pointed to itself, it would have been detached when
+ 		 * the block was cleared. Check for this instead of OOPSing.
+ 		 */
+-		if ((EXT4_JOURNAL(inode) == NULL) || bh2jh(this_bh))
++		if ((EXT4_JOURNAL(inode) == NULL) || EXT4_ES_CALL(168, bh2jh(this_bh)))
+ 			ext4_handle_dirty_metadata(handle, inode, this_bh);
+ 		else
+ 			EXT4_ERROR_INODE(inode,
+--- a/fs/ext4/inline.c
++++ b/fs/ext4/inline.c
+@@ -4,6 +4,7 @@
+  * Written by Tao Ma <boyu.mt@taobao.com>
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/iomap.h>
+ #include <linux/fiemap.h>
+ #include <linux/namei.h>
+@@ -353,7 +354,7 @@
+ 	BUG_ON(is.s.not_found);
+ 
+ 	len -= EXT4_MIN_INLINE_DATA_SIZE;
+-	value = kzalloc(len, GFP_NOFS);
++	value = EXT4_ES_CALL(175, kzalloc(len, GFP_NOFS));
+ 	if (!value) {
+ 		error = -ENOMEM;
+ 		goto out;
+@@ -1224,7 +1225,7 @@
+ 	int inline_size;
+ 
+ 	inline_size = ext4_get_inline_size(inode);
+-	buf = kmalloc(inline_size, GFP_NOFS);
++	buf = EXT4_ES_CALL(169, kmalloc(inline_size, GFP_NOFS));
+ 	if (!buf) {
+ 		error = -ENOMEM;
+ 		goto out;
+@@ -1405,7 +1406,7 @@
+ 	}
+ 
+ 	inline_size = ext4_get_inline_size(inode);
+-	dir_buf = kmalloc(inline_size, GFP_NOFS);
++	dir_buf = EXT4_ES_CALL(171, kmalloc(inline_size, GFP_NOFS));
+ 	if (!dir_buf) {
+ 		ret = -ENOMEM;
+ 		up_read(&EXT4_I(inode)->xattr_sem);
+@@ -1524,7 +1525,7 @@
+ 	}
+ 
+ 	inline_size = ext4_get_inline_size(inode);
+-	dir_buf = kmalloc(inline_size, GFP_NOFS);
++	dir_buf = EXT4_ES_CALL(172, kmalloc(inline_size, GFP_NOFS));
+ 	if (!dir_buf) {
+ 		ret = -ENOMEM;
+ 		up_read(&EXT4_I(inode)->xattr_sem);
+@@ -1640,7 +1641,7 @@
+ 
+ 	ret = -ENOMEM;
+ 	inline_size = ext4_get_inline_size(inode);
+-	link = kmalloc(inline_size + 1, GFP_NOFS);
++	link = EXT4_ES_CALL(173, kmalloc(inline_size + 1, GFP_NOFS));
+ 	if (!link)
+ 		goto out;
+ 
+@@ -2022,7 +2023,7 @@
+ 			BUG_ON(is.s.not_found);
+ 
+ 			value_len = le32_to_cpu(is.s.here->e_value_size);
+-			value = kmalloc(value_len, GFP_NOFS);
++			value = EXT4_ES_CALL(174, kmalloc(value_len, GFP_NOFS));
+ 			if (!value) {
+ 				err = -ENOMEM;
+ 				goto out_error;
+--- a/fs/ext4/inode.c
++++ b/fs/ext4/inode.c
+@@ -19,6 +19,7 @@
+  *  Assorted race fixes, rewrite of ext4_get_block() by Al Viro, 2000
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/fs.h>
+ #include <linux/mount.h>
+ #include <linux/time.h>
+@@ -414,7 +415,7 @@
+ 	if (IS_ENCRYPTED(inode) && S_ISREG(inode->i_mode))
+ 		return fscrypt_zeroout_range(inode, lblk, pblk, len);
+ 
+-	ret = sb_issue_zeroout(inode->i_sb, pblk, len, GFP_NOFS);
++	ret = EXT4_ES_CALL(183, sb_issue_zeroout(inode->i_sb, pblk, len, GFP_NOFS));
+ 	if (ret > 0)
+ 		ret = 0;
+ 
+@@ -955,7 +956,7 @@
+ 			wait_on_buffer(bhs[i]);
+ 
+ 	for (i = 0; i < bh_count; i++) {
+-		if (bhs[i] && !buffer_uptodate(bhs[i])) {
++		if (bhs[i] && !EXT4_ES_CALL(189, buffer_uptodate(bhs[i]))) {
+ 			err = -EIO;
+ 			goto out_brelse;
+ 		}
+@@ -1109,7 +1110,7 @@
+ 	 */
+ 	for (i = 0; i < nr_wait; i++) {
+ 		wait_on_buffer(wait[i]);
+-		if (!buffer_uptodate(wait[i]))
++		if (!EXT4_ES_CALL(200, buffer_uptodate(wait[i])))
+ 			err = -EIO;
+ 	}
+ 	if (unlikely(err)) {
+@@ -1480,7 +1481,7 @@
+ 	 * us from metadata over-estimation, though we may go over by
+ 	 * a small amount in the end.  Here we just reserve for data.
+ 	 */
+-	ret = dquot_reserve_block(inode, EXT4_C2B(sbi, nr_resv));
++	ret = EXT4_ES_CALL(234, dquot_reserve_block(inode, EXT4_C2B(sbi, nr_resv)));
+ 	if (ret)
+ 		return ret;
+ 
+@@ -3990,7 +3991,7 @@
+ 	/* Wait all existing dio workers, newcomers will block on i_rwsem */
+ 	inode_dio_wait(inode);
+ 
+-	ret = file_modified(file);
++	ret = EXT4_ES_CALL(209, file_modified(file));
+ 	if (ret)
+ 		goto out_mutex;
+ 
+@@ -4083,7 +4084,7 @@
+ 	if (ei->jinode || !EXT4_SB(inode->i_sb)->s_journal)
+ 		return 0;
+ 
+-	jinode = jbd2_alloc_inode(GFP_KERNEL);
++	jinode = EXT4_ES_CALL(210, jbd2_alloc_inode(GFP_KERNEL));
+ 	spin_lock(&inode->i_lock);
+ 	if (!ei->jinode) {
+ 		if (!jinode) {
+@@ -4519,7 +4520,7 @@
+ 	blk_finish_plug(&plug);
+ 	wait_on_buffer(bh);
+ 	ext4_simulate_fail_bh(sb, bh, EXT4_SIM_INODE_EIO);
+-	if (!buffer_uptodate(bh)) {
++	if (!EXT4_ES_CALL(216, buffer_uptodate(bh))) {
+ 		if (ret_block)
+ 			*ret_block = block;
+ 		brelse(bh);
+@@ -4743,7 +4744,7 @@
+ 		return ERR_PTR(-EFSCORRUPTED);
+ 	}
+ 
+-	inode = iget_locked(sb, ino);
++	inode = EXT4_ES_CALL(217, iget_locked(sb, ino));
+ 	if (!inode)
+ 		return ERR_PTR(-ENOMEM);
+ 	if (!(inode->i_state & I_NEW)) {
+@@ -5245,7 +5246,7 @@
+ 		 */
+ 		if (wbc->sync_mode == WB_SYNC_ALL && !wbc->for_sync)
+ 			sync_dirty_buffer(iloc.bh);
+-		if (buffer_req(iloc.bh) && !buffer_uptodate(iloc.bh)) {
++		if (buffer_req(iloc.bh) && !EXT4_ES_CALL(220, buffer_uptodate(iloc.bh))) {
+ 			ext4_error_inode_block(inode, iloc.bh->b_blocknr, EIO,
+ 					       "IO error syncing inode");
+ 			err = -EIO;
+@@ -5347,20 +5348,20 @@
+ 				  ATTR_GID | ATTR_TIMES_SET))))
+ 		return -EPERM;
+ 
+-	error = setattr_prepare(idmap, dentry, attr);
++	error = EXT4_ES_CALL(221, setattr_prepare(idmap, dentry, attr));
+ 	if (error)
+ 		return error;
+ 
+-	error = fscrypt_prepare_setattr(dentry, attr);
++	error = EXT4_ES_CALL(222, fscrypt_prepare_setattr(dentry, attr));
+ 	if (error)
+ 		return error;
+ 
+-	error = fsverity_prepare_setattr(dentry, attr);
++	error = EXT4_ES_CALL(223, fsverity_prepare_setattr(dentry, attr));
+ 	if (error)
+ 		return error;
+ 
+ 	if (is_quota_modification(idmap, inode, attr)) {
+-		error = dquot_initialize(inode);
++		error = EXT4_ES_CALL(224, dquot_initialize(inode));
+ 		if (error)
+ 			return error;
+ 	}
+@@ -5383,7 +5384,7 @@
+ 		 * counts xattr inode references.
+ 		 */
+ 		down_read(&EXT4_I(inode)->xattr_sem);
+-		error = dquot_transfer(idmap, inode, attr);
++		error = EXT4_ES_CALL(225, dquot_transfer(idmap, inode, attr));
+ 		up_read(&EXT4_I(inode)->xattr_sem);
+ 
+ 		if (error) {
+@@ -6067,7 +6068,7 @@
+ 	if (val)
+ 		ext4_set_inode_flag(inode, EXT4_INODE_JOURNAL_DATA);
+ 	else {
+-		err = jbd2_journal_flush(journal, 0);
++		err = EXT4_ES_CALL(226, jbd2_journal_flush(journal, 0));
+ 		if (err < 0) {
+ 			jbd2_journal_unlock_updates(journal);
+ 			ext4_writepages_up_write(inode->i_sb, alloc_ctx);
+--- a/fs/ext4/ioctl.c
++++ b/fs/ext4/ioctl.c
+@@ -8,6 +8,7 @@
+  * Universite Pierre et Marie Curie (Paris VI)
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/fs.h>
+ #include <linux/capability.h>
+ #include <linux/time.h>
+@@ -76,7 +77,7 @@
+ 	ext4_superblock_csum_set(sb);
+ 	unlock_buffer(bh);
+ 
+-	if (buffer_write_io_error(bh) || !buffer_uptodate(bh)) {
++	if (EXT4_ES_CALL(312, buffer_write_io_error(bh)) || !EXT4_ES_CALL(313, buffer_uptodate(bh))) {
+ 		ext4_msg(sbi->s_sb, KERN_ERR, "previous I/O error to "
+ 			 "superblock detected");
+ 		clear_buffer_write_io_error(bh);
+@@ -407,11 +408,11 @@
+ 	}
+ 
+ 	filemap_invalidate_lock(inode->i_mapping);
+-	err = filemap_write_and_wait(inode->i_mapping);
++	err = EXT4_ES_CALL(291, filemap_write_and_wait(inode->i_mapping));
+ 	if (err)
+ 		goto err_out;
+ 
+-	err = filemap_write_and_wait(inode_bl->i_mapping);
++	err = EXT4_ES_CALL(292, filemap_write_and_wait(inode_bl->i_mapping));
+ 	if (err)
+ 		goto err_out;
+ 
+@@ -450,7 +451,7 @@
+ 			memset(ei_bl->i_data, 0, sizeof(ei_bl->i_data));
+ 	}
+ 
+-	err = dquot_initialize(inode);
++	err = EXT4_ES_CALL(293, dquot_initialize(inode));
+ 	if (err)
+ 		goto err_out1;
+ 
+@@ -499,7 +500,7 @@
+ 	if (diff > 0)
+ 		dquot_free_space(inode, diff);
+ 	else
+-		err = dquot_alloc_space(inode, -1 * diff);
++		err = EXT4_ES_CALL(294, dquot_alloc_space(inode, -1 * diff));
+ 
+ 	if (err < 0) {
+ revert:
+@@ -642,7 +643,7 @@
+ 	if (S_ISREG(inode->i_mode) && !IS_IMMUTABLE(inode) &&
+ 	    (flags & EXT4_IMMUTABLE_FL)) {
+ 		inode_dio_wait(inode);
+-		err = filemap_write_and_wait(inode->i_mapping);
++		err = EXT4_ES_CALL(265, filemap_write_and_wait(inode->i_mapping));
+ 		if (err)
+ 			goto flags_out;
+ 	}
+@@ -744,7 +745,7 @@
+ 	if (ext4_is_quota_file(inode))
+ 		return err;
+ 
+-	err = dquot_initialize(inode);
++	err = EXT4_ES_CALL(266, dquot_initialize(inode));
+ 	if (err)
+ 		return err;
+ 
+@@ -823,7 +824,7 @@
+ 
+ 	switch (flags) {
+ 	case EXT4_GOING_FLAGS_DEFAULT:
+-		ret = bdev_freeze(sb->s_bdev);
++		ret = EXT4_ES_CALL(262, bdev_freeze(sb->s_bdev));
+ 		if (ret)
+ 			return ret;
+ 		set_bit(EXT4_FLAGS_SHUTDOWN, &sbi->s_ext4_flags);
+@@ -877,8 +878,8 @@
+ 
+ 	info->gi_last_flags = xfm->fmr_flags;
+ 	ext4_fsmap_from_internal(info->gi_sb, &fm, xfm);
+-	if (copy_to_user(&info->gi_data->fmh_recs[info->gi_idx++], &fm,
+-			sizeof(struct fsmap)))
++	if (EXT4_ES_CALL(311, copy_to_user(&info->gi_data->fmh_recs[info->gi_idx++], &fm,
++			sizeof(struct fsmap))))
+ 		return -EFAULT;
+ 
+ 	return 0;
+@@ -893,7 +894,7 @@
+ 	bool aborted = false;
+ 	int error;
+ 
+-	if (copy_from_user(&head, arg, sizeof(struct fsmap_head)))
++	if (EXT4_ES_CALL(285, copy_from_user(&head, arg, sizeof(struct fsmap_head))))
+ 		return -EFAULT;
+ 	if (memchr_inv(head.fmh_reserved, 0, sizeof(head.fmh_reserved)) ||
+ 	    memchr_inv(head.fmh_keys[0].fmr_reserved, 0,
+@@ -929,16 +930,16 @@
+ 	/* If we didn't abort, set the "last" flag in the last fmx */
+ 	if (!aborted && info.gi_idx) {
+ 		info.gi_last_flags |= FMR_OF_LAST;
+-		if (copy_to_user(&info.gi_data->fmh_recs[info.gi_idx - 1].fmr_flags,
++		if (EXT4_ES_CALL(289, copy_to_user(&info.gi_data->fmh_recs[info.gi_idx - 1].fmr_flags,
+ 				 &info.gi_last_flags,
+-				 sizeof(info.gi_last_flags)))
++				 sizeof(info.gi_last_flags))))
+ 			return -EFAULT;
+ 	}
+ 
+ 	/* copy back header */
+ 	head.fmh_entries = xhead.fmh_entries;
+ 	head.fmh_oflags = xhead.fmh_oflags;
+-	if (copy_to_user(arg, &head, sizeof(struct fsmap_head)))
++	if (EXT4_ES_CALL(290, copy_to_user(arg, &head, sizeof(struct fsmap_head))))
+ 		return -EFAULT;
+ 
+ 	return 0;
+@@ -961,14 +962,14 @@
+ 		goto group_add_out;
+ 	}
+ 
+-	err = mnt_want_write_file(file);
++	err = EXT4_ES_CALL(283, mnt_want_write_file(file));
+ 	if (err)
+ 		goto group_add_out;
+ 
+ 	err = ext4_group_add(sb, input);
+ 	if (EXT4_SB(sb)->s_journal) {
+ 		jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
+-		err2 = jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0);
++		err2 = EXT4_ES_CALL(284, jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0));
+ 		jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
+ 	}
+ 	if (err == 0)
+@@ -1049,7 +1050,7 @@
+ 	struct inode *inode = file_inode(filp);
+ 	int error;
+ 
+-	if (copy_from_user(&fiemap, ufiemap, sizeof(fiemap)))
++	if (EXT4_ES_CALL(295, copy_from_user(&fiemap, ufiemap, sizeof(fiemap))))
+ 		return -EFAULT;
+ 
+ 	if (fiemap.fm_extent_count > FIEMAP_MAX_EXTENTS)
+@@ -1063,7 +1064,7 @@
+ 			fiemap.fm_length);
+ 	fiemap.fm_flags = fieinfo.fi_flags;
+ 	fiemap.fm_mapped_extents = fieinfo.fi_extents_mapped;
+-	if (copy_to_user(ufiemap, &fiemap, sizeof(fiemap)))
++	if (EXT4_ES_CALL(296, copy_to_user(ufiemap, &fiemap, sizeof(fiemap))))
+ 		error = -EFAULT;
+ 
+ 	return error;
+@@ -1076,8 +1077,8 @@
+ 	unsigned int flush_flags = 0;
+ 	struct super_block *sb = file_inode(filp)->i_sb;
+ 
+-	if (copy_from_user(&flags, (__u32 __user *)arg,
+-				sizeof(__u32)))
++	if (EXT4_ES_CALL(297, copy_from_user(&flags, (__u32 __user *)arg,
++				sizeof(__u32))))
+ 		return -EFAULT;
+ 
+ 	if (!capable(CAP_SYS_ADMIN))
+@@ -1108,7 +1109,7 @@
+ 	}
+ 
+ 	jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
+-	err = jbd2_journal_flush(EXT4_SB(sb)->s_journal, flush_flags);
++	err = EXT4_ES_CALL(300, jbd2_journal_flush(EXT4_SB(sb)->s_journal, flush_flags));
+ 	jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
+ 
+ 	return err;
+@@ -1129,7 +1130,7 @@
+ 	 * find the required terminating null byte in order to test the
+ 	 * label length. The on disk label doesn't need to be null terminated.
+ 	 */
+-	if (copy_from_user(new_label, user_label, EXT4_LABEL_MAX + 1))
++	if (EXT4_ES_CALL(302, copy_from_user(new_label, user_label, EXT4_LABEL_MAX + 1)))
+ 		return -EFAULT;
+ 
+ 	len = strnlen(new_label, EXT4_LABEL_MAX + 1);
+@@ -1141,7 +1142,7 @@
+ 	 */
+ 	memset(new_label + len, 0, EXT4_LABEL_MAX - len);
+ 
+-	ret = mnt_want_write_file(filp);
++	ret = EXT4_ES_CALL(303, mnt_want_write_file(filp));
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1166,7 +1167,7 @@
+ 	memtostr_pad(label, sbi->s_es->s_volume_name);
+ 	unlock_buffer(sbi->s_sbh);
+ 
+-	if (copy_to_user(user_label, label, sizeof(label)))
++	if (EXT4_ES_CALL(301, copy_to_user(user_label, label, sizeof(label))))
+ 		return -EFAULT;
+ 	return 0;
+ }
+@@ -1177,13 +1178,13 @@
+ 	struct fsuuid fsuuid;
+ 	__u8 uuid[UUID_SIZE];
+ 
+-	if (copy_from_user(&fsuuid, ufsuuid, sizeof(fsuuid)))
++	if (EXT4_ES_CALL(304, copy_from_user(&fsuuid, ufsuuid, sizeof(fsuuid))))
+ 		return -EFAULT;
+ 
+ 	if (fsuuid.fsu_len == 0) {
+ 		fsuuid.fsu_len = UUID_SIZE;
+-		if (copy_to_user(&ufsuuid->fsu_len, &fsuuid.fsu_len,
+-					sizeof(fsuuid.fsu_len)))
++		if (EXT4_ES_CALL(305, copy_to_user(&ufsuuid->fsu_len, &fsuuid.fsu_len,
++					sizeof(fsuuid.fsu_len))))
+ 			return -EFAULT;
+ 		return 0;
+ 	}
+@@ -1196,8 +1197,8 @@
+ 	unlock_buffer(sbi->s_sbh);
+ 
+ 	fsuuid.fsu_len = UUID_SIZE;
+-	if (copy_to_user(ufsuuid, &fsuuid, sizeof(fsuuid)) ||
+-	    copy_to_user(&ufsuuid->fsu_uuid[0], uuid, UUID_SIZE))
++	if (EXT4_ES_CALL(306, copy_to_user(ufsuuid, &fsuuid, sizeof(fsuuid))) ||
++	    EXT4_ES_CALL(307, copy_to_user(&ufsuuid->fsu_uuid[0], uuid, UUID_SIZE)))
+ 		return -EFAULT;
+ 	return 0;
+ }
+@@ -1222,16 +1223,16 @@
+ 		|| ext4_has_feature_stable_inodes(sb))
+ 		return -EOPNOTSUPP;
+ 
+-	if (copy_from_user(&fsuuid, ufsuuid, sizeof(fsuuid)))
++	if (EXT4_ES_CALL(308, copy_from_user(&fsuuid, ufsuuid, sizeof(fsuuid))))
+ 		return -EFAULT;
+ 
+ 	if (fsuuid.fsu_len != UUID_SIZE || fsuuid.fsu_flags != 0)
+ 		return -EINVAL;
+ 
+-	if (copy_from_user(uuid, &ufsuuid->fsu_uuid[0], UUID_SIZE))
++	if (EXT4_ES_CALL(309, copy_from_user(uuid, &ufsuuid->fsu_uuid[0], UUID_SIZE)))
+ 		return -EFAULT;
+ 
+-	ret = mnt_want_write_file(filp);
++	ret = EXT4_ES_CALL(310, mnt_want_write_file(filp));
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1271,7 +1272,7 @@
+ 			return -ENOTTY;
+ 		}
+ 
+-		err = mnt_want_write_file(filp);
++		err = EXT4_ES_CALL(267, mnt_want_write_file(filp));
+ 		if (err)
+ 			return err;
+ 		if (get_user(generation, (int __user *) arg)) {
+@@ -1320,14 +1321,14 @@
+ 			goto group_extend_out;
+ 		}
+ 
+-		err = mnt_want_write_file(filp);
++		err = EXT4_ES_CALL(268, mnt_want_write_file(filp));
+ 		if (err)
+ 			goto group_extend_out;
+ 
+ 		err = ext4_group_extend(sb, EXT4_SB(sb)->s_es, n_blocks_count);
+ 		if (EXT4_SB(sb)->s_journal) {
+ 			jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
+-			err2 = jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0);
++			err2 = EXT4_ES_CALL(269, jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0));
+ 			jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
+ 		}
+ 		if (err == 0)
+@@ -1349,8 +1350,8 @@
+ 		    !(filp->f_mode & FMODE_WRITE))
+ 			return -EBADF;
+ 
+-		if (copy_from_user(&me,
+-			(struct move_extent __user *)arg, sizeof(me)))
++		if (EXT4_ES_CALL(270, copy_from_user(&me,
++			(struct move_extent __user *)arg, sizeof(me))))
+ 			return -EFAULT;
+ 		me.moved_len = 0;
+ 
+@@ -1375,7 +1376,7 @@
+ 			goto mext_out;
+ 		}
+ 
+-		err = mnt_want_write_file(filp);
++		err = EXT4_ES_CALL(271, mnt_want_write_file(filp));
+ 		if (err)
+ 			goto mext_out;
+ 
+@@ -1383,8 +1384,8 @@
+ 					me.donor_start, me.len, &me.moved_len);
+ 		mnt_drop_write_file(filp);
+ 
+-		if (copy_to_user((struct move_extent __user *)arg,
+-				 &me, sizeof(me)))
++		if (EXT4_ES_CALL(272, copy_to_user((struct move_extent __user *)arg,
++				 &me, sizeof(me))))
+ 			err = -EFAULT;
+ mext_out:
+ 		fdput(donor);
+@@ -1394,8 +1395,8 @@
+ 	case EXT4_IOC_GROUP_ADD: {
+ 		struct ext4_new_group_data input;
+ 
+-		if (copy_from_user(&input, (struct ext4_new_group_input __user *)arg,
+-				sizeof(input)))
++		if (EXT4_ES_CALL(273, copy_from_user(&input, (struct ext4_new_group_input __user *)arg,
++				sizeof(input))))
+ 			return -EFAULT;
+ 
+ 		return ext4_ioctl_group_add(filp, &input);
+@@ -1408,7 +1409,7 @@
+ 		if (!inode_owner_or_capable(idmap, inode))
+ 			return -EACCES;
+ 
+-		err = mnt_want_write_file(filp);
++		err = EXT4_ES_CALL(274, mnt_want_write_file(filp));
+ 		if (err)
+ 			return err;
+ 		/*
+@@ -1436,7 +1437,7 @@
+ 		if (!inode_owner_or_capable(idmap, inode))
+ 			return -EACCES;
+ 
+-		err = mnt_want_write_file(filp);
++		err = EXT4_ES_CALL(275, mnt_want_write_file(filp));
+ 		if (err)
+ 			return err;
+ 		err = ext4_alloc_da_blocks(inode);
+@@ -1449,7 +1450,7 @@
+ 		int err;
+ 		if (!(filp->f_mode & FMODE_WRITE))
+ 			return -EBADF;
+-		err = mnt_want_write_file(filp);
++		err = EXT4_ES_CALL(276, mnt_want_write_file(filp));
+ 		if (err)
+ 			return err;
+ 		err = swap_inode_boot_loader(sb, idmap, inode);
+@@ -1462,8 +1463,8 @@
+ 		int err = 0, err2 = 0;
+ 		ext4_group_t o_group = EXT4_SB(sb)->s_groups_count;
+ 
+-		if (copy_from_user(&n_blocks_count, (__u64 __user *)arg,
+-				   sizeof(__u64))) {
++		if (EXT4_ES_CALL(277, copy_from_user(&n_blocks_count, (__u64 __user *)arg,
++				   sizeof(__u64)))) {
+ 			return -EFAULT;
+ 		}
+ 
+@@ -1471,7 +1472,7 @@
+ 		if (err)
+ 			return err;
+ 
+-		err = mnt_want_write_file(filp);
++		err = EXT4_ES_CALL(278, mnt_want_write_file(filp));
+ 		if (err)
+ 			goto resizefs_out;
+ 
+@@ -1479,7 +1480,7 @@
+ 		if (EXT4_SB(sb)->s_journal) {
+ 			ext4_fc_mark_ineligible(sb, EXT4_FC_REASON_RESIZE, NULL);
+ 			jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
+-			err2 = jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0);
++			err2 = EXT4_ES_CALL(279, jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0));
+ 			jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
+ 		}
+ 		if (err == 0)
+@@ -1515,16 +1516,16 @@
+ 		if (test_opt(sb, NOLOAD) && ext4_has_feature_journal(sb))
+ 			return -EROFS;
+ 
+-		if (copy_from_user(&range, (struct fstrim_range __user *)arg,
+-		    sizeof(range)))
++		if (EXT4_ES_CALL(281, copy_from_user(&range, (struct fstrim_range __user *)arg,
++		    sizeof(range))))
+ 			return -EFAULT;
+ 
+ 		ret = ext4_trim_fs(sb, &range);
+ 		if (ret < 0)
+ 			return ret;
+ 
+-		if (copy_to_user((struct fstrim_range __user *)arg, &range,
+-		    sizeof(range)))
++		if (EXT4_ES_CALL(282, copy_to_user((struct fstrim_range __user *)arg, &range,
++		    sizeof(range))))
+ 			return -EFAULT;
+ 
+ 		return 0;
+--- a/fs/ext4/mballoc.c
++++ b/fs/ext4/mballoc.c
+@@ -9,6 +9,7 @@
+  * mballoc.c contains the multiblocks allocation routines
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include "ext4_jbd2.h"
+ #include "mballoc.h"
+ #include <linux/log2.h>
+@@ -1307,7 +1308,7 @@
+ 	/* allocate buffer_heads to read bitmaps */
+ 	if (groups_per_page > 1) {
+ 		i = sizeof(struct buffer_head *) * groups_per_page;
+-		bh = kzalloc(i, gfp);
++		bh = EXT4_ES_CALL(337, kzalloc(i, gfp));
+ 		if (bh == NULL)
+ 			return -ENOMEM;
+ 	} else
+@@ -1364,7 +1365,7 @@
+ 			/* skip initialized uptodate buddy */
+ 			continue;
+ 
+-		if (!buffer_verified(bh[group - first_group]))
++		if (!EXT4_ES_CALL(338, buffer_verified(bh[group - first_group])))
+ 			/* Skip faulty bitmaps */
+ 			continue;
+ 		err = 0;
+@@ -3300,7 +3301,7 @@
+ 		return 0;
+ 
+ 	size = roundup_pow_of_two(sizeof(*sbi->s_group_info) * size);
+-	new_groupinfo = kvzalloc(size, GFP_KERNEL);
++	new_groupinfo = EXT4_ES_CALL(315, kvzalloc(size, GFP_KERNEL));
+ 	if (!new_groupinfo) {
+ 		ext4_msg(sb, KERN_ERR, "can't allocate buddy meta group");
+ 		return -ENOMEM;
+@@ -3353,7 +3354,7 @@
+ 	meta_group_info = sbi_array_rcu_deref(sbi, s_group_info, idx);
+ 	i = group & (EXT4_DESC_PER_BLOCK(sb) - 1);
+ 
+-	meta_group_info[i] = kmem_cache_zalloc(cachep, GFP_NOFS);
++	meta_group_info[i] = EXT4_ES_CALL(316, kmem_cache_zalloc(cachep, GFP_NOFS));
+ 	if (meta_group_info[i] == NULL) {
+ 		ext4_msg(sb, KERN_ERR, "can't allocate buddy mem");
+ 		goto exit_group_info;
+@@ -3414,7 +3415,7 @@
+ 	if (err)
+ 		return err;
+ 
+-	sbi->s_buddy_cache = new_inode(sb);
++	sbi->s_buddy_cache = EXT4_ES_CALL(323, new_inode(sb));
+ 	if (sbi->s_buddy_cache == NULL) {
+ 		ext4_msg(sb, KERN_ERR, "can't get new inode");
+ 		goto err_freesgi;
+@@ -3522,9 +3523,9 @@
+ 	slab_size = offsetof(struct ext4_group_info,
+ 				bb_counters[blocksize_bits + 2]);
+ 
+-	cachep = kmem_cache_create(ext4_groupinfo_slab_names[cache_index],
++	cachep = EXT4_ES_CALL(322, kmem_cache_create(ext4_groupinfo_slab_names[cache_index],
+ 					slab_size, 0, SLAB_RECLAIM_ACCOUNT,
+-					NULL);
++					NULL));
+ 
+ 	ext4_groupinfo_caches[cache_index] = cachep;
+ 
+@@ -3633,15 +3634,15 @@
+ 	} while (i < MB_NUM_ORDERS(sb));
+ 
+ 	sbi->s_mb_avg_fragment_size =
+-		kmalloc_array(MB_NUM_ORDERS(sb), sizeof(struct list_head),
+-			GFP_KERNEL);
++		EXT4_ES_CALL(317, kmalloc_array(MB_NUM_ORDERS(sb), sizeof(struct list_head),
++			GFP_KERNEL));
+ 	if (!sbi->s_mb_avg_fragment_size) {
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
+ 	sbi->s_mb_avg_fragment_size_locks =
+-		kmalloc_array(MB_NUM_ORDERS(sb), sizeof(rwlock_t),
+-			GFP_KERNEL);
++		EXT4_ES_CALL(318, kmalloc_array(MB_NUM_ORDERS(sb), sizeof(rwlock_t),
++			GFP_KERNEL));
+ 	if (!sbi->s_mb_avg_fragment_size_locks) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -3651,15 +3652,15 @@
+ 		rwlock_init(&sbi->s_mb_avg_fragment_size_locks[i]);
+ 	}
+ 	sbi->s_mb_largest_free_orders =
+-		kmalloc_array(MB_NUM_ORDERS(sb), sizeof(struct list_head),
+-			GFP_KERNEL);
++		EXT4_ES_CALL(319, kmalloc_array(MB_NUM_ORDERS(sb), sizeof(struct list_head),
++			GFP_KERNEL));
+ 	if (!sbi->s_mb_largest_free_orders) {
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
+ 	sbi->s_mb_largest_free_orders_locks =
+-		kmalloc_array(MB_NUM_ORDERS(sb), sizeof(rwlock_t),
+-			GFP_KERNEL);
++		EXT4_ES_CALL(320, kmalloc_array(MB_NUM_ORDERS(sb), sizeof(rwlock_t),
++			GFP_KERNEL));
+ 	if (!sbi->s_mb_largest_free_orders_locks) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -3713,7 +3714,7 @@
+ 			sbi->s_mb_group_prealloc, EXT4_NUM_B2C(sbi, sbi->s_stripe));
+ 	}
+ 
+-	sbi->s_locality_groups = alloc_percpu(struct ext4_locality_group);
++	sbi->s_locality_groups = EXT4_ES_CALL(321, alloc_percpu(struct ext4_locality_group));
+ 	if (sbi->s_locality_groups == NULL) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -5835,7 +5836,7 @@
+ 	struct ext4_prealloc_space *pa;
+ 
+ 	BUG_ON(ext4_pspace_cachep == NULL);
+-	pa = kmem_cache_zalloc(ext4_pspace_cachep, GFP_NOFS);
++	pa = EXT4_ES_CALL(333, kmem_cache_zalloc(ext4_pspace_cachep, GFP_NOFS));
+ 	if (!pa)
+ 		return -ENOMEM;
+ 	atomic_set(&pa->pa_count, 1);
+@@ -6405,7 +6406,7 @@
+ 		}
+ 	}
+ 
+-	ac = kmem_cache_zalloc(ext4_ac_cachep, GFP_NOFS);
++	ac = EXT4_ES_CALL(330, kmem_cache_zalloc(ext4_ac_cachep, GFP_NOFS));
+ 	if (!ac) {
+ 		ar->len = 0;
+ 		*errp = -ENOMEM;
+--- a/fs/ext4/mmp.c
++++ b/fs/ext4/mmp.c
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: GPL-2.0
++#include <linux/ext4_error_site.h>
+ #include <linux/fs.h>
+ #include <linux/random.h>
+ #include <linux/buffer_head.h>
+@@ -50,7 +51,7 @@
+ 	get_bh(bh);
+ 	submit_bh(REQ_OP_WRITE | REQ_SYNC | REQ_META | REQ_PRIO, bh);
+ 	wait_on_buffer(bh);
+-	if (unlikely(!buffer_uptodate(bh)))
++	if (unlikely(!EXT4_ES_CALL(353, buffer_uptodate(bh))))
+ 		return -EIO;
+ 	return 0;
+ }
+--- a/fs/ext4/move_extent.c
++++ b/fs/ext4/move_extent.c
+@@ -5,6 +5,7 @@
+  *            Akira Fujita <a-fujita@rs.jp.nec.com>
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/fs.h>
+ #include <linux/quotaops.h>
+ #include <linux/slab.h>
+@@ -228,7 +229,7 @@
+ 		if (bh_offset(bh) > to)
+ 			break;
+ 		wait_on_buffer(bh);
+-		if (buffer_uptodate(bh))
++		if (EXT4_ES_CALL(362, buffer_uptodate(bh)))
+ 			continue;
+ 		return -EIO;
+ 	} while ((bh = bh->b_this_page) != head);
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -25,6 +25,7 @@
+  *	Theodore Ts'o, 2002
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/fs.h>
+ #include <linux/pagemap.h>
+ #include <linux/time.h>
+@@ -1638,7 +1639,7 @@
+ 		if ((bh = bh_use[ra_ptr++]) == NULL)
+ 			goto next;
+ 		wait_on_buffer(bh);
+-		if (!buffer_uptodate(bh)) {
++		if (!EXT4_ES_CALL(386, buffer_uptodate(bh))) {
+ 			EXT4_ERROR_INODE_ERR(dir, EIO,
+ 					     "reading directory lblock %lu",
+ 					     (unsigned long) block);
+@@ -2857,7 +2858,7 @@
+ 	struct inode *inode;
+ 	int err, credits, retries = 0;
+ 
+-	err = dquot_initialize(dir);
++	err = EXT4_ES_CALL(371, dquot_initialize(dir));
+ 	if (err)
+ 		return err;
+ 
+@@ -2892,7 +2893,7 @@
+ 	struct inode *inode;
+ 	int err, credits, retries = 0;
+ 
+-	err = dquot_initialize(dir);
++	err = EXT4_ES_CALL(382, dquot_initialize(dir));
+ 	if (err)
+ 		return err;
+ 
+@@ -2926,7 +2927,7 @@
+ 	struct inode *inode;
+ 	int err, retries = 0;
+ 
+-	err = dquot_initialize(dir);
++	err = EXT4_ES_CALL(384, dquot_initialize(dir));
+ 	if (err)
+ 		return err;
+ 
+@@ -3045,7 +3046,7 @@
+ 	if (EXT4_DIR_LINK_MAX(dir))
+ 		return -EMLINK;
+ 
+-	err = dquot_initialize(dir);
++	err = EXT4_ES_CALL(379, dquot_initialize(dir));
+ 	if (err)
+ 		return err;
+ 
+@@ -3212,10 +3213,10 @@
+ 
+ 	/* Initialize quotas before so that eventual writes go in
+ 	 * separate transaction */
+-	retval = dquot_initialize(dir);
++	retval = EXT4_ES_CALL(380, dquot_initialize(dir));
+ 	if (retval)
+ 		return retval;
+-	retval = dquot_initialize(d_inode(dentry));
++	retval = EXT4_ES_CALL(381, dquot_initialize(d_inode(dentry)));
+ 	if (retval)
+ 		return retval;
+ 
+@@ -3411,10 +3412,10 @@
+ 	 * Initialize quotas before so that eventual writes go
+ 	 * in separate transaction
+ 	 */
+-	retval = dquot_initialize(dir);
++	retval = EXT4_ES_CALL(374, dquot_initialize(dir));
+ 	if (retval)
+ 		goto out_trace;
+-	retval = dquot_initialize(d_inode(dentry));
++	retval = EXT4_ES_CALL(375, dquot_initialize(d_inode(dentry)));
+ 	if (retval)
+ 		goto out_trace;
+ 
+@@ -3473,12 +3474,12 @@
+ 	if (unlikely(ext4_forced_shutdown(dir->i_sb)))
+ 		return -EIO;
+ 
+-	err = fscrypt_prepare_symlink(dir, symname, len, dir->i_sb->s_blocksize,
+-				      &disk_link);
++	err = EXT4_ES_CALL(376, fscrypt_prepare_symlink(dir, symname, len, dir->i_sb->s_blocksize,
++				      &disk_link));
+ 	if (err)
+ 		return err;
+ 
+-	err = dquot_initialize(dir);
++	err = EXT4_ES_CALL(377, dquot_initialize(dir));
+ 	if (err)
+ 		return err;
+ 
+@@ -3605,7 +3606,7 @@
+ 	if (inode->i_nlink >= EXT4_LINK_MAX)
+ 		return -EMLINK;
+ 
+-	err = fscrypt_prepare_link(old_dentry, dir, dentry);
++	err = EXT4_ES_CALL(372, fscrypt_prepare_link(old_dentry, dir, dentry));
+ 	if (err)
+ 		return err;
+ 
+@@ -3614,7 +3615,7 @@
+ 			EXT4_I(old_dentry->d_inode)->i_projid)))
+ 		return -EXDEV;
+ 
+-	err = dquot_initialize(dir);
++	err = EXT4_ES_CALL(373, dquot_initialize(dir));
+ 	if (err)
+ 		return err;
+ 	return __ext4_link(dir, inode, dentry);
+@@ -3949,20 +3950,20 @@
+ 			EXT4_I(old_dentry->d_inode)->i_projid)))
+ 		return -EXDEV;
+ 
+-	retval = dquot_initialize(old.dir);
++	retval = EXT4_ES_CALL(392, dquot_initialize(old.dir));
+ 	if (retval)
+ 		return retval;
+-	retval = dquot_initialize(old.inode);
++	retval = EXT4_ES_CALL(393, dquot_initialize(old.inode));
+ 	if (retval)
+ 		return retval;
+-	retval = dquot_initialize(new.dir);
++	retval = EXT4_ES_CALL(394, dquot_initialize(new.dir));
+ 	if (retval)
+ 		return retval;
+ 
+ 	/* Initialize quotas before so that eventual writes go
+ 	 * in separate transaction */
+ 	if (new.inode) {
+-		retval = dquot_initialize(new.inode);
++		retval = EXT4_ES_CALL(395, dquot_initialize(new.inode));
+ 		if (retval)
+ 			return retval;
+ 	}
+@@ -4209,10 +4210,10 @@
+ 			EXT4_I(new_dentry->d_inode)->i_projid)))
+ 		return -EXDEV;
+ 
+-	retval = dquot_initialize(old.dir);
++	retval = EXT4_ES_CALL(390, dquot_initialize(old.dir));
+ 	if (retval)
+ 		return retval;
+-	retval = dquot_initialize(new.dir);
++	retval = EXT4_ES_CALL(391, dquot_initialize(new.dir));
+ 	if (retval)
+ 		return retval;
+ 
+@@ -4337,8 +4338,8 @@
+ 	if (flags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE | RENAME_WHITEOUT))
+ 		return -EINVAL;
+ 
+-	err = fscrypt_prepare_rename(old_dir, old_dentry, new_dir, new_dentry,
+-				     flags);
++	err = EXT4_ES_CALL(383, fscrypt_prepare_rename(old_dir, old_dentry, new_dir, new_dentry,
++				     flags));
+ 	if (err)
+ 		return err;
+ 
+--- a/fs/ext4/orphan.c
++++ b/fs/ext4/orphan.c
+@@ -1,6 +1,7 @@
+ /*
+  * Ext4 orphan inode handling
+  */
++#include <linux/ext4_error_site.h>
+ #include <linux/fs.h>
+ #include <linux/quotaops.h>
+ #include <linux/buffer_head.h>
+@@ -725,8 +726,8 @@
+ 	}
+ 	oi->of_blocks = orphan_file_blocks;
+ 	oi->of_csum_seed = EXT4_I(inode)->i_csum_seed;
+-	oi->of_binfo = kmalloc(oi->of_blocks*sizeof(struct ext4_orphan_block),
+-			       GFP_KERNEL);
++	oi->of_binfo = EXT4_ES_CALL(406, kmalloc(oi->of_blocks*sizeof(struct ext4_orphan_block),
++			       GFP_KERNEL));
+ 	if (!oi->of_binfo) {
+ 		ret = -ENOMEM;
+ 		goto out_put;
+--- a/fs/ext4/page-io.c
++++ b/fs/ext4/page-io.c
+@@ -7,6 +7,7 @@
+  * Written by Theodore Ts'o, 2010.
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/fs.h>
+ #include <linux/time.h>
+ #include <linux/highuid.h>
+@@ -57,7 +58,7 @@
+ {
+ 	struct ext4_io_end_vec *io_end_vec;
+ 
+-	io_end_vec = kmem_cache_zalloc(io_end_vec_cachep, GFP_NOFS);
++	io_end_vec = EXT4_ES_CALL(407, kmem_cache_zalloc(io_end_vec_cachep, GFP_NOFS));
+ 	if (!io_end_vec)
+ 		return ERR_PTR(-ENOMEM);
+ 	INIT_LIST_HEAD(&io_end_vec->list);
+@@ -274,7 +275,7 @@
+ 
+ ext4_io_end_t *ext4_init_io_end(struct inode *inode, gfp_t flags)
+ {
+-	ext4_io_end_t *io_end = kmem_cache_zalloc(io_end_cachep, flags);
++	ext4_io_end_t *io_end = EXT4_ES_CALL(410, kmem_cache_zalloc(io_end_cachep, flags));
+ 
+ 	if (io_end) {
+ 		io_end->inode = inode;
+--- a/fs/ext4/readpage.c
++++ b/fs/ext4/readpage.c
+@@ -28,6 +28,7 @@
+  *
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/kernel.h>
+ #include <linux/export.h>
+ #include <linux/mm.h>
+@@ -397,8 +398,8 @@
+ 	if (!bio_post_read_ctx_cache)
+ 		goto fail;
+ 	bio_post_read_ctx_pool =
+-		mempool_create_slab_pool(NUM_PREALLOC_POST_READ_CTXS,
+-					 bio_post_read_ctx_cache);
++		EXT4_ES_CALL(431, mempool_create_slab_pool(NUM_PREALLOC_POST_READ_CTXS,
++					 bio_post_read_ctx_cache));
+ 	if (!bio_post_read_ctx_pool)
+ 		goto fail_free_cache;
+ 	return 0;
+--- a/fs/ext4/resize.c
++++ b/fs/ext4/resize.c
+@@ -10,6 +10,7 @@
+  */
+ 
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/errno.h>
+ #include <linux/slab.h>
+ #include <linux/jiffies.h>
+@@ -32,7 +33,7 @@
+ 
+ void ext4_kvfree_array_rcu(void *to_free)
+ {
+-	struct ext4_rcu_ptr *ptr = kzalloc(sizeof(*ptr), GFP_KERNEL);
++	struct ext4_rcu_ptr *ptr = EXT4_ES_CALL(432, kzalloc(sizeof(*ptr), GFP_KERNEL));
+ 
+ 	if (ptr) {
+ 		ptr->ptr = to_free;
+@@ -268,14 +269,14 @@
+ 	if (WARN_ON_ONCE(flex_gd->resize_bg > max_resize_bg))
+ 		flex_gd->resize_bg = max_resize_bg;
+ 
+-	flex_gd->groups = kmalloc_array(flex_gd->resize_bg,
++	flex_gd->groups = EXT4_ES_CALL(433, kmalloc_array(flex_gd->resize_bg,
+ 					sizeof(struct ext4_new_group_data),
+-					GFP_NOFS);
++					GFP_NOFS));
+ 	if (flex_gd->groups == NULL)
+ 		goto out2;
+ 
+-	flex_gd->bg_flags = kmalloc_array(flex_gd->resize_bg, sizeof(__u16),
+-					  GFP_NOFS);
++	flex_gd->bg_flags = EXT4_ES_CALL(434, kmalloc_array(flex_gd->resize_bg, sizeof(__u16),
++					  GFP_NOFS));
+ 	if (flex_gd->bg_flags == NULL)
+ 		goto out1;
+ 
+@@ -434,7 +435,7 @@
+ 	struct buffer_head *bh;
+ 	int err;
+ 
+-	bh = sb_getblk(sb, blk);
++	bh = EXT4_ES_CALL(439, sb_getblk(sb, blk));
+ 	if (unlikely(!bh))
+ 		return ERR_PTR(-ENOMEM);
+ 	BUFFER_TRACE(bh, "get_write_access");
+@@ -498,7 +499,7 @@
+ 		if (err < 0)
+ 			return err;
+ 
+-		bh = sb_getblk(sb, flex_gd->groups[group].block_bitmap);
++		bh = EXT4_ES_CALL(440, sb_getblk(sb, flex_gd->groups[group].block_bitmap));
+ 		if (unlikely(!bh))
+ 			return -ENOMEM;
+ 
+@@ -595,7 +596,7 @@
+ 			if (err < 0)
+ 				goto out;
+ 
+-			gdb = sb_getblk(sb, block);
++			gdb = EXT4_ES_CALL(435, sb_getblk(sb, block));
+ 			if (unlikely(!gdb)) {
+ 				err = -ENOMEM;
+ 				goto out;
+@@ -624,8 +625,8 @@
+ 		 * table blocks
+ 		 */
+ 		if (ext4_bg_has_super(sb, group)) {
+-			err = sb_issue_zeroout(sb, gdblocks + start + 1,
+-					reserved_gdb, GFP_NOFS);
++			err = EXT4_ES_CALL(436, sb_issue_zeroout(sb, gdblocks + start + 1,
++					reserved_gdb, GFP_NOFS));
+ 			if (err)
+ 				goto out;
+ 		}
+@@ -639,8 +640,8 @@
+ 		block = group_data[i].inode_table;
+ 		ext4_debug("clear inode table blocks %#04llx -> %#04lx\n",
+ 			   block, sbi->s_itb_per_group);
+-		err = sb_issue_zeroout(sb, block, sbi->s_itb_per_group,
+-				       GFP_NOFS);
++		err = EXT4_ES_CALL(437, sb_issue_zeroout(sb, block, sbi->s_itb_per_group,
++				       GFP_NOFS));
+ 		if (err)
+ 			goto out;
+ 
+@@ -912,8 +913,8 @@
+ 	if (unlikely(err))
+ 		goto errout;
+ 
+-	n_group_desc = kvmalloc((gdb_num + 1) * sizeof(struct buffer_head *),
+-				GFP_KERNEL);
++	n_group_desc = EXT4_ES_CALL(443, kvmalloc((gdb_num + 1) * sizeof(struct buffer_head *),
++				GFP_KERNEL));
+ 	if (!n_group_desc) {
+ 		err = -ENOMEM;
+ 		ext4_warning(sb, "not enough memory for %lu groups",
+@@ -998,8 +999,8 @@
+ 	gdb_bh = ext4_sb_bread(sb, gdblock, 0);
+ 	if (IS_ERR(gdb_bh))
+ 		return PTR_ERR(gdb_bh);
+-	n_group_desc = kvmalloc((gdb_num + 1) * sizeof(struct buffer_head *),
+-				GFP_KERNEL);
++	n_group_desc = EXT4_ES_CALL(442, kvmalloc((gdb_num + 1) * sizeof(struct buffer_head *),
++				GFP_KERNEL));
+ 	if (!n_group_desc) {
+ 		brelse(gdb_bh);
+ 		err = -ENOMEM;
+@@ -1058,7 +1059,7 @@
+ 	int res, i;
+ 	int err;
+ 
+-	primary = kmalloc_array(reserved_gdb, sizeof(*primary), GFP_NOFS);
++	primary = EXT4_ES_CALL(441, kmalloc_array(reserved_gdb, sizeof(*primary), GFP_NOFS));
+ 	if (!primary)
+ 		return -ENOMEM;
+ 
+@@ -1210,7 +1211,7 @@
+ 		else
+ 			backup_block = first_block + has_super;
+ 
+-		bh = sb_getblk(sb, backup_block);
++		bh = EXT4_ES_CALL(438, sb_getblk(sb, backup_block));
+ 		if (unlikely(!bh)) {
+ 			err = -ENOMEM;
+ 			break;
+@@ -1323,7 +1324,7 @@
+ 
+ static struct buffer_head *ext4_get_bitmap(struct super_block *sb, __u64 block)
+ {
+-	struct buffer_head *bh = sb_getblk(sb, block);
++	struct buffer_head *bh = EXT4_ES_CALL(444, sb_getblk(sb, block));
+ 	if (unlikely(!bh))
+ 		return NULL;
+ 	if (!bh_uptodate_or_lock(bh)) {
+--- a/fs/ext4/super.c
++++ b/fs/ext4/super.c
+@@ -17,6 +17,7 @@
+  *        David S. Miller (davem@caip.rutgers.edu), 1995
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/module.h>
+ #include <linux/string.h>
+ #include <linux/fs.h>
+@@ -199,7 +200,7 @@
+ 	__ext4_read_bh(bh, op_flags, end_io);
+ 
+ 	wait_on_buffer(bh);
+-	if (buffer_uptodate(bh))
++	if (EXT4_ES_CALL(450, buffer_uptodate(bh)))
+ 		return 0;
+ 	return -EIO;
+ }
+@@ -227,7 +228,7 @@
+ 	struct buffer_head *bh;
+ 	int ret;
+ 
+-	bh = sb_getblk_gfp(sb, block, gfp);
++	bh = EXT4_ES_CALL(453, sb_getblk_gfp(sb, block, gfp));
+ 	if (bh == NULL)
+ 		return ERR_PTR(-ENOMEM);
+ 	if (ext4_buffer_uptodate(bh))
+@@ -786,7 +787,7 @@
+ 		ext4_checker_tx_event(sbi->s_sb, EXT4_CHECKER_EVENT_TX_BEGIN,
+ 				      NULL, handle, EXT4_CHECKER_TX_SUPER_BEGIN,
+ 				      __LINE__);
+-		if (jbd2_journal_get_write_access(handle, sbh)) {
++		if (EXT4_ES_CALL(494, jbd2_journal_get_write_access(handle, sbh))) {
+ 			ext4_checker_tx_event(sbi->s_sb,
+ 				      EXT4_CHECKER_EVENT_TX_END, NULL, handle,
+ 				      EXT4_CHECKER_TX_SUPER_END, __LINE__);
+@@ -798,14 +799,14 @@
+ 			call_notify_err = true;
+ 
+ 		ext4_update_super(sbi->s_sb);
+-		if (buffer_write_io_error(sbh) || !buffer_uptodate(sbh)) {
++		if (EXT4_ES_CALL(495, buffer_write_io_error(sbh)) || !EXT4_ES_CALL(496, buffer_uptodate(sbh))) {
+ 			ext4_msg(sbi->s_sb, KERN_ERR, "previous I/O error to "
+ 				 "superblock detected");
+ 			clear_buffer_write_io_error(sbh);
+ 			set_buffer_uptodate(sbh);
+ 		}
+ 
+-		if (jbd2_journal_dirty_metadata(handle, sbh)) {
++		if (EXT4_ES_CALL(497, jbd2_journal_dirty_metadata(handle, sbh))) {
+ 			ext4_checker_tx_event(sbi->s_sb,
+ 				      EXT4_CHECKER_EVENT_TX_END, NULL, handle,
+ 				      EXT4_CHECKER_TX_SUPER_END, __LINE__);
+@@ -1264,8 +1265,8 @@
+ 	ext4_ct_record(sbi->s_sb, "MOUNT.SUPER.BLOCKS", "P-SB", 0, ~0U,
+ 		__LINE__, ext4_free_blocks_count(sbi->s_es), EXT4_C2B(sbi, block),
+ 		0, EXT4_CT_CONSISTENT, "mount_descriptor_summary_copy");
+-	err = percpu_counter_init(&sbi->s_freeclusters_counter, block,
+-				  GFP_KERNEL);
++	err = EXT4_ES_CALL(502, percpu_counter_init(&sbi->s_freeclusters_counter, block,
++				  GFP_KERNEL));
+ 	if (!err)
+ 		ext4_ct_record(sbi->s_sb, "MOUNT.GLOBAL.INIT", "INIT-GLOBAL-B", 0,
+ 			~0U, __LINE__, block, 0, block, EXT4_CT_RAW, "percpu_init");
+@@ -1275,27 +1276,27 @@
+ 		ext4_ct_record(sbi->s_sb, "MOUNT.SUPER.INODES", "P-SB", 0, ~0U,
+ 			__LINE__, le32_to_cpu(sbi->s_es->s_free_inodes_count), freei,
+ 			0, EXT4_CT_CONSISTENT, "mount_descriptor_summary_copy");
+-		err = percpu_counter_init(&sbi->s_freeinodes_counter, freei,
+-					  GFP_KERNEL);
++		err = EXT4_ES_CALL(503, percpu_counter_init(&sbi->s_freeinodes_counter, freei,
++					  GFP_KERNEL));
+ 		if (!err)
+ 			ext4_ct_record(sbi->s_sb, "MOUNT.GLOBAL.INIT", "INIT-GLOBAL-I", 0,
+ 				~0U, __LINE__, freei, 0, freei, EXT4_CT_RAW, "percpu_init");
+ 	}
+ 	if (!err) {
+ 		unsigned long dirs = ext4_count_dirs(sbi->s_sb);
+-		err = percpu_counter_init(&sbi->s_dirs_counter, dirs, GFP_KERNEL);
++		err = EXT4_ES_CALL(504, percpu_counter_init(&sbi->s_dirs_counter, dirs, GFP_KERNEL));
+ 		if (!err)
+ 			ext4_ct_record(sbi->s_sb, "MOUNT.GLOBAL.INIT", "INIT-GLOBAL-U", 0,
+ 				~0U, __LINE__, dirs, 0, dirs, EXT4_CT_RAW, "percpu_init");
+ 	}
+ 	if (!err)
+-		err = percpu_counter_init(&sbi->s_dirtyclusters_counter, 0,
+-					  GFP_KERNEL);
++		err = EXT4_ES_CALL(505, percpu_counter_init(&sbi->s_dirtyclusters_counter, 0,
++					  GFP_KERNEL));
+ 	if (!err)
+-		err = percpu_counter_init(&sbi->s_sra_exceeded_retry_limit, 0,
+-					  GFP_KERNEL);
++		err = EXT4_ES_CALL(506, percpu_counter_init(&sbi->s_sra_exceeded_retry_limit, 0,
++					  GFP_KERNEL));
+ 	if (!err)
+-		err = percpu_init_rwsem(&sbi->s_writepages_rwsem);
++		err = EXT4_ES_CALL(507, percpu_init_rwsem(&sbi->s_writepages_rwsem));
+ 
+ 	if (err)
+ 		ext4_msg(sbi->s_sb, KERN_ERR, "insufficient memory");
+@@ -1462,7 +1463,7 @@
+ {
+ 	struct ext4_inode_info *ei;
+ 
+-	ei = alloc_inode_sb(sb, ext4_inode_cachep, GFP_NOFS);
++	ei = EXT4_ES_CALL(514, alloc_inode_sb(sb, ext4_inode_cachep, GFP_NOFS));
+ 	if (!ei)
+ 		return NULL;
+ 
+@@ -1560,12 +1561,12 @@
+ 
+ static int __init init_inodecache(void)
+ {
+-	ext4_inode_cachep = kmem_cache_create_usercopy("ext4_inode_cache",
++	ext4_inode_cachep = EXT4_ES_CALL(547, kmem_cache_create_usercopy("ext4_inode_cache",
+ 				sizeof(struct ext4_inode_info), 0,
+ 				SLAB_RECLAIM_ACCOUNT | SLAB_ACCOUNT,
+ 				offsetof(struct ext4_inode_info, i_data),
+ 				sizeof_field(struct ext4_inode_info, i_data),
+-				init_once);
++				init_once));
+ 	if (ext4_inode_cachep == NULL)
+ 		return -ENOMEM;
+ 	return 0;
+@@ -2078,7 +2079,7 @@
+ {
+ 	struct ext4_fs_context *ctx;
+ 
+-	ctx = kzalloc(sizeof(struct ext4_fs_context), GFP_KERNEL);
++	ctx = EXT4_ES_CALL(478, kzalloc(sizeof(struct ext4_fs_context), GFP_KERNEL));
+ 	if (!ctx)
+ 		return -ENOMEM;
+ 
+@@ -2117,7 +2118,7 @@
+ 		return 0;
+ 	}
+ 
+-	qname = kmemdup_nul(param->string, param->size, GFP_KERNEL);
++	qname = EXT4_ES_CALL(483, kmemdup_nul(param->string, param->size, GFP_KERNEL));
+ 	if (!qname) {
+ 		ext4_msg(NULL, KERN_ERR,
+ 			 "Not enough memory for storing quotafile name");
+@@ -2207,7 +2208,7 @@
+ 	int is_remount;
+ 	int token;
+ 
+-	token = fs_parse(fc, ext4_param_specs, param, &result);
++	token = EXT4_ES_CALL(479, fs_parse(fc, ext4_param_specs, param, &result));
+ 	if (token < 0)
+ 		return token;
+ 	is_remount = fc->purpose == FS_CONTEXT_FOR_RECONFIGURE;
+@@ -2375,7 +2376,7 @@
+ 			return -EINVAL;
+ 		}
+ 
+-		error = fs_lookup_param(fc, param, 1, LOOKUP_FOLLOW, &path);
++		error = EXT4_ES_CALL(480, fs_lookup_param(fc, param, 1, LOOKUP_FOLLOW, &path));
+ 		if (error) {
+ 			ext4_msg(NULL, KERN_ERR, "error: could not find "
+ 				 "journal device path");
+@@ -2517,8 +2518,8 @@
+ 
+ 				*value++ = 0;
+ 				v_len = strlen(value);
+-				param.string = kmemdup_nul(value, v_len,
+-							   GFP_KERNEL);
++				param.string = EXT4_ES_CALL(510, kmemdup_nul(value, v_len,
++							   GFP_KERNEL));
+ 				if (!param.string)
+ 					return -ENOMEM;
+ 				param.type = fs_value_is_string;
+@@ -2553,17 +2554,17 @@
+ 	if (!sbi->s_es->s_mount_opts[0])
+ 		return 0;
+ 
+-	s_mount_opts = kstrndup(sbi->s_es->s_mount_opts,
++	s_mount_opts = EXT4_ES_CALL(489, kstrndup(sbi->s_es->s_mount_opts,
+ 				sizeof(sbi->s_es->s_mount_opts),
+-				GFP_KERNEL);
++				GFP_KERNEL));
+ 	if (!s_mount_opts)
+ 		return ret;
+ 
+-	fc = kzalloc(sizeof(struct fs_context), GFP_KERNEL);
++	fc = EXT4_ES_CALL(490, kzalloc(sizeof(struct fs_context), GFP_KERNEL));
+ 	if (!fc)
+ 		goto out_free;
+ 
+-	s_ctx = kzalloc(sizeof(struct ext4_fs_context), GFP_KERNEL);
++	s_ctx = EXT4_ES_CALL(491, kzalloc(sizeof(struct ext4_fs_context), GFP_KERNEL));
+ 	if (!s_ctx)
+ 		goto out_free;
+ 
+@@ -3195,17 +3196,17 @@
+ 	if (size <= sbi->s_flex_groups_allocated)
+ 		return 0;
+ 
+-	new_groups = kvzalloc(roundup_pow_of_two(size *
+-			      sizeof(*sbi->s_flex_groups)), GFP_KERNEL);
++	new_groups = EXT4_ES_CALL(468, kvzalloc(roundup_pow_of_two(size *
++			      sizeof(*sbi->s_flex_groups)), GFP_KERNEL));
+ 	if (!new_groups) {
+ 		ext4_msg(sb, KERN_ERR,
+ 			 "not enough memory for %d flex group pointers", size);
+ 		return -ENOMEM;
+ 	}
+ 	for (i = sbi->s_flex_groups_allocated; i < size; i++) {
+-		new_groups[i] = kvzalloc(roundup_pow_of_two(
++		new_groups[i] = EXT4_ES_CALL(469, kvzalloc(roundup_pow_of_two(
+ 					 sizeof(struct flex_groups)),
+-					 GFP_KERNEL);
++					 GFP_KERNEL));
+ 		if (!new_groups[i]) {
+ 			for (j = sbi->s_flex_groups_allocated; j < i; j++)
+ 				kvfree(new_groups[j]);
+@@ -3999,7 +4000,7 @@
+ {
+ 	struct ext4_lazy_init *eli = NULL;
+ 
+-	eli = kzalloc(sizeof(*eli), GFP_KERNEL);
++	eli = EXT4_ES_CALL(471, kzalloc(sizeof(*eli), GFP_KERNEL));
+ 	if (!eli)
+ 		return -ENOMEM;
+ 
+@@ -4018,7 +4019,7 @@
+ {
+ 	struct ext4_li_request *elr;
+ 
+-	elr = kzalloc(sizeof(*elr), GFP_KERNEL);
++	elr = EXT4_ES_CALL(470, kzalloc(sizeof(*elr), GFP_KERNEL));
+ 	if (!elr)
+ 		return NULL;
+ 
+@@ -4240,7 +4241,7 @@
+ 	unsigned int j_blocks, j_inum = le32_to_cpu(es->s_journal_inum);
+ 	ext4_group_t i, ngroups = ext4_get_groups_count(sb);
+ 	ext4_fsblk_t overhead = 0;
+-	char *buf = (char *) get_zeroed_page(GFP_NOFS);
++	char *buf = (char *) EXT4_ES_CALL(472, get_zeroed_page(GFP_NOFS));
+ 
+ 	if (!buf)
+ 		return -ENOMEM;
+@@ -4365,7 +4366,7 @@
+ {
+ 	struct ext4_sb_info *sbi;
+ 
+-	sbi = kzalloc(sizeof(*sbi), GFP_KERNEL);
++	sbi = EXT4_ES_CALL(485, kzalloc(sizeof(*sbi), GFP_KERNEL));
+ 	if (!sbi)
+ 		return NULL;
+ 
+@@ -4373,7 +4374,7 @@
+ 					   NULL, NULL);
+ 
+ 	sbi->s_blockgroup_lock =
+-		kzalloc(sizeof(struct blockgroup_lock), GFP_KERNEL);
++		EXT4_ES_CALL(486, kzalloc(sizeof(struct blockgroup_lock), GFP_KERNEL));
+ 
+ 	if (!sbi->s_blockgroup_lock)
+ 		goto err_out;
+@@ -4809,8 +4810,8 @@
+ 	 * Test whether we have more sectors than will fit in sector_t,
+ 	 * and whether the max offset is addressable by the page cache.
+ 	 */
+-	err = generic_check_addressable(sb->s_blocksize_bits,
+-					ext4_blocks_count(es));
++	err = EXT4_ES_CALL(492, generic_check_addressable(sb->s_blocksize_bits,
++					ext4_blocks_count(es)));
+ 	if (err) {
+ 		ext4_msg(sb, KERN_ERR, "filesystem"
+ 			 " too large to mount safely on this system");
+@@ -4893,9 +4894,9 @@
+ 		}
+ 	}
+ 	rcu_assign_pointer(sbi->s_group_desc,
+-			   kvmalloc_array(db_count,
++			   EXT4_ES_CALL(498, kvmalloc_array(db_count,
+ 					  sizeof(struct buffer_head *),
+-					  GFP_KERNEL));
++					  GFP_KERNEL)));
+ 	if (sbi->s_group_desc == NULL) {
+ 		ext4_msg(sb, KERN_ERR, "not enough memory");
+ 		return -ENOMEM;
+@@ -5546,7 +5547,7 @@
+ 	}
+ 
+ 	generic_set_sb_d_ops(sb);
+-	sb->s_root = d_make_root(root);
++	sb->s_root = EXT4_ES_CALL(487, d_make_root(root));
+ 	if (!sb->s_root) {
+ 		ext4_msg(sb, KERN_ERR, "get root dentry failed");
+ 		err = -ENOMEM;
+@@ -5942,7 +5943,7 @@
+ 	sb_block = EXT4_MIN_BLOCK_SIZE / blocksize;
+ 	offset = EXT4_MIN_BLOCK_SIZE % blocksize;
+ 	set_blocksize(bdev_file, blocksize);
+-	bh = __bread(bdev, sb_block, blocksize);
++	bh = EXT4_ES_CALL(537, __bread(bdev, sb_block, blocksize));
+ 	if (!bh) {
+ 		ext4_msg(sb, KERN_ERR, "couldn't read superblock of "
+ 		       "external journal");
+@@ -6097,7 +6098,7 @@
+ 		ext4_msg(sb, KERN_INFO, "barriers disabled");
+ 
+ 	if (!ext4_has_feature_journal_needs_recovery(sb))
+-		err = jbd2_journal_wipe(journal, !really_read_only);
++		err = EXT4_ES_CALL(533, jbd2_journal_wipe(journal, !really_read_only));
+ 	if (!err) {
+ 		char *save = kmalloc(EXT4_S_ERR_LEN, GFP_KERNEL);
+ 		__le16 orig_state;
+@@ -6106,7 +6107,7 @@
+ 		if (save)
+ 			memcpy(save, ((char *) es) +
+ 			       EXT4_S_ERR_START, EXT4_S_ERR_LEN);
+-		err = jbd2_journal_load(journal);
++		err = EXT4_ES_CALL(534, jbd2_journal_load(journal));
+ 		if (save && memcmp(((char *) es) + EXT4_S_ERR_START,
+ 				   save, EXT4_S_ERR_LEN)) {
+ 			memcpy(((char *) es) + EXT4_S_ERR_START,
+@@ -6262,7 +6263,7 @@
+ 		return -EIO;
+ 	}
+ 
+-	if (buffer_write_io_error(sbh) || !buffer_uptodate(sbh)) {
++	if (EXT4_ES_CALL(475, buffer_write_io_error(sbh)) || !EXT4_ES_CALL(476, buffer_uptodate(sbh))) {
+ 		/*
+ 		 * Oh, dear.  A previous attempt to write the
+ 		 * superblock failed.  This could happen because the
+@@ -6283,7 +6284,7 @@
+ 	submit_bh(REQ_OP_WRITE | REQ_SYNC |
+ 		  (test_opt(sb, BARRIER) ? REQ_FUA : 0), sbh);
+ 	wait_on_buffer(sbh);
+-	if (buffer_write_io_error(sbh)) {
++	if (EXT4_ES_CALL(477, buffer_write_io_error(sbh))) {
+ 		ext4_msg(sb, KERN_ERR, "I/O error while writing "
+ 		       "superblock");
+ 		clear_buffer_write_io_error(sbh);
+@@ -6313,7 +6314,7 @@
+ 		return 0;
+ 	}
+ 	jbd2_journal_lock_updates(journal);
+-	err = jbd2_journal_flush(journal, 0);
++	err = EXT4_ES_CALL(508, jbd2_journal_flush(journal, 0));
+ 	if (err < 0)
+ 		goto out;
+ 
+@@ -6357,7 +6358,7 @@
+ 	 * journal by a prior ext4_error() or ext4_abort()
+ 	 */
+ 
+-	j_errno = jbd2_journal_errno(journal);
++	j_errno = EXT4_ES_CALL(536, jbd2_journal_errno(journal));
+ 	if (j_errno) {
+ 		char nbuf[16];
+ 
+@@ -6453,7 +6454,7 @@
+ 		 * Don't clear the needs_recovery flag if we failed to
+ 		 * flush the journal.
+ 		 */
+-		error = jbd2_journal_flush(journal, 0);
++		error = EXT4_ES_CALL(524, jbd2_journal_flush(journal, 0));
+ 		if (error < 0)
+ 			goto out;
+ 
+@@ -6946,7 +6947,7 @@
+ 				    EXT4_QUOTA_TRANS_BLOCKS(dquot->dq_sb));
+ 	if (IS_ERR(handle))
+ 		return PTR_ERR(handle);
+-	ret = dquot_commit(dquot);
++	ret = EXT4_ES_CALL(526, dquot_commit(dquot));
+ 	if (ret < 0)
+ 		ext4_error_err(dquot->dq_sb, -ret,
+ 			       "Failed to commit dquot type %d",
+@@ -6966,7 +6967,7 @@
+ 				    EXT4_QUOTA_INIT_BLOCKS(dquot->dq_sb));
+ 	if (IS_ERR(handle))
+ 		return PTR_ERR(handle);
+-	ret = dquot_acquire(dquot);
++	ret = EXT4_ES_CALL(527, dquot_acquire(dquot));
+ 	if (ret < 0)
+ 		ext4_error_err(dquot->dq_sb, -ret,
+ 			      "Failed to acquire dquot type %d",
+@@ -7021,7 +7022,7 @@
+ 	handle = ext4_journal_start_sb(sb, EXT4_HT_QUOTA, 2);
+ 	if (IS_ERR(handle))
+ 		return PTR_ERR(handle);
+-	ret = dquot_commit_info(sb, type);
++	ret = EXT4_ES_CALL(528, dquot_commit_info(sb, type));
+ 	err = ext4_journal_stop(handle);
+ 	if (!ret)
+ 		ret = err;
+@@ -7078,7 +7079,7 @@
+ 	}
+ 
+ 	lockdep_set_quota_inode(path->dentry->d_inode, I_DATA_SEM_QUOTA);
+-	err = dquot_quota_on(sb, type, format_id, path);
++	err = EXT4_ES_CALL(529, dquot_quota_on(sb, type, format_id, path));
+ 	if (!err) {
+ 		struct inode *inode = d_inode(path->dentry);
+ 		handle_t *handle;
+--- a/fs/ext4/sysfs.c
++++ b/fs/ext4/sysfs.c
+@@ -8,6 +8,7 @@
+  *
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/time.h>
+ #include <linux/fs.h>
+ #include <linux/seq_file.h>
+@@ -89,7 +90,7 @@
+ 	unsigned long t;
+ 	int ret;
+ 
+-	ret = kstrtoul(skip_spaces(buf), 0, &t);
++	ret = EXT4_ES_CALL(557, kstrtoul(skip_spaces(buf), 0, &t));
+ 	if (ret)
+ 		return ret;
+ 
+@@ -474,7 +475,7 @@
+ 
+ 	switch (a->attr_id) {
+ 	case attr_pointer_pi:
+-		ret = kstrtouint(skip_spaces(buf), 0, &t);
++		ret = EXT4_ES_CALL(558, kstrtouint(skip_spaces(buf), 0, &t));
+ 		if (ret)
+ 			return ret;
+ 		if ((int)t < 0)
+@@ -482,7 +483,7 @@
+ 		*((unsigned int *) ptr) = t;
+ 		return len;
+ 	case attr_pointer_ui:
+-		ret = kstrtouint(skip_spaces(buf), 0, &t);
++		ret = EXT4_ES_CALL(559, kstrtouint(skip_spaces(buf), 0, &t));
+ 		if (ret)
+ 			return ret;
+ 		if (a->attr_ptr == ptr_ext4_super_block_offset)
+@@ -491,7 +492,7 @@
+ 			*((unsigned int *) ptr) = t;
+ 		return len;
+ 	case attr_mb_order:
+-		ret = kstrtouint(skip_spaces(buf), 0, &t);
++		ret = EXT4_ES_CALL(560, kstrtouint(skip_spaces(buf), 0, &t));
+ 		if (ret)
+ 			return ret;
+ 		if (t > 64)
+@@ -499,7 +500,7 @@
+ 		*((unsigned int *) ptr) = t;
+ 		return len;
+ 	case attr_clusters_in_group:
+-		ret = kstrtouint(skip_spaces(buf), 0, &t);
++		ret = EXT4_ES_CALL(561, kstrtouint(skip_spaces(buf), 0, &t));
+ 		if (ret)
+ 			return ret;
+ 		if (t > sbi->s_clusters_per_group)
+@@ -507,7 +508,7 @@
+ 		*((unsigned int *) ptr) = t;
+ 		return len;
+ 	case attr_pointer_ul:
+-		ret = kstrtoul(skip_spaces(buf), 0, &lt);
++		ret = EXT4_ES_CALL(562, kstrtoul(skip_spaces(buf), 0, &lt));
+ 		if (ret)
+ 			return ret;
+ 		*((unsigned long *) ptr) = lt;
+@@ -580,8 +581,8 @@
+ 	int err;
+ 
+ 	init_completion(&sbi->s_kobj_unregister);
+-	err = kobject_init_and_add(&sbi->s_kobj, &ext4_sb_ktype, ext4_root,
+-				   "%s", sb->s_id);
++	err = EXT4_ES_CALL(551, kobject_init_and_add(&sbi->s_kobj, &ext4_sb_ktype, ext4_root,
++				   "%s", sb->s_id));
+ 	if (err) {
+ 		kobject_put(&sbi->s_kobj);
+ 		wait_for_completion(&sbi->s_kobj_unregister);
+@@ -621,18 +622,18 @@
+ {
+ 	int ret;
+ 
+-	ext4_root = kobject_create_and_add("ext4", fs_kobj);
++	ext4_root = EXT4_ES_CALL(553, kobject_create_and_add("ext4", fs_kobj));
+ 	if (!ext4_root)
+ 		return -ENOMEM;
+ 
+-	ext4_feat = kzalloc(sizeof(*ext4_feat), GFP_KERNEL);
++	ext4_feat = EXT4_ES_CALL(554, kzalloc(sizeof(*ext4_feat), GFP_KERNEL));
+ 	if (!ext4_feat) {
+ 		ret = -ENOMEM;
+ 		goto root_err;
+ 	}
+ 
+-	ret = kobject_init_and_add(ext4_feat, &ext4_feat_ktype,
+-				   ext4_root, "features");
++	ret = EXT4_ES_CALL(555, kobject_init_and_add(ext4_feat, &ext4_feat_ktype,
++				   ext4_root, "features"));
+ 	if (ret)
+ 		goto feat_err;
+ 
+--- a/fs/ext4/xattr.c
++++ b/fs/ext4/xattr.c
+@@ -51,6 +51,7 @@
+  * by the buffer lock.
+  */
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/init.h>
+ #include <linux/fs.h>
+ #include <linux/slab.h>
+@@ -466,7 +467,7 @@
+ 	int i, ret;
+ 
+ 	if (bh_count > ARRAY_SIZE(bhs_inline)) {
+-		bhs = kmalloc_array(bh_count, sizeof(*bhs), GFP_NOFS);
++		bhs = EXT4_ES_CALL(576, kmalloc_array(bh_count, sizeof(*bhs), GFP_NOFS));
+ 		if (!bhs)
+ 			return -ENOMEM;
+ 	}
+@@ -1006,10 +1007,10 @@
+ {
+ 	int err;
+ 
+-	err = dquot_alloc_inode(inode);
++	err = EXT4_ES_CALL(577, dquot_alloc_inode(inode));
+ 	if (err)
+ 		return err;
+-	err = dquot_alloc_space_nodirty(inode, round_up_cluster(inode, len));
++	err = EXT4_ES_CALL(578, dquot_alloc_space_nodirty(inode, round_up_cluster(inode, len)));
+ 	if (err)
+ 		dquot_free_inode(inode);
+ 	return err;
+@@ -1680,7 +1681,7 @@
+ 	WARN_ON_ONCE(ext4_handle_valid(journal_current_handle()) &&
+ 		     !(current->flags & PF_MEMALLOC_NOFS));
+ 
+-	ea_data = kvmalloc(value_len, GFP_KERNEL);
++	ea_data = EXT4_ES_CALL(579, kvmalloc(value_len, GFP_KERNEL));
+ 	if (!ea_data) {
+ 		mb_cache_entry_put(ea_inode_cache, ce);
+ 		return NULL;
+@@ -2120,7 +2121,7 @@
+ clone_block:
+ 		unlock_buffer(bs->bh);
+ 		ea_bdebug(bs->bh, "cloning");
+-		s->base = kmemdup(BHDR(bs->bh), bs->bh->b_size, GFP_NOFS);
++		s->base = EXT4_ES_CALL(566, kmemdup(BHDR(bs->bh), bs->bh->b_size, GFP_NOFS));
+ 		error = -ENOMEM;
+ 		if (s->base == NULL)
+ 			goto cleanup;
+@@ -2160,7 +2161,7 @@
+ 		}
+ 	} else {
+ 		/* Allocate a buffer where we construct the new block. */
+-		s->base = kzalloc(sb->s_blocksize, GFP_NOFS);
++		s->base = EXT4_ES_CALL(567, kzalloc(sb->s_blocksize, GFP_NOFS));
+ 		error = -ENOMEM;
+ 		if (s->base == NULL)
+ 			goto cleanup;
+@@ -2201,8 +2202,8 @@
+ #endif
+ 				/* The old block is released after updating
+ 				   the inode. */
+-				error = dquot_alloc_block(inode,
+-						EXT4_C2B(EXT4_SB(sb), 1));
++				error = EXT4_ES_CALL(568, dquot_alloc_block(inode,
++						EXT4_C2B(EXT4_SB(sb), 1)));
+ 				if (error)
+ 					goto cleanup;
+ 				BUFFER_TRACE(new_bh, "get_write_access");
+@@ -2713,7 +2714,7 @@
+ 	int error, retries = 0;
+ 	int credits;
+ 
+-	error = dquot_initialize(inode);
++	error = EXT4_ES_CALL(571, dquot_initialize(inode));
+ 	if (error)
+ 		return error;
+ 
+@@ -2791,8 +2792,8 @@
+ 	int needs_kvfree = 0;
+ 	int error;
+ 
+-	is = kzalloc(sizeof(struct ext4_xattr_ibody_find), GFP_NOFS);
+-	bs = kzalloc(sizeof(struct ext4_xattr_block_find), GFP_NOFS);
++	is = EXT4_ES_CALL(585, kzalloc(sizeof(struct ext4_xattr_ibody_find), GFP_NOFS));
++	bs = EXT4_ES_CALL(586, kzalloc(sizeof(struct ext4_xattr_block_find), GFP_NOFS));
+ 	b_entry_name = kmalloc(entry->e_name_len + 1, GFP_NOFS);
+ 	if (!is || !bs || !b_entry_name) {
+ 		error = -ENOMEM;
+@@ -2806,7 +2807,7 @@
+ 
+ 	/* Save the entry name and the entry value */
+ 	if (entry->e_value_inum) {
+-		buffer = kvmalloc(value_size, GFP_NOFS);
++		buffer = EXT4_ES_CALL(587, kvmalloc(value_size, GFP_NOFS));
+ 		if (!buffer) {
+ 			error = -ENOMEM;
+ 			goto out;
+--- /dev/null
++++ b/include/linux/ext4_error_site.h
+@@ -0,0 +1,43 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _LINUX_EXT4_ERROR_SITE_H
++#define _LINUX_EXT4_ERROR_SITE_H
++
++#include <linux/types.h>
++#include <linux/compiler.h>
++
++/* Assigned per object by fs/ext4/Makefile; zero is never a reviewed TU. */
++#ifndef EXT4_ERROR_SITE_TU
++#define EXT4_ERROR_SITE_TU 0
++#endif
++
++#ifdef CONFIG_EXT4_ERROR_SITE_TRACE
++extern bool ext4_error_site_enabled;
++u64 ext4_error_site_enter(unsigned int site_id);
++void ext4_error_site_return(unsigned int site_id, u64 invocation,
++			    long result, bool is_pointer);
++#endif
++
++#if defined(CONFIG_EXT4_ERROR_SITE_TRACE) && EXT4_ERROR_SITE_TU
++/*
++ * Preserve the original expression's type, short-circuit position, argument
++ * evaluation and return value. The expression is evaluated exactly once.
++ * id=0 removes a shared-header probe outside its reviewed translation units.
++ * No allocation, printk, filesystem IO or failure injection takes place here.
++ */
++#define EXT4_ES_CALL(id, expression) ({ \
++	const unsigned int __ext4_es_id = (id); \
++	u64 __ext4_es_invocation = 0; \
++	if (__ext4_es_id && READ_ONCE(ext4_error_site_enabled)) \
++		__ext4_es_invocation = ext4_error_site_enter(__ext4_es_id); \
++	__auto_type __ext4_es_value = (expression); \
++	if (__ext4_es_invocation) \
++		ext4_error_site_return(__ext4_es_id, __ext4_es_invocation, \
++			(long)__ext4_es_value, \
++			__builtin_classify_type(__ext4_es_value) == 5); \
++	__ext4_es_value; \
++})
++#else
++#define EXT4_ES_CALL(id, expression) (expression)
++#endif
++
++#endif /* _LINUX_EXT4_ERROR_SITE_H */
+--- a/include/linux/fs.h
++++ b/include/linux/fs.h
+@@ -2,6 +2,7 @@
+ #ifndef _LINUX_FS_H
+ #define _LINUX_FS_H
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/linkage.h>
+ #include <linux/wait_bit.h>
+ #include <linux/kdev_t.h>
+@@ -837,7 +838,7 @@
+ 
+ static inline int inode_trylock_shared(struct inode *inode)
+ {
+-	return down_read_trylock(&inode->i_rwsem);
++	return EXT4_ES_CALL((EXT4_ERROR_SITE_TU == 9 ? 124 : 0), down_read_trylock(&inode->i_rwsem));
+ }
+ 
+ static inline int inode_is_locked(struct inode *inode)
+--- a/include/linux/quotaops.h
++++ b/include/linux/quotaops.h
+@@ -8,6 +8,7 @@
+ #ifndef _LINUX_QUOTAOPS_
+ #define _LINUX_QUOTAOPS_
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/fs.h>
+ 
+ #define DQUOT_SPACE_WARN	0x1
+@@ -309,7 +310,7 @@
+ {
+ 	int ret;
+ 
+-	ret = dquot_alloc_space_nodirty(inode, nr);
++	ret = EXT4_ES_CALL((EXT4_ERROR_SITE_TU == 28 ? 584 : 0), dquot_alloc_space_nodirty(inode, nr));
+ 	if (!ret) {
+ 		/*
+ 		 * Mark inode fully dirty. Since we are allocating blocks, inode
+--- a/include/linux/slab.h
++++ b/include/linux/slab.h
+@@ -12,6 +12,7 @@
+ #ifndef _LINUX_SLAB_H
+ #define	_LINUX_SLAB_H
+ 
++#include <linux/ext4_error_site.h>
+ #include <linux/cache.h>
+ #include <linux/gfp.h>
+ #include <linux/overflow.h>
+@@ -1011,7 +1012,7 @@
+  */
+ static inline __alloc_size(1) void *kzalloc_noprof(size_t size, gfp_t flags)
+ {
+-	return kmalloc_noprof(size, flags | __GFP_ZERO);
++	return EXT4_ES_CALL((EXT4_ERROR_SITE_TU == 14 ? 176 : 0), kmalloc_noprof(size, flags | __GFP_ZERO));
+ }
+ #define kzalloc(...)				alloc_hooks(kzalloc_noprof(__VA_ARGS__))
+ #define kzalloc_node(_size, _flags, _node)	kmalloc_node(_size, (_flags)|__GFP_ZERO, _node)
+@@ -1037,7 +1038,7 @@
+ 	if (unlikely(check_mul_overflow(n, size, &bytes)))
+ 		return NULL;
+ 
+-	return kvmalloc_node_noprof(bytes, flags, node);
++	return EXT4_ES_CALL((EXT4_ERROR_SITE_TU == 25 ? 513 : 0), kvmalloc_node_noprof(bytes, flags, node));
+ }
+ 
+ #define kvmalloc_array_noprof(...)		kvmalloc_array_node_noprof(__VA_ARGS__, NUMA_NO_NODE)
+--- /dev/null
++++ b/include/trace/events/ext4_error_site.h
+@@ -0,0 +1,37 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM ext4_error
++
++#if !defined(_TRACE_EXT4_ERROR_SITE_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_EXT4_ERROR_SITE_H
++#include <linux/tracepoint.h>
++
++TRACE_EVENT(error_site,
++	TP_PROTO(unsigned int site_id, u64 invocation, bool returned,
++		 long result, bool is_pointer),
++	TP_ARGS(site_id, invocation, returned, result, is_pointer),
++	TP_STRUCT__entry(
++		__field(unsigned int, site_id)
++		__field(u64, invocation)
++		__field(bool, returned)
++		__field(long, result)
++		__field(bool, is_pointer)
++	),
++	TP_fast_assign(
++		__entry->site_id = site_id;
++		__entry->invocation = invocation;
++		__entry->returned = returned;
++		__entry->result = result;
++		__entry->is_pointer = is_pointer;
++	),
++	TP_printk("schema=1 site_id=%u invocation=%llu phase=%s result=%ld kind=%s",
++		__entry->site_id, __entry->invocation,
++		__entry->returned ? "return" : "enter", __entry->result,
++		!__entry->returned ? "pending" :
++		__entry->is_pointer ? "pointer" : "integer")
++);
++#endif
++
++#undef TRACE_INCLUDE_FILE
++#define TRACE_INCLUDE_FILE ext4_error_site
++#include <trace/define_trace.h>

@@ -1,0 +1,2608 @@
+{
+  "schema": 1,
+  "mode": "formula_gated_program_injection",
+  "base_sites_sha256": "e8d73c45c27bc1d5471a9c43811d16fd4e0f607a1adce7919a02d21f5edb5256",
+  "patch_sha256": "a87d72abe08c30e979fa9e0952ee91225c624d04747d9cce6229d11b5f0fb62e",
+  "replay_verified": true,
+  "inputs": {
+    "scripts/configure-injection.py": "914cd4b02f890267328b0da7676db91871657c4c7afc8cf3be01d1c42b318833",
+    "scripts/efi_source_audit.py": "a3cbd7509ea5708c925370d60a2fe3c4c699dac6ba2f2b714dff8b91374600df",
+    "instrumentation/ext4_efi.h": "acd610ed8cade9b7f4556104a1c1fac4bfc107c7df53eb806683f0d047348c00",
+    "instrumentation/ext4_efi_event.h": "16e2f1221032620e501dcfe120d5f392e5131c3d59fe3a5d6e57ded2c9a68641",
+    "instrumentation/efi.c": "9ecf69c610a077ab3937749a2fc2012e6514d684697eb77c2bc9bd907904cac9"
+  },
+  "summary": {
+    "observed": 265,
+    "supported": 215,
+    "stateful_observe_only": 50
+  },
+  "files": [
+    {
+      "path": "fs/ext4/Kconfig",
+      "before": "d31ecb3da62332786fabf9b9a2594dc3be3309db91c5dd90d760a07a4cd97d3e",
+      "after": "d3ea1aba28963bb2af1b068cb4040d1e733dc7093b62032c2019b51b367ecf0a"
+    },
+    {
+      "path": "fs/ext4/Makefile",
+      "before": "537bd5af550029172f963a3733740521176f1066e091c42f1b444aa048779df7",
+      "after": "8fd1b906ced1b493d0f84a780ab445f8d60b093609224bf5e2c4dd02ecd2bcb1"
+    },
+    {
+      "path": "fs/ext4/acl.c",
+      "before": "d9b4ca2897b9435752f1baf8cfe5d5b010ab4d35687c1b62230e82301230a796",
+      "after": "d36cee8c892dab502bf3bd5cbf8cb8b527267ccd3be26993e052ec35058928cb"
+    },
+    {
+      "path": "fs/ext4/balloc.c",
+      "before": "b13f304ba12ee4e3ba546c5a01a29153e6113d10f8d1b9a917c5f9056c0b8d42",
+      "after": "d4600302e7522e1e78463948513b999bd0c9cbc8a72c8a58944856899f17fe62"
+    },
+    {
+      "path": "fs/ext4/block_validity.c",
+      "before": "26aa544121ca5a966ff7c6c2ed787235edc2fb398fae6a51928c2cd601394c52",
+      "after": "572a58e9529defe1df1b9a2d9532a6fb70f1f89a4aaca3adb1670992c9c7278a"
+    },
+    {
+      "path": "fs/ext4/counter_trace.c",
+      "before": "c1d52fdc3ca0160732935f3c788353cdc3e96dd5a78127499cba9d3845e5d8bc",
+      "after": "640062c6c1c4a40643ee6fe0405eedc93523b2eb5c79100194444872ee725c74"
+    },
+    {
+      "path": "fs/ext4/dir.c",
+      "before": "6ea7a43632750d24945912aed395a4de9ae722371650454a9d7417bbad629b18",
+      "after": "b427fc0f25a21a90cec13351c50a46ec191b4369a546e3d0eb806f72607307ed"
+    },
+    {
+      "path": "fs/ext4/efi.c",
+      "before": null,
+      "after": "9ecf69c610a077ab3937749a2fc2012e6514d684697eb77c2bc9bd907904cac9"
+    },
+    {
+      "path": "fs/ext4/ext4.h",
+      "before": "94d9d214b6ed700a2175daff5e3886613f0ad197d85e77ee2ce1a85db79a84ec",
+      "after": "1d602b5cbaa90ecc98e96256537535934d83747b6d3a1d99a11794b7e5c3d788"
+    },
+    {
+      "path": "fs/ext4/ext4_jbd2.c",
+      "before": "bf69d8a4c88f3d577a5795abeaf404a8aa15be3a954b23e29a85f56d57135e25",
+      "after": "bda5ede17e5829b1373560e4fffd74b6ca3601234e0a443467ecda704bcdd6ea"
+    },
+    {
+      "path": "fs/ext4/ext4_jbd2.h",
+      "before": "dccec89191d6e327c028261926e18f31c2b957608a77cf0cf1e67eb89bf4fae4",
+      "after": "fe96f33eb0fda54e943ed301e1165c8c124d7a11a04d470d77b8cdb6fcf43ca2"
+    },
+    {
+      "path": "fs/ext4/extents.c",
+      "before": "caa400be711b7baa5cb6a80d9e5fb0297e2faafff5a44687b6d1202f73dfc8d2",
+      "after": "c9b6483c24b43ec8e7263b686e0be5149b184ab37c867b95c59f6b157004abdc"
+    },
+    {
+      "path": "fs/ext4/extents_status.c",
+      "before": "91fc56034c46527ef93460bed664ed3ed2c8a1fe44eb4dae7d52f876275fc749",
+      "after": "48e7efa72612279be4a85633dd562a0446762a14837bee3c5ebed9eba383bb7a"
+    },
+    {
+      "path": "fs/ext4/fast_commit.c",
+      "before": "299b4bff219c6089ba299d4d7d7325b256a078895e4dd0c139e922ffab82aec9",
+      "after": "f0d2cba973b19f1c8d29225fccfe1679cac1d8d3cc50e55013479c50d0f7e29e"
+    },
+    {
+      "path": "fs/ext4/file.c",
+      "before": "361d44b15b5a3ed90eaa828860b47dd2aced60c48c21b820af7a1f03f42b7371",
+      "after": "a176fe54b8e0b7323abb2a68e84085e5c3f5430215fabe9f50551348879c8e0d"
+    },
+    {
+      "path": "fs/ext4/fsmap.c",
+      "before": "6687d8800efb69d9ceb1aad691c373c92c8b5b8df3a1fd780aaef1be69fffdc8",
+      "after": "8778c3e9a5b0785388a7237873b7e354f697ac29926555bbe54bd5221f6bf072"
+    },
+    {
+      "path": "fs/ext4/fsync.c",
+      "before": "a14fc2598c6889cbe00b4267de581cf83a394d6c8df11806271460ca16ebd6d4",
+      "after": "f32669aa918eb7502e42af8943e3f6705f73f735a76b6b434ca98455c56c931f"
+    },
+    {
+      "path": "fs/ext4/ialloc.c",
+      "before": "2c9cce902417a3572f6be3623c6da2aaea9309910808d2d9ac8f6f01deb0c839",
+      "after": "2183c75cf25dd98e1842e5c734f748863a522fe16db7a48760f01bb38a1f5c55"
+    },
+    {
+      "path": "fs/ext4/indirect.c",
+      "before": "19d879596674710ef63da6789be0de0e5244c4415379c4b2ad037037c63301d4",
+      "after": "5a367524ba89bc7c6c932ee534d46c5af2c9db55b5be1087a7292d391de111dc"
+    },
+    {
+      "path": "fs/ext4/inline.c",
+      "before": "944fc3855053231d4152c3c4679b3835069afd70f6b2068b3a5a6836747acc48",
+      "after": "6696768b31bfce95c0f2f2491a93ad42a1199a621a801d1006e1c3a57e67bc72"
+    },
+    {
+      "path": "fs/ext4/inode.c",
+      "before": "25bfe3b1e74183e3c69f902988a8f78aff929ba449da61f7fc3ec8648f2a03f2",
+      "after": "27b1de785c71b16309252feb31a36c12149bc8f45a1f03adbeb08c58044a5f66"
+    },
+    {
+      "path": "fs/ext4/ioctl.c",
+      "before": "f29e918ab4573b7deb99fddf91af5f629779fb882f4c8303c15da65653b1661c",
+      "after": "8c1858f2059764a4b23e60d521d9a59e44ef94cef6dbd777a5f586fa9028d34b"
+    },
+    {
+      "path": "fs/ext4/mballoc.c",
+      "before": "55c11e281883798a41e1374940f031b985352a8038cecb7c72807362d28e4a8c",
+      "after": "54833a5782d48b71a16746b6e79ff51792b2b6816482ab120c738d9c7d2a3600"
+    },
+    {
+      "path": "fs/ext4/migrate.c",
+      "before": "0cabbdfc405fc73779508f7b8df45ce1ef300b5444d2bd1ac7730c4cfbbe874b",
+      "after": "d892880b133f76c0468c4bccec3ac4870c1209491058c4839ba477e54ee3fffd"
+    },
+    {
+      "path": "fs/ext4/mmp.c",
+      "before": "6b656bedd06b33a203549b5e5fd7abc184cb8208e5a237f3df244424a829a04b",
+      "after": "4104b08e39b37a841252fba85fb320e5f1af2f95baa2a59a4ed18e9f7cc09134"
+    },
+    {
+      "path": "fs/ext4/move_extent.c",
+      "before": "ffd0f856408532801c282324ffe4f5e3c768b8046c2f8241c2ad56e82ebdb312",
+      "after": "2b62b88e5d176f8c811a51bdf94880fabed12dba5627e60436428fa34491bc84"
+    },
+    {
+      "path": "fs/ext4/namei.c",
+      "before": "ac222381cc29b37b9856be07af41fe4a5eed60780167877c2467d821663d0969",
+      "after": "c73f5b3f94bbec88214938e961d06b6a52d2af50f9380fb8d05d338cf5752505"
+    },
+    {
+      "path": "fs/ext4/orphan.c",
+      "before": "44ad04d6dde24b67180db4f2669eb6f05133bbc0adde8e5a4ff6dc787ebb89b8",
+      "after": "3ac87bfc56e2517b3ab4f9f654af58ba2011516735d7bcfb428d75ef7a45901a"
+    },
+    {
+      "path": "fs/ext4/page-io.c",
+      "before": "2834e9b2a93b89311150ac4fdacb9d046e12b326931ca962e5310904fe966b09",
+      "after": "a40fa65301db6f8baee43765fe48fcb49d96d5e3d069e6693536fff7b1464b27"
+    },
+    {
+      "path": "fs/ext4/readpage.c",
+      "before": "f4ba8d7044cf7bb8886c9dbb40b17e622b542ef216ee539bbd0c3fb90b8c28d7",
+      "after": "062f9abc623703f9db4ad47c8eaa4238500f4e55096776d9da9a1cd5590f6961"
+    },
+    {
+      "path": "fs/ext4/resize.c",
+      "before": "d89d4d24bd6a29c8943af4a1cf5846604d70ae4808116deeadd5625d8bb46f27",
+      "after": "238e1efd503b160971094c87f48a4f62a693e9358912f9b5dd971c6ba0ffb5e4"
+    },
+    {
+      "path": "fs/ext4/super.c",
+      "before": "2b7e6fdba16447981f59c83146db91591b0a57c43e13bd98c917f6a5c5818dbc",
+      "after": "6b1f2a45df4911112789ad33661da02eac3a6e4dd78f23515e2222ddae4e2cf8"
+    },
+    {
+      "path": "fs/ext4/sysfs.c",
+      "before": "092c3f8eed8d40c86e4bba58ec0bd87cc9b154219e2674afa229b23e5eb9ff9d",
+      "after": "2287954494a0c4ccc2a6d5082178cab866ab00df3ed30a3e3dbcd41eb7c1a890"
+    },
+    {
+      "path": "fs/ext4/xattr.c",
+      "before": "792c1072e9536eb5ba34cf8075c9722cc12d54fba9d8e8ecb291db3210f6ac39",
+      "after": "d11b1b530ac3a09af0e27f25fc2e288aad9878fcfd3ad79d05aba713dd461e28"
+    },
+    {
+      "path": "fs/jbd2/journal.c",
+      "before": "c0f27f7bf227dd854483b2641d745d6dbb3d06eed896b8f5e70b9da53f859eb9",
+      "after": "4394c16e5000d935160419c0ff15f45c3d131eb63365f447c29a3f7f8308ad86"
+    },
+    {
+      "path": "include/linux/ext4_efi.h",
+      "before": null,
+      "after": "acd610ed8cade9b7f4556104a1c1fac4bfc107c7df53eb806683f0d047348c00"
+    },
+    {
+      "path": "include/linux/fs.h",
+      "before": "2cbe16e2d094e011b4cbfd2659f26464568f651678f89ccefc0c29dad3521a91",
+      "after": "79eb7570a6424fda915c884302917314e8d57f317ce12a3e17665055eca9dac5"
+    },
+    {
+      "path": "include/linux/quotaops.h",
+      "before": "4f22509d42911df800cb3e3a0d9625336ee735afe072a4fc124392f47b85429f",
+      "after": "d27776b8b5f93f9e4df89ee2b84689857e9203df28694ac795c4d0d11019e85d"
+    },
+    {
+      "path": "include/linux/slab.h",
+      "before": "87facc21aae0374d5183fa412f8f2ed55731ebd3fe6e10d36b9e8643e946c117",
+      "after": "988b179d4ecb9b0c066f6fde645790fd5be2e90bf70dde3853ca41c419fd36d1"
+    },
+    {
+      "path": "include/trace/events/ext4_efi.h",
+      "before": null,
+      "after": "16e2f1221032620e501dcfe120d5f392e5131c3d59fe3a5d6e57ded2c9a68641"
+    }
+  ],
+  "policies": [
+    {
+      "site_id": 1,
+      "callee": "kmalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 2,
+      "callee": "posix_acl_alloc",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 3,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 5,
+      "callee": "posix_acl_create",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 6,
+      "callee": "kmalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 16,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 21,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 22,
+      "callee": "kmem_cache_alloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 24,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 25,
+      "callee": "fscrypt_prepare_readdir",
+      "supported": true,
+      "failure": "-EOPNOTSUPP",
+      "guard": "IS_ENCRYPTED(__efi_a0)",
+      "cleanup": "(void)0",
+      "reason": "encrypted_inode_required"
+    },
+    {
+      "site_id": 31,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 32,
+      "callee": "jbd2_journal_start_reserved",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 33,
+      "callee": "is_handle_aborted",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 34,
+      "callee": "jbd2_journal_get_write_access",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 36,
+      "callee": "jbd2_journal_revoke",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 37,
+      "callee": "jbd2_journal_get_create_access",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 38,
+      "callee": "jbd2_journal_dirty_metadata",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 41,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 42,
+      "callee": "kmalloc_array_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 43,
+      "callee": "sb_getblk_gfp",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 46,
+      "callee": "kmalloc_array_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 50,
+      "callee": "inode_newsize_ok",
+      "supported": true,
+      "failure": "-EFBIG",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 51,
+      "callee": "file_modified",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 52,
+      "callee": "file_modified",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 53,
+      "callee": "file_modified",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 54,
+      "callee": "inode_newsize_ok",
+      "supported": true,
+      "failure": "-EFBIG",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 55,
+      "callee": "file_modified",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 56,
+      "callee": "fiemap_prep",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 57,
+      "callee": "fiemap_fill_next_extent",
+      "supported": true,
+      "failure": "-EFAULT",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 63,
+      "callee": "kmalloc_array_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 64,
+      "callee": "sb_getblk_gfp",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 67,
+      "callee": "sb_getblk_gfp",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 69,
+      "callee": "kmem_cache_alloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 71,
+      "callee": "kmem_cache_alloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 73,
+      "callee": "__percpu_counter_init_many",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 74,
+      "callee": "__percpu_counter_init_many",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 75,
+      "callee": "__percpu_counter_init_many",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 76,
+      "callee": "__percpu_counter_init_many",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 77,
+      "callee": "shrinker_alloc",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 96,
+      "callee": "kmem_cache_alloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 97,
+      "callee": "kmalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 100,
+      "callee": "jbd2_fc_begin_commit",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 103,
+      "callee": "jbd2_fc_wait_bufs",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 104,
+      "callee": "krealloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 110,
+      "callee": "jbd2_submit_inode_data",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 111,
+      "callee": "jbd2_wait_inode_data",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 114,
+      "callee": "jbd2_fc_get_buf",
+      "supported": true,
+      "failure": "-ENOSPC",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 115,
+      "callee": "jbd2_fc_get_buf",
+      "supported": true,
+      "failure": "-ENOSPC",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 116,
+      "callee": "d_alloc",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 117,
+      "callee": "krealloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 119,
+      "callee": "iomap_seek_hole",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 120,
+      "callee": "iomap_seek_data",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 121,
+      "callee": "fscrypt_file_open",
+      "supported": true,
+      "failure": "-EOPNOTSUPP",
+      "guard": "IS_ENCRYPTED(__efi_a0)",
+      "cleanup": "(void)0",
+      "reason": "encrypted_inode_required"
+    },
+    {
+      "site_id": 122,
+      "callee": "fsverity_file_open",
+      "supported": true,
+      "failure": "-EOPNOTSUPP",
+      "guard": "IS_VERITY(__efi_a0)",
+      "cleanup": "(void)0",
+      "reason": "verity_inode_required"
+    },
+    {
+      "site_id": 123,
+      "callee": "inode_trylock_shared",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 124,
+      "callee": "down_read_trylock",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 125,
+      "callee": "inode_trylock_shared",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 126,
+      "callee": "inode_trylock",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 127,
+      "callee": "file_modified",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 129,
+      "callee": "generic_write_checks",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 131,
+      "callee": "file_modified",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 133,
+      "callee": "kmalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 134,
+      "callee": "file_write_and_wait_range",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 135,
+      "callee": "generic_buffers_fsync_noflush",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 138,
+      "callee": "sync_mapping_buffers",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 139,
+      "callee": "sync_inode_metadata",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 144,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 147,
+      "callee": "new_inode",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 148,
+      "callee": "fscrypt_prepare_new_inode",
+      "supported": true,
+      "failure": "-EOPNOTSUPP",
+      "guard": "IS_ENCRYPTED(__efi_a0)",
+      "cleanup": "(void)0",
+      "reason": "encrypted_inode_required"
+    },
+    {
+      "site_id": 149,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 151,
+      "callee": "insert_inode_locked",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 152,
+      "callee": "dquot_alloc_inode",
+      "supported": true,
+      "failure": "-EDQUOT",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 154,
+      "callee": "get_inode_acl",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 158,
+      "callee": "sb_issue_zeroout",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 165,
+      "callee": "sb_getblk",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 168,
+      "callee": "bh2jh",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 169,
+      "callee": "kmalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 171,
+      "callee": "kmalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 172,
+      "callee": "kmalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 173,
+      "callee": "kmalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 174,
+      "callee": "kmalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 175,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 176,
+      "callee": "kmalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 183,
+      "callee": "sb_issue_zeroout",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 187,
+      "callee": "buffer_write_io_error",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 189,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 200,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 209,
+      "callee": "file_modified",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 210,
+      "callee": "kmem_cache_alloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a0 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 216,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 217,
+      "callee": "iget_locked",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 220,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 221,
+      "callee": "setattr_prepare",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 222,
+      "callee": "fscrypt_prepare_setattr",
+      "supported": true,
+      "failure": "-EOPNOTSUPP",
+      "guard": "IS_ENCRYPTED(d_inode(__efi_a0))",
+      "cleanup": "(void)0",
+      "reason": "encrypted_inode_required"
+    },
+    {
+      "site_id": 223,
+      "callee": "fsverity_prepare_setattr",
+      "supported": true,
+      "failure": "-EOPNOTSUPP",
+      "guard": "IS_VERITY(d_inode(__efi_a0))",
+      "cleanup": "(void)0",
+      "reason": "verity_inode_required"
+    },
+    {
+      "site_id": 224,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 225,
+      "callee": "dquot_transfer",
+      "supported": true,
+      "failure": "-EDQUOT",
+      "guard": "sb_any_quota_loaded(__efi_a1->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 226,
+      "callee": "jbd2_journal_flush",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 234,
+      "callee": "dquot_reserve_block",
+      "supported": true,
+      "failure": "-EDQUOT",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 262,
+      "callee": "bdev_freeze",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 265,
+      "callee": "filemap_write_and_wait",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 266,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 267,
+      "callee": "mnt_want_write_file",
+      "supported": true,
+      "failure": "-EROFS",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 268,
+      "callee": "mnt_want_write_file",
+      "supported": true,
+      "failure": "-EROFS",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 269,
+      "callee": "jbd2_journal_flush",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 270,
+      "callee": "copy_from_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 271,
+      "callee": "mnt_want_write_file",
+      "supported": true,
+      "failure": "-EROFS",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 272,
+      "callee": "copy_to_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 273,
+      "callee": "copy_from_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 274,
+      "callee": "mnt_want_write_file",
+      "supported": true,
+      "failure": "-EROFS",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 275,
+      "callee": "mnt_want_write_file",
+      "supported": true,
+      "failure": "-EROFS",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 276,
+      "callee": "mnt_want_write_file",
+      "supported": true,
+      "failure": "-EROFS",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 277,
+      "callee": "copy_from_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 278,
+      "callee": "mnt_want_write_file",
+      "supported": true,
+      "failure": "-EROFS",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 279,
+      "callee": "jbd2_journal_flush",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 281,
+      "callee": "copy_from_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 282,
+      "callee": "copy_to_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 283,
+      "callee": "mnt_want_write_file",
+      "supported": true,
+      "failure": "-EROFS",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 284,
+      "callee": "jbd2_journal_flush",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 285,
+      "callee": "copy_from_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 289,
+      "callee": "copy_to_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 290,
+      "callee": "copy_to_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 291,
+      "callee": "filemap_write_and_wait",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 292,
+      "callee": "filemap_write_and_wait",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 293,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 294,
+      "callee": "dquot_alloc_space",
+      "supported": true,
+      "failure": "-EDQUOT",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 295,
+      "callee": "copy_from_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 296,
+      "callee": "copy_to_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 297,
+      "callee": "copy_from_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 300,
+      "callee": "jbd2_journal_flush",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 301,
+      "callee": "copy_to_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 302,
+      "callee": "copy_from_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 303,
+      "callee": "mnt_want_write_file",
+      "supported": true,
+      "failure": "-EROFS",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 304,
+      "callee": "copy_from_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 305,
+      "callee": "copy_to_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 306,
+      "callee": "copy_to_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 307,
+      "callee": "copy_to_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 308,
+      "callee": "copy_from_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 309,
+      "callee": "copy_from_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "if (check_copy_size(__efi_a0, __efi_a2, false)) memset(__efi_a0, 0, __efi_a2)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 310,
+      "callee": "mnt_want_write_file",
+      "supported": true,
+      "failure": "-EROFS",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 311,
+      "callee": "copy_to_user",
+      "supported": true,
+      "failure": "__efi_a2",
+      "guard": "(__efi_a2 > 0)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 312,
+      "callee": "buffer_write_io_error",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 313,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 315,
+      "callee": "__kvmalloc_node_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 316,
+      "callee": "kmem_cache_alloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 317,
+      "callee": "kmalloc_array_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 318,
+      "callee": "kmalloc_array_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 319,
+      "callee": "kmalloc_array_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 320,
+      "callee": "kmalloc_array_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 321,
+      "callee": "pcpu_alloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 322,
+      "callee": "__kmem_cache_create",
+      "supported": true,
+      "failure": "0",
+      "guard": "!(__efi_a3 & SLAB_PANIC)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 323,
+      "callee": "new_inode",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 330,
+      "callee": "kmem_cache_alloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 333,
+      "callee": "kmem_cache_alloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 337,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 338,
+      "callee": "buffer_verified",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 353,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 362,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 371,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 372,
+      "callee": "fscrypt_prepare_link",
+      "supported": true,
+      "failure": "-EOPNOTSUPP",
+      "guard": "IS_ENCRYPTED(__efi_a1)",
+      "cleanup": "(void)0",
+      "reason": "encrypted_inode_required"
+    },
+    {
+      "site_id": 373,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 374,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 375,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 376,
+      "callee": "fscrypt_prepare_symlink",
+      "supported": true,
+      "failure": "-EOPNOTSUPP",
+      "guard": "IS_ENCRYPTED(__efi_a0)",
+      "cleanup": "(void)0",
+      "reason": "encrypted_inode_required"
+    },
+    {
+      "site_id": 377,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 379,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 380,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 381,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 382,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 383,
+      "callee": "fscrypt_prepare_rename",
+      "supported": true,
+      "failure": "-EOPNOTSUPP",
+      "guard": "(IS_ENCRYPTED(__efi_a0) || IS_ENCRYPTED(__efi_a2))",
+      "cleanup": "(void)0",
+      "reason": "encrypted_inode_required"
+    },
+    {
+      "site_id": 384,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 386,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 390,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 391,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 392,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 393,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 394,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 395,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 406,
+      "callee": "kmalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 407,
+      "callee": "kmem_cache_alloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 410,
+      "callee": "kmem_cache_alloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 431,
+      "callee": "mempool_create_node_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 432,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 433,
+      "callee": "kmalloc_array_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 434,
+      "callee": "kmalloc_array_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 435,
+      "callee": "sb_getblk",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 436,
+      "callee": "sb_issue_zeroout",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 437,
+      "callee": "sb_issue_zeroout",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 438,
+      "callee": "sb_getblk",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 439,
+      "callee": "sb_getblk",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 440,
+      "callee": "sb_getblk",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 441,
+      "callee": "kmalloc_array_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 442,
+      "callee": "__kvmalloc_node_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 443,
+      "callee": "__kvmalloc_node_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 444,
+      "callee": "sb_getblk",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 447,
+      "callee": "buffer_write_io_error",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 450,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 453,
+      "callee": "sb_getblk_gfp",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 468,
+      "callee": "__kvmalloc_node_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 469,
+      "callee": "__kvmalloc_node_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 470,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 471,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 472,
+      "callee": "get_zeroed_page_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a0 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 475,
+      "callee": "buffer_write_io_error",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 476,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 477,
+      "callee": "buffer_write_io_error",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 478,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 479,
+      "callee": "fs_parse",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 480,
+      "callee": "fs_lookup_param",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 483,
+      "callee": "kmemdup_nul",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 485,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 486,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 487,
+      "callee": "d_make_root",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "iput(__efi_a0)",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 489,
+      "callee": "kstrndup",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 490,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 491,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 492,
+      "callee": "generic_check_addressable",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 494,
+      "callee": "jbd2_journal_get_write_access",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 495,
+      "callee": "buffer_write_io_error",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 496,
+      "callee": "buffer_uptodate",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 497,
+      "callee": "jbd2_journal_dirty_metadata",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 498,
+      "callee": "kvmalloc_array_node_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 502,
+      "callee": "__percpu_counter_init_many",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 503,
+      "callee": "__percpu_counter_init_many",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 504,
+      "callee": "__percpu_counter_init_many",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 505,
+      "callee": "__percpu_counter_init_many",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 506,
+      "callee": "__percpu_counter_init_many",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 507,
+      "callee": "__percpu_init_rwsem",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 508,
+      "callee": "jbd2_journal_flush",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 510,
+      "callee": "kmemdup_nul",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 513,
+      "callee": "__kvmalloc_node_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 514,
+      "callee": "kmem_cache_alloc_lru_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 524,
+      "callee": "jbd2_journal_flush",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 526,
+      "callee": "dquot_commit",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 527,
+      "callee": "dquot_acquire",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 528,
+      "callee": "dquot_commit_info",
+      "supported": true,
+      "failure": "-EIO",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 529,
+      "callee": "dquot_quota_on",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 533,
+      "callee": "jbd2_journal_wipe",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 534,
+      "callee": "jbd2_journal_load",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 536,
+      "callee": "jbd2_journal_errno",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 537,
+      "callee": "__bread",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 547,
+      "callee": "kmem_cache_create_usercopy",
+      "supported": true,
+      "failure": "0",
+      "guard": "!(__efi_a3 & SLAB_PANIC)",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 550,
+      "callee": "buffer_write_io_error",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 551,
+      "callee": "kobject_init_and_add",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 553,
+      "callee": "kobject_create_and_add",
+      "supported": true,
+      "failure": "0",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 554,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 555,
+      "callee": "kobject_init_and_add",
+      "supported": false,
+      "failure": "0",
+      "guard": "false",
+      "cleanup": "(void)0",
+      "reason": "requires_stateful_failure_model"
+    },
+    {
+      "site_id": 557,
+      "callee": "kstrtoul",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 558,
+      "callee": "kstrtouint",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 559,
+      "callee": "kstrtouint",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 560,
+      "callee": "kstrtouint",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 561,
+      "callee": "kstrtouint",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 562,
+      "callee": "kstrtoul",
+      "supported": true,
+      "failure": "-EINVAL",
+      "guard": "true",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 566,
+      "callee": "kmemdup_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 567,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 568,
+      "callee": "dquot_alloc_block",
+      "supported": true,
+      "failure": "-EDQUOT",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 571,
+      "callee": "dquot_initialize",
+      "supported": true,
+      "failure": "-ENOMEM",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 576,
+      "callee": "kmalloc_array_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a2 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 577,
+      "callee": "dquot_alloc_inode",
+      "supported": true,
+      "failure": "-EDQUOT",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 578,
+      "callee": "dquot_alloc_space_nodirty",
+      "supported": true,
+      "failure": "-EDQUOT",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 579,
+      "callee": "__kvmalloc_node_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 584,
+      "callee": "dquot_alloc_space_nodirty",
+      "supported": true,
+      "failure": "-EDQUOT",
+      "guard": "sb_any_quota_loaded(__efi_a0->i_sb)",
+      "cleanup": "(void)0",
+      "reason": "quota_must_be_loaded"
+    },
+    {
+      "site_id": 585,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 586,
+      "callee": "kzalloc_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    },
+    {
+      "site_id": 587,
+      "callee": "__kvmalloc_node_noprof",
+      "supported": true,
+      "failure": "0",
+      "guard": "(true && !(__efi_a1 & __GFP_NOFAIL))",
+      "cleanup": "(void)0",
+      "reason": "skip_call_with_contract_failure"
+    }
+  ]
+}
