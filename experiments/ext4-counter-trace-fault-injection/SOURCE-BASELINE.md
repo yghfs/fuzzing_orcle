@@ -60,4 +60,4 @@ python3 scripts/configure-injection.py --check --prepare-source
 [源码回归测试](tests/test-injection.py) 对补丁重放后的实际源码检查上游 xattr 校验、
 dirty-metadata 和 rename 分支，确认 unlink 顺序、extent 错误路径及 namespace 写入次数；
 另通过篡改临时源码树，确认清单外修改、缺文件、额外文件、链接和可执行位变化会被拒绝。
-全部 265 条错误点记录及原始 `site_id` 保留，其中 215 条支持注入，50 条只观测。
+全部 265 条错误点记录及原始 `site_id` 保留，其中 229 条支持注入，36 条只观测。

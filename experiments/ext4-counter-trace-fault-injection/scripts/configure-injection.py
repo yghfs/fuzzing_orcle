@@ -22,6 +22,13 @@ MANIFEST = PROJECT/'injection.json'
 ASSETS = {'ext4_efi.h': 'include/linux/ext4_efi.h',
           'ext4_efi_event.h': 'include/trace/events/ext4_efi.h', 'efi.c': 'fs/ext4/efi.c'}
 
+# A predicate over buffer state can be injected faithfully by mutating the
+# flag instead of faking the answer. The cleanup slot performs the same
+# clear_buffer_uptodate() that upstream's ext4_simulate_fail_bh() applies
+# immediately before the very same check, so the object and the return value
+# stay consistent and every later observer sees the same failure.
+STATE_MUTATORS = {'buffer_uptodate': 'clear_buffer_uptodate'}
+
 # These return codes have a matching failure contract. Stateful predicates and
 # calls which partially initialize/consume complex resources remain observable
 # and are explicitly rejected, rather than fabricating an impossible errno.
@@ -71,7 +78,18 @@ def policy(site):
     a = [f'__efi_a{i}' for i in range(len(args))]
     value, guard, cleanup = None, 'true', '(void)0'
     reason = 'skip_call_with_contract_failure'
-    if name in STATEFUL:
+    if name in STATE_MUTATORS:
+        # A buffer-state predicate is not an error code, so substituting only
+        # the return value would contradict the object every other observer
+        # sees: one call would report "invalid" while the same bh still carries
+        # BH_Uptodate elsewhere in the syscall. Mutate the flag in the cleanup
+        # slot, which runs before the substituted result is assigned, so all
+        # later buffer_uptodate() calls on that bh agree. This is exactly what
+        # upstream's own ext4_simulate_fail_bh() does at the read site.
+        value = '0'
+        cleanup = f'{STATE_MUTATORS[name]}({a[0]})'
+        reason = 'object_state_mutation_matches_upstream_ext4_simulate_fail_bh'
+    elif name in STATEFUL:
         value, guard, reason = '0', 'false', 'requires_stateful_failure_model'
     elif name in NULLS:
         value = '0'
@@ -120,7 +138,8 @@ def policy(site):
         guard = f'({guard} && !({a[gfp]} & __GFP_NOFAIL))'
     if spelling == 'kmem_cache_create': guard = f'!({a[3]} & SLAB_PANIC)'
     if spelling == 'kmem_cache_create_usercopy': guard = f'!({a[3]} & SLAB_PANIC)'
-    return dict(site_id=site['site_id'], callee=name, supported=name not in STATEFUL,
+    return dict(site_id=site['site_id'], callee=name,
+                supported=name not in STATEFUL or name in STATE_MUTATORS,
                 failure=value, guard=guard, cleanup=cleanup, reason=reason)
 
 

@@ -67,7 +67,8 @@ site_id=175 invocation=4622 phase=return result=1 kind=pointer
 ## 程序级故障注入：2026-11-25 至 26 日
 
 实现入口为 [run-campaign.py](scripts/run-campaign.py)。265 条记录都有显式策略，
-215 条支持合成接口失败，50 条状态相关记录只观测。新增的 13 项测试通过，覆盖：
+229 条支持合成接口失败，36 条状态相关记录只观测（`buffer_uptodate` 由
+`clear_buffer_uptodate()` 做对象状态注入后纳入可注入集合）。新增的 13 项测试通过，覆盖：
 公式先后顺序、跨 syscall 保留与程序重置、其他设备/observer 排除、计划与实际计数核对、
 动态新点、三点全部八种组合、组合调度、参数单次求值与 cleanup、syscall 前紧邻 arm，
 以及实际生成的 usercopy 包装在整段失败时的返回值、目标清零和大小检查失败时不写的契约。

@@ -263,7 +263,17 @@ int main(void) {
         policies=json.loads((PROJECT/'injection.json').read_text())
         self.assertEqual({s['site_id'] for s in mapping['sites']},{s['site_id'] for s in policies['policies']})
         for p in policies['policies']:
-            if p['callee']=='buffer_uptodate':self.assertFalse(p['supported'])
+            # buffer_uptodate is a predicate over object state, so it is injected
+            # by clearing the very flag the check reads -- exactly what upstream's
+            # ext4_simulate_fail_bh() does just before the same check. The other
+            # stateful predicates have no equivalent single-flag mutation (a
+            # cleared BH_Uptodate does not make buffer_write_io_error() true).
+            if p['callee']=='buffer_uptodate':
+                self.assertTrue(p['supported'])
+                self.assertEqual(p['failure'],'0')
+                self.assertEqual(p['cleanup'],'clear_buffer_uptodate(__efi_a0)')
+            elif p['callee'] in ('buffer_write_io_error','bh2jh','buffer_verified'):
+                self.assertFalse(p['supported'])
             if p['callee']=='copy_from_user':
                 self.assertEqual(p['failure'],'__efi_a2')
                 self.assertIn('check_copy_size(__efi_a0, __efi_a2, false)',p['cleanup'])

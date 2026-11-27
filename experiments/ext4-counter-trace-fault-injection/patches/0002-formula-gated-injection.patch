@@ -95,7 +95,7 @@
  	wait_on_buffer(bh);
  	ext4_simulate_fail_bh(sb, bh, EXT4_SIM_BBITMAP_EIO);
 -	if (!EXT4_ES_CALL(16, buffer_uptodate(bh))) {
-+	if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(16, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
++	if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(16, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); })) {
  		ext4_error_err(sb, EIO, "Cannot read block bitmap - "
  			       "block_group = %u, block_bitmap = %llu",
  			       block_group, (unsigned long long) bh->b_blocknr);
@@ -636,7 +636,7 @@
 +			mark_buffer_dirty(bh);
 +		if (inode && inode_needs_sync(inode)) {
 +			sync_dirty_buffer(bh);
-+			if (buffer_req(bh) && !({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(41, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
++			if (buffer_req(bh) && !({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(41, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); })) {
 +				ext4_error_inode_err(inode, where, line,
 +						     bh->b_blocknr, EIO,
 +					"IO error syncing itable block");
@@ -1202,7 +1202,7 @@
  	ext4_read_bh(bh, REQ_META | REQ_PRIO, ext4_end_bitmap_read);
  	ext4_simulate_fail_bh(sb, bh, EXT4_SIM_IBITMAP_EIO);
 -	if (!EXT4_ES_CALL(144, buffer_uptodate(bh))) {
-+	if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(144, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
++	if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(144, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); })) {
  		put_bh(bh);
  		ext4_error_err(sb, EIO, "Cannot read inode bitmap - "
  			       "block_group = %u, inode_bitmap = %llu",
@@ -1473,7 +1473,7 @@
  
  	for (i = 0; i < bh_count; i++) {
 -		if (bhs[i] && !EXT4_ES_CALL(189, buffer_uptodate(bhs[i]))) {
-+		if (bhs[i] && !({ __auto_type __efi_a0 = (bhs[i]); EXT4_EFI_CALL(189, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
++		if (bhs[i] && !({ __auto_type __efi_a0 = (bhs[i]); EXT4_EFI_CALL(189, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); })) {
  			err = -EIO;
  			goto out_brelse;
  		}
@@ -1482,7 +1482,7 @@
  	for (i = 0; i < nr_wait; i++) {
  		wait_on_buffer(wait[i]);
 -		if (!EXT4_ES_CALL(200, buffer_uptodate(wait[i])))
-+		if (!({ __auto_type __efi_a0 = (wait[i]); EXT4_EFI_CALL(200, false, 0, (void)0, buffer_uptodate(__efi_a0)); }))
++		if (!({ __auto_type __efi_a0 = (wait[i]); EXT4_EFI_CALL(200, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); }))
  			err = -EIO;
  	}
  	if (unlikely(err)) {
@@ -1534,7 +1534,7 @@
  	wait_on_buffer(bh);
  	ext4_simulate_fail_bh(sb, bh, EXT4_SIM_INODE_EIO);
 -	if (!EXT4_ES_CALL(216, buffer_uptodate(bh))) {
-+	if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(216, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
++	if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(216, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); })) {
  		if (ret_block)
  			*ret_block = block;
  		brelse(bh);
@@ -1552,7 +1552,7 @@
  		if (wbc->sync_mode == WB_SYNC_ALL && !wbc->for_sync)
  			sync_dirty_buffer(iloc.bh);
 -		if (buffer_req(iloc.bh) && !EXT4_ES_CALL(220, buffer_uptodate(iloc.bh))) {
-+		if (buffer_req(iloc.bh) && !({ __auto_type __efi_a0 = (iloc.bh); EXT4_EFI_CALL(220, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
++		if (buffer_req(iloc.bh) && !({ __auto_type __efi_a0 = (iloc.bh); EXT4_EFI_CALL(220, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); })) {
  			ext4_error_inode_block(inode, iloc.bh->b_blocknr, EIO,
  					       "IO error syncing inode");
  			err = -EIO;
@@ -1669,7 +1669,7 @@
  	unlock_buffer(bh);
  
 -	if (EXT4_ES_CALL(312, buffer_write_io_error(bh)) || !EXT4_ES_CALL(313, buffer_uptodate(bh))) {
-+	if (({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(312, false, 0, (void)0, buffer_write_io_error(__efi_a0)); }) || !({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(313, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
++	if (({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(312, false, 0, (void)0, buffer_write_io_error(__efi_a0)); }) || !({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(313, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); })) {
  		ext4_msg(sbi->s_sb, KERN_ERR, "previous I/O error to "
  			 "superblock detected");
  		clear_buffer_write_io_error(bh);
@@ -2220,7 +2220,7 @@
  	submit_bh(REQ_OP_WRITE | REQ_SYNC | REQ_META | REQ_PRIO, bh);
  	wait_on_buffer(bh);
 -	if (unlikely(!EXT4_ES_CALL(353, buffer_uptodate(bh))))
-+	if (unlikely(!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(353, false, 0, (void)0, buffer_uptodate(__efi_a0)); })))
++	if (unlikely(!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(353, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); })))
  		return -EIO;
  	return 0;
  }
@@ -2240,7 +2240,7 @@
  			break;
  		wait_on_buffer(bh);
 -		if (EXT4_ES_CALL(362, buffer_uptodate(bh)))
-+		if (({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(362, false, 0, (void)0, buffer_uptodate(__efi_a0)); }))
++		if (({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(362, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); }))
  			continue;
  		return -EIO;
  	} while ((bh = bh->b_this_page) != head);
@@ -2299,7 +2299,7 @@
  			goto next;
  		wait_on_buffer(bh);
 -		if (!EXT4_ES_CALL(386, buffer_uptodate(bh))) {
-+		if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(386, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
++		if (!({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(386, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); })) {
  			EXT4_ERROR_INODE_ERR(dir, EIO,
  					     "reading directory lblock %lu",
  					     (unsigned long) block);
@@ -3145,7 +3145,7 @@
  
  	wait_on_buffer(bh);
 -	if (EXT4_ES_CALL(450, buffer_uptodate(bh)))
-+	if (({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(450, false, 0, (void)0, buffer_uptodate(__efi_a0)); }))
++	if (({ __auto_type __efi_a0 = (bh); EXT4_EFI_CALL(450, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); }))
  		return 0;
  	return -EIO;
  }
@@ -3190,7 +3190,7 @@
  
  		ext4_update_super(sbi->s_sb);
 -		if (EXT4_ES_CALL(495, buffer_write_io_error(sbh)) || !EXT4_ES_CALL(496, buffer_uptodate(sbh))) {
-+		if (({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(495, false, 0, (void)0, buffer_write_io_error(__efi_a0)); }) || !({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(496, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
++		if (({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(495, false, 0, (void)0, buffer_write_io_error(__efi_a0)); }) || !({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(496, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); })) {
  			ext4_msg(sbi->s_sb, KERN_ERR, "previous I/O error to "
  				 "superblock detected");
  			clear_buffer_write_io_error(sbh);
@@ -3488,7 +3488,7 @@
  	}
  
 -	if (EXT4_ES_CALL(475, buffer_write_io_error(sbh)) || !EXT4_ES_CALL(476, buffer_uptodate(sbh))) {
-+	if (({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(475, false, 0, (void)0, buffer_write_io_error(__efi_a0)); }) || !({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(476, false, 0, (void)0, buffer_uptodate(__efi_a0)); })) {
++	if (({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(475, false, 0, (void)0, buffer_write_io_error(__efi_a0)); }) || !({ __auto_type __efi_a0 = (sbh); EXT4_EFI_CALL(476, true, 0, clear_buffer_uptodate(__efi_a0), buffer_uptodate(__efi_a0)); })) {
  		/*
  		 * Oh, dear.  A previous attempt to write the
  		 * superblock failed.  This could happen because the

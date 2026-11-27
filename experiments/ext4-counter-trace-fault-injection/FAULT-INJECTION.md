@@ -28,7 +28,9 @@ F 之后真正执行的其他 enter 才能合格。每个 syscall 仍单独记�
 `0001` 在原 counter-trace 补丁上添加全部 265 个观测探针；`0002` 将这些表达式接入
 [内核运行时](instrumentation/efi.c)。按 token、caller、TU 选择器和哈希匹配源码，
 生成失败直接报错。[策略生成器](scripts/configure-injection.py) 对每条记录生成显式策略，
-保存到 [injection.json](injection.json)：215 条支持注入，50 条只观测。
+保存到 [injection.json](injection.json)：229 条支持注入，36 条只观测。
+`buffer_uptodate` 属对象状态谓词，策略是把检查所读的标志清掉
+（`clear_buffer_uptodate(bh)`，与上游 `ext4_simulate_fail_bh()` 同构），而不是伪造返回 0。
 
 最终被测代码保留官方 Linux 6.12.1 的错误处理语义。`0002` 同时撤销基础补丁中
 与插桩无关的修复和额外校验，具体恢复项与全树哈希检查见 [源码基线](SOURCE-BASELINE.md)。

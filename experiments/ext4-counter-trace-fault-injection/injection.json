@@ -2,10 +2,10 @@
   "schema": 1,
   "mode": "formula_gated_program_injection",
   "base_sites_sha256": "e8d73c45c27bc1d5471a9c43811d16fd4e0f607a1adce7919a02d21f5edb5256",
-  "patch_sha256": "a87d72abe08c30e979fa9e0952ee91225c624d04747d9cce6229d11b5f0fb62e",
+  "patch_sha256": "8ae927a94a11dc1317dbd3a03c51c9465df00246c9cd4e5388c1ce7cdad1866d",
   "replay_verified": true,
   "inputs": {
-    "scripts/configure-injection.py": "914cd4b02f890267328b0da7676db91871657c4c7afc8cf3be01d1c42b318833",
+    "scripts/configure-injection.py": "8812e3d3d106fe0d565fd9e04794dee40dbdd65ac03787dda4f5a5d1c6df38ce",
     "scripts/efi_source_audit.py": "a3cbd7509ea5708c925370d60a2fe3c4c699dac6ba2f2b714dff8b91374600df",
     "instrumentation/ext4_efi.h": "acd610ed8cade9b7f4556104a1c1fac4bfc107c7df53eb806683f0d047348c00",
     "instrumentation/ext4_efi_event.h": "16e2f1221032620e501dcfe120d5f392e5131c3d59fe3a5d6e57ded2c9a68641",
@@ -13,8 +13,8 @@
   },
   "summary": {
     "observed": 265,
-    "supported": 215,
-    "stateful_observe_only": 50
+    "supported": 229,
+    "stateful_observe_only": 36
   },
   "files": [
     {
@@ -35,7 +35,7 @@
     {
       "path": "fs/ext4/balloc.c",
       "before": "b13f304ba12ee4e3ba546c5a01a29153e6113d10f8d1b9a917c5f9056c0b8d42",
-      "after": "d4600302e7522e1e78463948513b999bd0c9cbc8a72c8a58944856899f17fe62"
+      "after": "39c5e6ac882ac9df6da6578190ed84eb9492808f589b6d83441591e5b3af8e79"
     },
     {
       "path": "fs/ext4/block_validity.c",
@@ -65,7 +65,7 @@
     {
       "path": "fs/ext4/ext4_jbd2.c",
       "before": "bf69d8a4c88f3d577a5795abeaf404a8aa15be3a954b23e29a85f56d57135e25",
-      "after": "bda5ede17e5829b1373560e4fffd74b6ca3601234e0a443467ecda704bcdd6ea"
+      "after": "575b5b22784de67b99b171141510abe5aef77bbf42113dc237e2dc0b518f2f58"
     },
     {
       "path": "fs/ext4/ext4_jbd2.h",
@@ -105,7 +105,7 @@
     {
       "path": "fs/ext4/ialloc.c",
       "before": "2c9cce902417a3572f6be3623c6da2aaea9309910808d2d9ac8f6f01deb0c839",
-      "after": "2183c75cf25dd98e1842e5c734f748863a522fe16db7a48760f01bb38a1f5c55"
+      "after": "7f0dfa3a5a737af45da9b0f17da2582541190a0a29e4bfbab3910982ba9e917e"
     },
     {
       "path": "fs/ext4/indirect.c",
@@ -120,12 +120,12 @@
     {
       "path": "fs/ext4/inode.c",
       "before": "25bfe3b1e74183e3c69f902988a8f78aff929ba449da61f7fc3ec8648f2a03f2",
-      "after": "27b1de785c71b16309252feb31a36c12149bc8f45a1f03adbeb08c58044a5f66"
+      "after": "581dfca9d28af3a0d8bb11258ac6241d308785297d0a0d7db631fafe8a44f9ec"
     },
     {
       "path": "fs/ext4/ioctl.c",
       "before": "f29e918ab4573b7deb99fddf91af5f629779fb882f4c8303c15da65653b1661c",
-      "after": "8c1858f2059764a4b23e60d521d9a59e44ef94cef6dbd777a5f586fa9028d34b"
+      "after": "e0d21087f063591fb7ebc6a6c68447ec28b9695569b951cd31f276733c0a8132"
     },
     {
       "path": "fs/ext4/mballoc.c",
@@ -140,17 +140,17 @@
     {
       "path": "fs/ext4/mmp.c",
       "before": "6b656bedd06b33a203549b5e5fd7abc184cb8208e5a237f3df244424a829a04b",
-      "after": "4104b08e39b37a841252fba85fb320e5f1af2f95baa2a59a4ed18e9f7cc09134"
+      "after": "58afb3c1a39c29b1d5eec52bc352e1b54ba26626cfcd28b0e19c4e6cc6365466"
     },
     {
       "path": "fs/ext4/move_extent.c",
       "before": "ffd0f856408532801c282324ffe4f5e3c768b8046c2f8241c2ad56e82ebdb312",
-      "after": "2b62b88e5d176f8c811a51bdf94880fabed12dba5627e60436428fa34491bc84"
+      "after": "b92389c6a6cd2ffcc897909f0c34296721edc5e6f0477acfeb1b25f4aab4eef8"
     },
     {
       "path": "fs/ext4/namei.c",
       "before": "ac222381cc29b37b9856be07af41fe4a5eed60780167877c2467d821663d0969",
-      "after": "c73f5b3f94bbec88214938e961d06b6a52d2af50f9380fb8d05d338cf5752505"
+      "after": "4d6d9869fdcc2a4a962598cce7460e11087d53de16557421860509b50a68c2d7"
     },
     {
       "path": "fs/ext4/orphan.c",
@@ -175,7 +175,7 @@
     {
       "path": "fs/ext4/super.c",
       "before": "2b7e6fdba16447981f59c83146db91591b0a57c43e13bd98c917f6a5c5818dbc",
-      "after": "6b1f2a45df4911112789ad33661da02eac3a6e4dd78f23515e2222ddae4e2cf8"
+      "after": "74d70f21c309dae6e57c1384f4d710cf324f4302d0a090a296b601f170f65a3f"
     },
     {
       "path": "fs/ext4/sysfs.c",
@@ -267,11 +267,11 @@
     {
       "site_id": 16,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 21,
@@ -375,11 +375,11 @@
     {
       "site_id": 41,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 42,
@@ -816,11 +816,11 @@
     {
       "site_id": 144,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 147,
@@ -987,20 +987,20 @@
     {
       "site_id": 189,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 200,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 209,
@@ -1023,11 +1023,11 @@
     {
       "site_id": 216,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 217,
@@ -1041,11 +1041,11 @@
     {
       "site_id": 220,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 221,
@@ -1500,11 +1500,11 @@
     {
       "site_id": 313,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 315,
@@ -1626,20 +1626,20 @@
     {
       "site_id": 353,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 362,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 371,
@@ -1761,11 +1761,11 @@
     {
       "site_id": 386,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 390,
@@ -1986,11 +1986,11 @@
     {
       "site_id": 450,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 453,
@@ -2058,11 +2058,11 @@
     {
       "site_id": 476,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 477,
@@ -2193,11 +2193,11 @@
     {
       "site_id": 496,
       "callee": "buffer_uptodate",
-      "supported": false,
+      "supported": true,
       "failure": "0",
-      "guard": "false",
-      "cleanup": "(void)0",
-      "reason": "requires_stateful_failure_model"
+      "guard": "true",
+      "cleanup": "clear_buffer_uptodate(__efi_a0)",
+      "reason": "object_state_mutation_matches_upstream_ext4_simulate_fail_bh"
     },
     {
       "site_id": 497,
