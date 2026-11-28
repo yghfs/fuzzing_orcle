@@ -11,6 +11,17 @@
 extent/间接块可达性、extent status、reservation、EA inode、flex、buddy、延迟释放和
 事务/操作后置条件作为补充模型。
 
+`ext4_rmdir` / `__ext4_unlink` / `ext4_rename` 的出错出口另有运行期模型
+（`ext4_checker_{rmdir,unlink,rename}_error`），判据是"一次失败的
+`ext4_mark_inode_dirty()` 不算已持久化"：调用方记录每一步更新是否被 journal 接受，
+模型据此把内存值折回 durable 值再比对，只读内存（含内存中的目录块缓冲），不读设备。
+这三个模型与故障注入实验
+[ext4-counter-trace-fault-injection](../ext4-counter-trace-fault-injection/) 共用同一份实现，
+定义就在 [0001 基座补丁](patches/0001-counter-trace-core-and-probes.patch) 里；本实验只做
+checker，不包含任何错误注入。call site 不共享：本补丁在 `ext4_delete_entry()` 之前
+`ext4_reserve_inode_write()` 钉住 unlink 的 inode 缓冲，注入实验用
+`restore_upstream_semantics()` 把它改回上游顺序后缺陷才在那里出现。
+
 ## 普通构建和回归
 
 在[根目录](../../README.md)完成宿主和 guest 准备后运行：

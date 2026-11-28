@@ -92,7 +92,7 @@
 -
 --- a/fs/ext4/counter_models.c
 +++ b/fs/ext4/counter_models.c
-@@ -0,0 +1,2917 @@
+@@ -0,0 +1,3072 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Additional models and diagnostics for the ext4 consistency checker. */
 +
@@ -1196,17 +1196,70 @@
 +
 +void ext4_checker_rmdir_error(struct inode *dir, struct inode *inode,
 +			      unsigned int old_dir_nlink,
-+			      bool entry_deleted, int err)
++			      unsigned int old_child_nlink,
++			      bool entry_removal_attempted, bool entry_deleted,
++			      bool child_committed, bool parent_committed, int err)
 +{
-+	unsigned int expected;
++	unsigned int dir_durable, child_durable, expected_dir;
 +
-+	if (!dir || !inode || !entry_deleted || !S_ISDIR(inode->i_mode) ||
-+	    inode->i_nlink || !err)
++	if (!dir || !inode || !READ_ONCE(EXT4_SB(dir->i_sb)->s_checker_active))
 +		return;
-+	expected = old_dir_nlink > 2 ? old_dir_nlink - 1 : old_dir_nlink;
++	if (EXT4_SB(dir->i_sb)->s_mount_state & EXT4_FC_REPLAY)
++		return;
++
++	/*
++	 * A failed ext4_mark_inode_dirty() is not a durable update: the count the
++	 * inode carries in memory then never reaches the device, so what survives
++	 * the unmount is the value from before the change.  Each side is judged on
++	 * that durable value, derived from the per-update flag the caller recorded.
++	 * Everything read here is in memory; no block is fetched from the device.
++	 *
++	 *   - the removal was never attempted: both sides keep their starting
++	 *     counts;
++	 *   - the removal was attempted but the write failed: ext4_generic_delete_entry()
++	 *     already zeroed the entry in the buffer, so the name is gone from memory
++	 *     while the child keeps every link -- the child must have been retired
++	 *     for the removal to be recoverable;
++	 *   - the entry is gone and the child's update did not commit: on disk the
++	 *     directory is unreachable while its name has disappeared, which is what
++	 *     e2fsck reports as a disconnected directory;
++	 *   - the entry write landed and the child's cleared count was accepted: the
++	 *     removal is durable, so the parent may no longer count this directory.
++	 *     Whether this call also recorded its own decrement is a separate
++	 *     question -- treating a failed parent update as "nothing changed" is the
++	 *     defect, because the child is gone while the parent still counts it.
++	 */
++	dir_durable = parent_committed ? dir->i_nlink : old_dir_nlink;
++	child_durable = child_committed ? inode->i_nlink : old_child_nlink;
++
++	if (!entry_removal_attempted) {
++		ext4_checker_count_check(dir, EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT,
++					 "rmdir_error_before_removal", old_dir_nlink,
++					 old_dir_nlink, dir_durable, true);
++		ext4_checker_count_check(inode, EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT,
++					 "rmdir_error_before_removal", old_child_nlink,
++					 old_child_nlink, child_durable, true);
++		return;
++	}
++	if (!entry_deleted) {
++		ext4_checker_count_check(inode, EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT,
++					 "rmdir_error_entry_removed_child_kept",
++					 old_child_nlink, 0, child_durable, true);
++		return;
++	}
++	if (!child_committed) {
++		ext4_checker_count_check(inode, EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT,
++					 "rmdir_error_child_nlink_not_committed",
++					 old_child_nlink, 0, child_durable, true);
++		return;
++	}
++	/* Both halves of the removal are durable from here on: the entry write
++	 * landed and the child's cleared count was accepted.  The parent must no
++	 * longer count this directory. */
++	expected_dir = old_dir_nlink > 2 ? old_dir_nlink - 1 : old_dir_nlink;
 +	ext4_checker_count_check(dir, EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT,
 +				 "rmdir_error_parent_nlink", old_dir_nlink,
-+				 expected, dir->i_nlink, true);
++				 expected_dir, dir_durable, true);
 +}
 +
 +/*
@@ -3010,6 +3063,108 @@
 +	sbi->s_checker_events = NULL;
 +	sbi->s_checker_tx_context = NULL;
 +}
++
++void ext4_checker_unlink_error(struct inode *dir, struct inode *inode,
++			       unsigned int old_nlink, bool entry_removed,
++			       bool inode_committed, int err)
++{
++	unsigned int durable;
++
++	if (!dir || !inode || !READ_ONCE(EXT4_SB(dir->i_sb)->s_checker_active))
++		return;
++	if (EXT4_SB(dir->i_sb)->s_mount_state & EXT4_FC_REPLAY)
++		return;
++
++	/*
++	 * unlink removes the directory entry and only then drops the inode's link
++	 * count.  A failed ext4_mark_inode_dirty() is not durable, so the count that
++	 * survives the unmount is the one from before the drop.  Judging that
++	 * durable value, rather than the value left in memory, is what exposes the
++	 * defect while the operation is still in progress:
++	 *
++	 *   - the entry removal never happened: the inode keeps every link and must
++	 *     still report exactly that;
++	 *   - the entry is gone: the name no longer exists, so the inode may keep
++	 *     only the links of the names that remain.  If the update carrying the
++	 *     decremented count did not commit, the on-disk count still includes the
++	 *     removed name and e2fsck reports a disconnected inode.
++	 */
++	durable = inode_committed ? inode->i_nlink : old_nlink;
++
++	if (!entry_removed) {
++		ext4_checker_count_check(inode, EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT,
++					 "unlink_error_before_removal", old_nlink,
++					 old_nlink, durable, true);
++		return;
++	}
++	ext4_checker_count_check(inode, EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT,
++				 "unlink_error_entry_removed_link_count",
++				 old_nlink, old_nlink ? old_nlink - 1 : 0,
++				 durable, true);
++}
++
++void ext4_checker_rename_error(struct inode *old_inode, struct inode *new_inode,
++			       unsigned int old_nlink, bool verified,
++			       bool dest_linked, bool source_linked,
++			       bool target_committed, unsigned int old_target_nlink,
++			       int err)
++{
++	unsigned int target_durable;
++
++	if (!old_inode || !verified ||
++	    !READ_ONCE(EXT4_SB(old_inode->i_sb)->s_checker_active))
++		return;
++	if (EXT4_SB(old_inode->i_sb)->s_mount_state & EXT4_FC_REPLAY)
++		return;
++
++	/*
++	 * rename publishes the destination entry before it retires the source and
++	 * before it commits the replaced target's decremented count.  Each of those
++	 * effects is visible in memory before it is durable, so the model reads the
++	 * names out of the buffers and derives the link count the namespace
++	 * requires.  Everything here is in memory; no block is read from the device.
++	 *
++	 *   - the destination name was never published: nothing moved, so the source
++	 *     must still carry its original count;
++	 *   - the destination is published and the source name remains: two names
++	 *     resolve to one inode, so a single link is a lost update;
++	 *   - only the destination remains: the move is complete and the source count
++	 *     is unchanged, because rename never touches it for a non-directory;
++	 *   - the replaced target lost a link in memory.  When that update did not
++	 *     commit, the on-disk count still includes the name that is gone.
++	 */
++	if (!dest_linked) {
++		ext4_checker_count_check(old_inode, EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT,
++					 "rename_error_before_link", old_nlink,
++					 old_nlink, old_inode->i_nlink, true);
++		return;
++	}
++	if (source_linked) {
++		ext4_checker_count_check(old_inode, EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT,
++					 "rename_error_dest_linked_source_kept",
++					 old_nlink, old_nlink + 1,
++					 old_inode->i_nlink, true);
++		return;
++	}
++	ext4_checker_count_check(old_inode, EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT,
++				 "rename_error_move_complete", old_nlink,
++				 old_nlink, old_inode->i_nlink, true);
++	if (new_inode) {
++		/*
++		 * The replaced name is already gone from the buffer, so the target
++		 * keeps one link fewer than it started with.  Compare the target's
++		 * own durable count, not the source's.
++		 */
++		target_durable = target_committed ? new_inode->i_nlink
++						  : old_target_nlink;
++		ext4_checker_count_check(new_inode,
++					 EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT,
++					 "rename_error_target_link_count",
++					 old_target_nlink,
++					 old_target_nlink ? old_target_nlink - 1 : 0,
++					 target_durable, true);
++	}
++}
 --- a/fs/ext4/counter_relations.c
 +++ b/fs/ext4/counter_relations.c
 @@ -0,0 +1,391 @@
@@ -4737,7 +4892,7 @@
  extern ext4_fsblk_t ext4_mb_new_blocks(handle_t *,
  				struct ext4_allocation_request *, int *);
  extern void ext4_discard_preallocations(struct inode *);
-@@ -3269,6 +3401,310 @@
+@@ -3269,6 +3401,337 @@
  				struct ext4_group_desc *bg, __u32 count);
  extern void ext4_used_dirs_set(struct super_block *sb,
  				struct ext4_group_desc *bg, __u32 count);
@@ -4860,7 +5015,17 @@
 +				unsigned int old_nlink);
 +void ext4_checker_rmdir_error(struct inode *dir, struct inode *inode,
 +			      unsigned int old_dir_nlink,
-+			      bool entry_deleted, int err);
++			      unsigned int old_child_nlink,
++			      bool entry_removal_attempted, bool entry_deleted,
++			      bool child_committed, bool parent_committed, int err);
++void ext4_checker_unlink_error(struct inode *dir, struct inode *inode,
++			       unsigned int old_nlink, bool entry_removed,
++			       bool inode_committed, int err);
++void ext4_checker_rename_error(struct inode *old_inode, struct inode *new_inode,
++			       unsigned int old_nlink, bool verified,
++			       bool dest_linked, bool source_linked,
++			       bool target_committed, unsigned int old_target_nlink,
++			       int err);
 +void ext4_checker_xattr_update_failure(struct inode *inode, int err,
 +				       bool body_updated,
 +				       bool shared_block);
@@ -4966,7 +5131,24 @@
 +static inline void ext4_checker_rmdir_error(struct inode *dir,
 +					    struct inode *inode,
 +					    unsigned int old_dir_nlink,
-+					    bool entry_deleted, int err) {}
++					    unsigned int old_child_nlink,
++					    bool entry_removal_attempted,
++					    bool entry_deleted,
++					    bool child_committed,
++					    bool parent_committed, int err) {}
++static inline void ext4_checker_unlink_error(struct inode *dir,
++					    struct inode *inode,
++					    unsigned int old_nlink,
++					    bool entry_removed,
++					    bool inode_committed, int err) {}
++static inline void ext4_checker_rename_error(struct inode *old_inode,
++					     struct inode *new_inode,
++					     unsigned int old_nlink,
++					     bool verified, bool dest_linked,
++					     bool source_linked,
++					     bool target_committed,
++					     unsigned int old_target_nlink,
++					     int err) {}
 +static inline void ext4_checker_xattr_update_failure(struct inode *inode,
 +						     int err,
 +						     bool body_updated,
@@ -5048,7 +5230,7 @@
  extern void ext4_itable_unused_set(struct super_block *sb,
  				   struct ext4_group_desc *bg, __u32 count);
  extern int ext4_group_desc_csum_verify(struct super_block *sb, __u32 group,
-@@ -3422,6 +3858,10 @@
+@@ -3422,6 +3885,10 @@
  
  struct ext4_group_info {
  	unsigned long   bb_state;
@@ -5059,7 +5241,7 @@
  #ifdef AGGRESSIVE_CHECK
  	unsigned long	bb_check_counter;
  #endif
-@@ -3596,7 +4036,7 @@
+@@ -3596,7 +4063,7 @@
  				    struct inode *dir,
  				    struct ext4_dir_entry_2 *de_del,
  				    struct buffer_head *bh,
@@ -7710,7 +7892,7 @@
  		ext4_orphan_add(handle, inode);
  		unlock_new_inode(inode);
  		err2 = ext4_mark_inode_dirty(handle, inode);
-@@ -3139,10 +3200,12 @@
+@@ -3139,10 +3200,19 @@
  static int ext4_rmdir(struct inode *dir, struct dentry *dentry)
  {
  	int retval;
@@ -7720,11 +7902,18 @@
  	struct ext4_dir_entry_2 *de;
  	handle_t *handle = NULL;
 +	unsigned int old_dir_nlink = dir->i_nlink;
++	unsigned int old_child_nlink = inode->i_nlink;
++	bool entry_removal_attempted = false;
 +	bool entry_deleted = false;
++	/* Which of the two updates the journal accepted.  A failure arriving after
++	 * a count changed but before its update was accepted leaves memory ahead of
++	 * the device, so the checker judges each side on its durable value. */
++	bool child_committed = false;
++	bool parent_committed = false;
  
  	if (unlikely(ext4_forced_shutdown(dir->i_sb)))
  		return -EIO;
-@@ -3158,13 +3221,14 @@
+@@ -3158,13 +3228,14 @@
  
  	retval = -ENOENT;
  	bh = ext4_find_entry(dir, &dentry->d_name, &de, NULL);
@@ -7743,7 +7932,11 @@
  	retval = -EFSCORRUPTED;
  	if (le32_to_cpu(de->inode) != inode->i_ino)
  		goto end_rmdir;
-@@ -3187,13 +3251,23 @@
+@@ -3184,16 +3255,27 @@
+ 	if (IS_DIRSYNC(dir))
+ 		ext4_handle_sync(handle);
+ 
++	entry_removal_attempted = true;
  	retval = ext4_delete_entry(handle, dir, de, bh);
  	if (retval)
  		goto end_rmdir;
@@ -7768,24 +7961,48 @@
  	/* There's no need to set i_disksize: the fact that i_nlink is
  	 * zero will ensure that the right thing happens during any
  	 * recovery. */
-@@ -3219,6 +3293,8 @@
+@@ -3202,12 +3284,14 @@
+ 	inode_set_mtime_to_ts(dir, inode_set_ctime_current(dir));
+ 	inode_set_ctime_current(inode);
+ 	retval = ext4_mark_inode_dirty(handle, inode);
++	child_committed = !retval;
+ 	if (retval)
+ 		goto end_rmdir;
+ 	ext4_dec_count(dir);
+ 	ext4_update_dx_flag(dir);
+ 	ext4_fc_track_unlink(handle, dentry);
+ 	retval = ext4_mark_inode_dirty(handle, dir);
++	parent_committed = !retval;
+ 
+ 	/* VFS negative dentries are incompatible with Encoding and
+ 	 * Case-insensitiveness. Eventually we'll want avoid
+@@ -3219,6 +3303,9 @@
  		d_invalidate(dentry);
  
  end_rmdir:
-+	ext4_checker_rmdir_error(dir, inode, old_dir_nlink, entry_deleted,
-+				 retval);
++	ext4_checker_rmdir_error(dir, inode, old_dir_nlink, old_child_nlink,
++				 entry_removal_attempted, entry_deleted,
++				 child_committed, parent_committed, retval);
  	brelse(bh);
  	if (handle)
  		ext4_journal_stop(handle);
-@@ -3232,6 +3308,7 @@
+@@ -3232,8 +3319,15 @@
  	int retval = -ENOENT;
  	struct buffer_head *bh;
  	struct ext4_dir_entry_2 *de;
 +	struct ext4_iloc dir_iloc, inode_iloc;
  	handle_t *handle;
  	int skip_remove_dentry = 0;
++	unsigned int old_nlink = inode->i_nlink;
++	/* Facts the checker needs to judge this exit: the entry removal and the
++	 * inode update are the two steps that can leave a dangling name behind.
++	 * Only in-memory state is involved, so reporting is immediate. */
++	bool entry_removed = false;
++	bool inode_committed = false;
  
-@@ -3268,6 +3345,22 @@
+ 	/*
+ 	 * Keep this outside the transaction; it may have to set up the
+@@ -3268,8 +3362,31 @@
  	if (IS_DIRSYNC(dir))
  		ext4_handle_sync(handle);
  
@@ -7807,8 +8024,17 @@
 +
  	if (!skip_remove_dentry) {
  		retval = ext4_delete_entry(handle, dir, de, bh);
++		/*
++		 * ext4_generic_delete_entry() zeroes the entry before the buffer
++		 * write that can fail, so a failed removal may already have taken the
++		 * name out of the block.  The buffer is in memory: read the state it
++		 * is actually in instead of inferring it from the return value.
++		 */
++		entry_removed = !retval || le32_to_cpu(de->inode) == 0;
  		if (retval)
-@@ -3283,8 +3376,12 @@
+ 			goto out_handle;
+ 		inode_set_mtime_to_ts(dir, inode_set_ctime_current(dir));
+@@ -3283,15 +3400,26 @@
  	if (inode->i_nlink == 0)
  		ext4_warning_inode(inode, "Deleting file '%.*s' with no links",
  				   d_name->len, d_name->name);
@@ -7822,10 +8048,13 @@
  	if (!inode->i_nlink)
  		ext4_orphan_add(handle, inode);
  	inode_set_ctime_current(inode);
-@@ -3292,6 +3389,10 @@
+ 	retval = ext4_mark_inode_dirty(handle, inode);
++	inode_committed = !retval;
  	if (dentry && !retval)
  		ext4_fc_track_unlink(handle, dentry);
  out_handle:
++	ext4_checker_unlink_error(dir, inode, old_nlink, entry_removed,
++				  inode_committed, retval);
 +	if (dir_iloc.bh)
 +		brelse(dir_iloc.bh);
 +	if (inode_iloc.bh)
@@ -7833,7 +8062,7 @@
  	ext4_journal_stop(handle);
  out_bh:
  	brelse(bh);
-@@ -3435,7 +3536,7 @@
+@@ -3435,7 +3563,7 @@
  	goto out_retry;
  
  err_drop_inode:
@@ -7842,7 +8071,7 @@
  	ext4_mark_inode_dirty(handle, inode);
  	ext4_orphan_add(handle, inode);
  	unlock_new_inode(inode);
-@@ -3458,8 +3559,9 @@
+@@ -3458,8 +3586,9 @@
  	handle = ext4_journal_start(dir, EXT4_HT_DIR,
  		(EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +
  		 EXT4_INDEX_EXTRA_TRANS_BLOCKS) + 1);
@@ -7853,7 +8082,7 @@
  
  	if (IS_DIRSYNC(dir))
  		ext4_handle_sync(handle);
-@@ -3479,7 +3581,13 @@
+@@ -3479,7 +3608,13 @@
  		d_instantiate(dentry, inode);
  		ext4_fc_track_link(handle, dentry);
  	} else {
@@ -7868,7 +8097,7 @@
  		iput(inode);
  	}
  	ext4_journal_stop(handle);
-@@ -3600,7 +3708,8 @@
+@@ -3600,7 +3735,8 @@
  		return -EFSCORRUPTED;
  	BUFFER_TRACE(ent->dir_bh, "get_write_access");
  	return ext4_journal_get_write_access(handle, ent->dir->i_sb,
@@ -7878,7 +8107,7 @@
  }
  
  static int ext4_rename_dir_finish(handle_t *handle, struct ext4_renament *ent,
-@@ -3611,16 +3720,23 @@
+@@ -3611,16 +3747,23 @@
  	if (!ent->dir_bh)
  		return 0;
  
@@ -7907,7 +8136,7 @@
  		}
  	} else {
  		retval = ext4_mark_inode_dirty(handle, ent->inode);
-@@ -3638,10 +3754,18 @@
+@@ -3638,10 +3781,18 @@
  	int retval, retval2;
  
  	BUFFER_TRACE(ent->bh, "get write access");
@@ -7928,7 +8157,7 @@
  	ent->de->inode = cpu_to_le32(ino);
  	if (ext4_has_feature_filetype(ent->dir->i_sb))
  		ent->de->file_type = file_type;
-@@ -3650,7 +3774,8 @@
+@@ -3650,7 +3801,8 @@
  	retval = ext4_mark_inode_dirty(handle, ent->dir);
  	BUFFER_TRACE(ent->bh, "call ext4_handle_dirty_metadata");
  	if (!ent->inlined) {
@@ -7938,7 +8167,7 @@
  		if (unlikely(retval2)) {
  			ext4_std_error(ent->dir->i_sb, retval2);
  			return retval2;
-@@ -3685,8 +3810,9 @@
+@@ -3685,8 +3837,9 @@
  	brelse(old.bh);
  }
  
@@ -7950,7 +8179,7 @@
  {
  	int retval = -ENOENT;
  	struct buffer_head *bh;
-@@ -3702,10 +3828,12 @@
+@@ -3702,10 +3855,12 @@
  	return retval;
  }
  
@@ -7963,7 +8192,7 @@
  	/*
  	 * ent->de could have moved from under us during htree split, so make
  	 * sure that we are deleting the right entry.  We might also be pointing
-@@ -3720,7 +3848,8 @@
+@@ -3720,7 +3875,8 @@
  		retval = ext4_find_delete_entry(handle, ent->dir,
  						&ent->dentry->d_name);
  	} else {
@@ -7973,7 +8202,19 @@
  		if (retval == -ENOENT) {
  			retval = ext4_find_delete_entry(handle, ent->dir,
  							&ent->dentry->d_name);
-@@ -3973,7 +4102,15 @@
+@@ -3808,6 +3964,11 @@
+ 	struct inode *whiteout = NULL;
+ 	int credits;
+ 	u8 old_file_type;
++	unsigned int old_nlink = old.inode->i_nlink;
++	unsigned int old_target_nlink = new.inode ? new.inode->i_nlink : 0;
++	/* Whether the update carrying the replaced target's decremented count was
++	 * accepted by the journal; without it the on-disk count is stale. */
++	bool target_committed = false;
+ 
+ 	if (new.inode && new.inode->i_nlink == 0) {
+ 		EXT4_ERROR_INODE(new.inode,
+@@ -3973,7 +4134,15 @@
  			/* checked ext4_empty_dir above, can't have another
  			 * parent, ext4_dec_count() won't work for many-linked
  			 * dirs */
@@ -7990,8 +8231,50 @@
  		} else {
  			ext4_inc_count(new.dir);
  			ext4_update_dx_flag(new.dir);
-@@ -4022,9 +4159,14 @@
+@@ -4012,6 +4181,7 @@
+ 
+ 	if (new.inode) {
+ 		retval = ext4_mark_inode_dirty(handle, new.inode);
++		target_committed = !retval;
+ 		if (unlikely(retval))
+ 			goto end_rename;
+ 		if (!new.inode->i_nlink)
+@@ -4020,11 +4190,48 @@
+ 	retval = 0;
+ 
  end_rename:
++	/*
++	 * Both entry writes are buffered before the metadata hand-off that can
++	 * fail, so the return value does not say which names the namespace now
++	 * holds.  Look the two names up in memory, the same way the mkdir checker
++	 * verifies whether its entry was published.
++	 */
++	if (retval) {
++		struct buffer_head *chk;
++		struct ext4_dir_entry_2 *cde;
++		bool verified = true;
++		bool dest_linked = false;
++		bool source_linked = true;
++
++		chk = ext4_find_entry(new.dir, &new.dentry->d_name, &cde, NULL);
++		if (IS_ERR(chk))
++			verified = false;
++		else if (chk) {
++			dest_linked = le32_to_cpu(cde->inode) == old.inode->i_ino;
++			brelse(chk);
++		}
++		chk = ext4_find_entry(old.dir, &old.dentry->d_name, &cde, NULL);
++		if (IS_ERR(chk))
++			verified = false;
++		else {
++			source_linked = chk && le32_to_cpu(cde->inode) == old.inode->i_ino;
++			brelse(chk);
++		}
++		ext4_checker_rename_error(old.inode, new.inode, old_nlink, verified,
++					  dest_linked, source_linked,
++					  target_committed, old_target_nlink,
++					  retval);
++	}
  	if (whiteout) {
  		if (retval) {
 -			ext4_resetent(handle, &old,
@@ -8008,7 +8291,7 @@
  			ext4_mark_inode_dirty(handle, whiteout);
  			ext4_orphan_add(handle, whiteout);
  		}
-@@ -4111,7 +4253,6 @@
+@@ -4111,7 +4318,6 @@
  
  	if (IS_DIRSYNC(old.dir) || IS_DIRSYNC(new.dir))
  		ext4_handle_sync(handle);
@@ -8016,7 +8299,7 @@
  	if (S_ISDIR(old.inode->i_mode)) {
  		retval = ext4_rename_dir_prepare(handle, &old, new.dir != old.dir);
  		if (retval)
-@@ -4202,27 +4343,73 @@
+@@ -4202,27 +4408,73 @@
  		return err;
  
  	if (flags & RENAME_EXCHANGE) {

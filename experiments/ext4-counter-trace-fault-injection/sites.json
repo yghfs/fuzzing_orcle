@@ -3,8 +3,8 @@
   "kernel_version": "6.12.1",
   "mode": "observe_only",
   "review_csv_sha256": "8e68ed6bdc631a10221ef430f68bd175b52b82dfbbbdfd00d7d48891a1c3bbcf",
-  "base_patch_sha256": "549a6f783d7e6a63742e07cb659d7dbae30b75007bde9154a3310cb464113104",
-  "patch_sha256": "490abd35c37bfa99392af5e222dabe8c12acee8094a597018c2b0b95991b6c57",
+  "base_patch_sha256": "06ec87210bed027ff35eaac3757a6405c68d801a0607cabbf2c59fdc5ab3523d",
+  "patch_sha256": "06f71c1f34a55c3cc55f4b8dd78eb7ecfd067a5809888f16f82010eaba2bdb99",
   "replay_verified": true,
   "inputs": {
     "scripts/instrument-sites.py": "4b53ddd50d5e63739119e459e7028a1788ccca634059485922c3a2a3b0c10dcb",
@@ -94,8 +94,8 @@
     },
     {
       "path": "fs/ext4/ext4.h",
-      "baseline_sha256": "116806309ad6673e5435762b7354e0c71b8848c2b7b155b5fb04eea69dde479f",
-      "instrumented_sha256": "94d9d214b6ed700a2175daff5e3886613f0ad197d85e77ee2ce1a85db79a84ec"
+      "baseline_sha256": "72a8731520b78dbd22606a21825e7ccc73ff9bf8f2ff01256ec8af5479892d34",
+      "instrumented_sha256": "cd44e48cc4da1618bf72fd79f38e5086061f8d6f8d252204b6955caa03101c13"
     },
     {
       "path": "fs/ext4/ext4_jbd2.c",
@@ -174,8 +174,8 @@
     },
     {
       "path": "fs/ext4/namei.c",
-      "baseline_sha256": "d03fb5e44371df3a0b844ababab6b2c38e6f470ae48bab92e79811eeaa89a41f",
-      "instrumented_sha256": "ac222381cc29b37b9856be07af41fe4a5eed60780167877c2467d821663d0969"
+      "baseline_sha256": "31d573b7a0cb4b851d6448742722e1956ada59a0c69bb15c79620da49164169f",
+      "instrumented_sha256": "7d5a98ddd9f8c9d008503bb754418b9579415e3fe3712293aaf20cbd68cf8dfd"
     },
     {
       "path": "fs/ext4/orphan.c",
@@ -1764,10 +1764,10 @@
       "source_spelling": "buffer_write_io_error",
       "source_expression": "buffer_write_io_error(bh)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 4293,
+      "mapped_line": 4320,
       "translation_unit_id": 15,
       "runtime_selector": "(EXT4_ERROR_SITE_TU == 15 ? 187 : EXT4_ERROR_SITE_TU == 25 ? 447 : EXT4_ERROR_SITE_TU == 26 ? 550 : 0)",
-      "instrumented_line": 4294
+      "instrumented_line": 4321
     },
     {
       "site_id": 189,
@@ -3114,10 +3114,10 @@
       "source_spelling": "fscrypt_prepare_link",
       "source_expression": "fscrypt_prepare_link(old_dentry, dir, dentry)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3608,
+      "mapped_line": 3635,
       "translation_unit_id": 20,
       "runtime_selector": "372",
-      "instrumented_line": 3609
+      "instrumented_line": 3636
     },
     {
       "site_id": 373,
@@ -3132,10 +3132,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(dir)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3617,
+      "mapped_line": 3644,
       "translation_unit_id": 20,
       "runtime_selector": "373",
-      "instrumented_line": 3618
+      "instrumented_line": 3645
     },
     {
       "site_id": 374,
@@ -3150,10 +3150,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(dir)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3414,
+      "mapped_line": 3441,
       "translation_unit_id": 20,
       "runtime_selector": "374",
-      "instrumented_line": 3415
+      "instrumented_line": 3442
     },
     {
       "site_id": 375,
@@ -3168,10 +3168,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(d_inode(dentry))",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3417,
+      "mapped_line": 3444,
       "translation_unit_id": 20,
       "runtime_selector": "375",
-      "instrumented_line": 3418
+      "instrumented_line": 3445
     },
     {
       "site_id": 376,
@@ -3186,10 +3186,10 @@
       "source_spelling": "fscrypt_prepare_symlink",
       "source_expression": "fscrypt_prepare_symlink(dir, symname, len, dir->i_sb->s_blocksize,\n\t\t\t\t      &disk_link)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3476,
+      "mapped_line": 3503,
       "translation_unit_id": 20,
       "runtime_selector": "376",
-      "instrumented_line": 3477
+      "instrumented_line": 3504
     },
     {
       "site_id": 377,
@@ -3204,10 +3204,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(dir)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3481,
+      "mapped_line": 3508,
       "translation_unit_id": 20,
       "runtime_selector": "377",
-      "instrumented_line": 3482
+      "instrumented_line": 3509
     },
     {
       "site_id": 379,
@@ -3240,10 +3240,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(dir)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3215,
+      "mapped_line": 3222,
       "translation_unit_id": 20,
       "runtime_selector": "380",
-      "instrumented_line": 3216
+      "instrumented_line": 3223
     },
     {
       "site_id": 381,
@@ -3258,10 +3258,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(d_inode(dentry))",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3218,
+      "mapped_line": 3225,
       "translation_unit_id": 20,
       "runtime_selector": "381",
-      "instrumented_line": 3219
+      "instrumented_line": 3226
     },
     {
       "site_id": 382,
@@ -3294,10 +3294,10 @@
       "source_spelling": "fscrypt_prepare_rename",
       "source_expression": "fscrypt_prepare_rename(old_dir, old_dentry, new_dir, new_dentry,\n\t\t\t\t     flags)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 4340,
+      "mapped_line": 4405,
       "translation_unit_id": 20,
       "runtime_selector": "383",
-      "instrumented_line": 4341
+      "instrumented_line": 4406
     },
     {
       "site_id": 384,
@@ -3348,10 +3348,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(old.dir)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 4212,
+      "mapped_line": 4277,
       "translation_unit_id": 20,
       "runtime_selector": "390",
-      "instrumented_line": 4213
+      "instrumented_line": 4278
     },
     {
       "site_id": 391,
@@ -3366,10 +3366,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(new.dir)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 4215,
+      "mapped_line": 4280,
       "translation_unit_id": 20,
       "runtime_selector": "391",
-      "instrumented_line": 4216
+      "instrumented_line": 4281
     },
     {
       "site_id": 392,
@@ -3384,10 +3384,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(old.dir)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3952,
+      "mapped_line": 3984,
       "translation_unit_id": 20,
       "runtime_selector": "392",
-      "instrumented_line": 3953
+      "instrumented_line": 3985
     },
     {
       "site_id": 393,
@@ -3402,10 +3402,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(old.inode)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3955,
+      "mapped_line": 3987,
       "translation_unit_id": 20,
       "runtime_selector": "393",
-      "instrumented_line": 3956
+      "instrumented_line": 3988
     },
     {
       "site_id": 394,
@@ -3420,10 +3420,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(new.dir)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3958,
+      "mapped_line": 3990,
       "translation_unit_id": 20,
       "runtime_selector": "394",
-      "instrumented_line": 3959
+      "instrumented_line": 3991
     },
     {
       "site_id": 395,
@@ -3438,10 +3438,10 @@
       "source_spelling": "dquot_initialize",
       "source_expression": "dquot_initialize(new.inode)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 3965,
+      "mapped_line": 3997,
       "translation_unit_id": 20,
       "runtime_selector": "395",
-      "instrumented_line": 3966
+      "instrumented_line": 3998
     },
     {
       "site_id": 406,
@@ -3762,10 +3762,10 @@
       "source_spelling": "buffer_write_io_error",
       "source_expression": "buffer_write_io_error(bh)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 4293,
+      "mapped_line": 4320,
       "translation_unit_id": 25,
       "runtime_selector": "(EXT4_ERROR_SITE_TU == 15 ? 187 : EXT4_ERROR_SITE_TU == 25 ? 447 : EXT4_ERROR_SITE_TU == 26 ? 550 : 0)",
-      "instrumented_line": 4294
+      "instrumented_line": 4321
     },
     {
       "site_id": 450,
@@ -4608,10 +4608,10 @@
       "source_spelling": "buffer_write_io_error",
       "source_expression": "buffer_write_io_error(bh)",
       "mapping_note": "unchanged_call_expression",
-      "mapped_line": 4293,
+      "mapped_line": 4320,
       "translation_unit_id": 26,
       "runtime_selector": "(EXT4_ERROR_SITE_TU == 15 ? 187 : EXT4_ERROR_SITE_TU == 25 ? 447 : EXT4_ERROR_SITE_TU == 26 ? 550 : 0)",
-      "instrumented_line": 4294
+      "instrumented_line": 4321
     },
     {
       "site_id": 551,

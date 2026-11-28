@@ -30,6 +30,16 @@
   清理目录、格式化或重新挂载。程序自身的创建、删除、写入正常发生。
 - 逐点公式、操作出口和整个程序结束后的稳定快照检查一起运行；正常的故障返回本身不是缺陷。
   结束 campaign 后才卸载并执行 `e2fsck -fn`。
+- `mkdir` / `rmdir` / `unlink` / `rename` 的出错出口有运行期模型：以**这次退出实际提交了什么**
+  为基准（不是"成功时应有的值"），只读内存状态与内存中的目录块，因此"返回错误但目录项已发布 /
+  名字已消失而链接数未减"能在 syscall 当场报 `EXT4 invariant violation`，不必等卸载后的 e2fsck。
+  关键判据是"一次失败的 `ext4_mark_inode_dirty()` 不算已持久化"：调用方记录每步更新是否被
+  journal 接受，模型据此把内存值折回磁盘上实际留下的值再比对。`group add` 还没有出口模型。
+  这三个模型的判定逻辑放在共享基座补丁
+  [0001-counter-trace-core-and-probes.patch](../ext4-counter-trace/patches/0001-counter-trace-core-and-probes.patch)
+  里，与只做 checker 的 `ext4-counter-trace` 实验共用一份实现；本实验的注入层只做 EFI 门控
+  和上游语义还原（`restore_upstream_semantics()` 把基座补丁收紧过的 unlink 顺序改回去，
+  缺陷才在这里成立）。
 
 ## 运行
 

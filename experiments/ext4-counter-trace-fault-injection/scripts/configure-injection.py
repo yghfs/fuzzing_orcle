@@ -403,6 +403,23 @@ def restore_upstream_formatting(changed, baseline):
             changed[name] = restored
 
 
+# --- namespace exit models --------------------------------------------------
+#
+# The rmdir / unlink / rename exit models are part of the checker itself, not of
+# the injection layer: they live in the shared base patch
+# (../ext4-counter-trace/patches/0001-counter-trace-core-and-probes.patch), which
+# this experiment applies as its baseline.  The models judge an error exit by
+# what it actually committed -- a failed ext4_mark_inode_dirty() is not a durable
+# update -- and inspect only in-memory state, so both experiments share one
+# implementation of that logic.
+#
+# Call sites are NOT shared: the base patch reserves the unlink inode buffers
+# before ext4_delete_entry(), which closes the very window these models look for,
+# and restore_upstream_semantics() below reverts that so the defects exist here.
+# The hooks are inherited from the base patch; this layer only restores upstream
+# operation order around them.
+
+
 def generate():
     mapping = json.loads((PROJECT/'sites.json').read_text())
     policies = [policy(s) for s in mapping['sites']]
@@ -471,11 +488,27 @@ def prepare(manifest):
     if not source.exists():
         source.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(['cp', '-al', str(sites.PRISTINE), str(source)], check=True)
+    # The tree is a build product of (pristine, base patch, review patch), so the
+    # layers are reapplied whenever it is not already at the layer-1 state.  A
+    # tree that was recreated from the pristine source is indistinguishable from
+    # a missing one here, and skipping the layers would leave it unauditable.
+    def at_before():
+        return all((source/f['path']).is_file() and
+                   sites.sha((source/f['path']).read_bytes()) == f['before']
+                   if f['before'] else not (source/f['path']).exists()
+                   for f in manifest['files'])
+
+    def at_after():
+        return all((source/f['path']).is_file() and
+                   sites.sha((source/f['path']).read_bytes()) == f['after']
+                   if f['after'] else not (source/f['path']).exists()
+                   for f in manifest['files'])
+
+    if not at_before() and not at_after():
         sites.patch_run(source, sites.BASE_PATCH)
         sites.patch_run(source, sites.PATCH)
-    before = all((source/f['path']).is_file() and sites.sha((source/f['path']).read_bytes()) == f['before']
-                 if f['before'] else not (source/f['path']).exists() for f in manifest['files'])
-    if before: sites.patch_run(source, PATCH)
+    if at_before():
+        sites.patch_run(source, PATCH)
     report = verify_source(source, PROJECT, manifest)
     output = PROJECT/'build/linux-error-site-trace/source-audit.json'
     output.parent.mkdir(parents=True, exist_ok=True)

@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "mode": "formula_gated_program_injection",
-  "base_sites_sha256": "e8d73c45c27bc1d5471a9c43811d16fd4e0f607a1adce7919a02d21f5edb5256",
-  "patch_sha256": "8ae927a94a11dc1317dbd3a03c51c9465df00246c9cd4e5388c1ce7cdad1866d",
+  "base_sites_sha256": "a6f750adb048df98d5823d2a6046ed69a0e978d99c4bfaf73744932b35c2c308",
+  "patch_sha256": "d79ef1989f47bcc5160696bbb1c4b82f1ca839c93ea96322247ed368cd852fba",
   "replay_verified": true,
   "inputs": {
-    "scripts/configure-injection.py": "8812e3d3d106fe0d565fd9e04794dee40dbdd65ac03787dda4f5a5d1c6df38ce",
+    "scripts/configure-injection.py": "07dd3ac4146725a8aeffc679a2d955d1943357e5cca2873e2c2a148ccc5b75e5",
     "scripts/efi_source_audit.py": "a3cbd7509ea5708c925370d60a2fe3c4c699dac6ba2f2b714dff8b91374600df",
     "instrumentation/ext4_efi.h": "acd610ed8cade9b7f4556104a1c1fac4bfc107c7df53eb806683f0d047348c00",
     "instrumentation/ext4_efi_event.h": "16e2f1221032620e501dcfe120d5f392e5131c3d59fe3a5d6e57ded2c9a68641",
@@ -59,8 +59,8 @@
     },
     {
       "path": "fs/ext4/ext4.h",
-      "before": "94d9d214b6ed700a2175daff5e3886613f0ad197d85e77ee2ce1a85db79a84ec",
-      "after": "1d602b5cbaa90ecc98e96256537535934d83747b6d3a1d99a11794b7e5c3d788"
+      "before": "cd44e48cc4da1618bf72fd79f38e5086061f8d6f8d252204b6955caa03101c13",
+      "after": "16807faa7ff65c45c21962b330aa5b25ef2d99fb6be69bd9b823faf84628014b"
     },
     {
       "path": "fs/ext4/ext4_jbd2.c",
@@ -149,8 +149,8 @@
     },
     {
       "path": "fs/ext4/namei.c",
-      "before": "ac222381cc29b37b9856be07af41fe4a5eed60780167877c2467d821663d0969",
-      "after": "4d6d9869fdcc2a4a962598cce7460e11087d53de16557421860509b50a68c2d7"
+      "before": "7d5a98ddd9f8c9d008503bb754418b9579415e3fe3712293aaf20cbd68cf8dfd",
+      "after": "efe0a9cb2baf3b73561e293564b05b8bbab496acb22840e08809327cabe8ebfe"
     },
     {
       "path": "fs/ext4/orphan.c",

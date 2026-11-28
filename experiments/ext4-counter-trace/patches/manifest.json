@@ -1,6 +1,6 @@
 {
   "patch": "0001-counter-trace-core-and-probes.patch",
-  "sha256": "549a6f783d7e6a63742e07cb659d7dbae30b75007bde9154a3310cb464113104",
+  "sha256": "06ec87210bed027ff35eaac3757a6405c68d801a0607cabbf2c59fdc5ab3523d",
   "replay_verified": true,
   "files": [
     {
@@ -26,7 +26,7 @@
     {
       "path": "fs/ext4/counter_models.c",
       "before_sha256": null,
-      "after_sha256": "b2143556d73a3647af38c4b91487667730fa842debe57527fd33c128577a7440"
+      "after_sha256": "5aa1aef7596f9de965b30b76a37973364753e262169bcceb7edd4ea9637dcda4"
     },
     {
       "path": "fs/ext4/counter_relations.c",
@@ -46,7 +46,7 @@
     {
       "path": "fs/ext4/ext4.h",
       "before_sha256": "3a3cdc0439c0c828176bd9f6bc5f25b041f273de29ee0b53c3970716052f114e",
-      "after_sha256": "116806309ad6673e5435762b7354e0c71b8848c2b7b155b5fb04eea69dde479f"
+      "after_sha256": "72a8731520b78dbd22606a21825e7ccc73ff9bf8f2ff01256ec8af5479892d34"
     },
     {
       "path": "fs/ext4/ext4_jbd2.c",
@@ -121,7 +121,7 @@
     {
       "path": "fs/ext4/namei.c",
       "before_sha256": "5db5af62747549e38d0474ed5c34de504cf861f2d46432f46724d446b02da7e6",
-      "after_sha256": "d03fb5e44371df3a0b844ababab6b2c38e6f470ae48bab92e79811eeaa89a41f"
+      "after_sha256": "31d573b7a0cb4b851d6448742722e1956ada59a0c69bb15c79620da49164169f"
     },
     {
       "path": "fs/ext4/orphan.c",

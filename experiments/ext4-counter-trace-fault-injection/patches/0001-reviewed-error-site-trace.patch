@@ -565,7 +565,7 @@
  #include <linux/refcount.h>
  #include <linux/types.h>
  #include <linux/blkdev.h>
-@@ -4290,7 +4291,7 @@
+@@ -4317,7 +4318,7 @@
  	 * have to read the block because we may read the old data
  	 * successfully.
  	 */
@@ -2045,7 +2045,7 @@
  	if (err)
  		return err;
  
-@@ -3212,10 +3213,10 @@
+@@ -3219,10 +3220,10 @@
  
  	/* Initialize quotas before so that eventual writes go in
  	 * separate transaction */
@@ -2058,7 +2058,7 @@
  	if (retval)
  		return retval;
  
-@@ -3411,10 +3412,10 @@
+@@ -3438,10 +3439,10 @@
  	 * Initialize quotas before so that eventual writes go
  	 * in separate transaction
  	 */
@@ -2071,7 +2071,7 @@
  	if (retval)
  		goto out_trace;
  
-@@ -3473,12 +3474,12 @@
+@@ -3500,12 +3501,12 @@
  	if (unlikely(ext4_forced_shutdown(dir->i_sb)))
  		return -EIO;
  
@@ -2087,7 +2087,7 @@
  	if (err)
  		return err;
  
-@@ -3605,7 +3606,7 @@
+@@ -3632,7 +3633,7 @@
  	if (inode->i_nlink >= EXT4_LINK_MAX)
  		return -EMLINK;
  
@@ -2096,7 +2096,7 @@
  	if (err)
  		return err;
  
-@@ -3614,7 +3615,7 @@
+@@ -3641,7 +3642,7 @@
  			EXT4_I(old_dentry->d_inode)->i_projid)))
  		return -EXDEV;
  
@@ -2105,7 +2105,7 @@
  	if (err)
  		return err;
  	return __ext4_link(dir, inode, dentry);
-@@ -3949,20 +3950,20 @@
+@@ -3981,20 +3982,20 @@
  			EXT4_I(old_dentry->d_inode)->i_projid)))
  		return -EXDEV;
  
@@ -2130,7 +2130,7 @@
  		if (retval)
  			return retval;
  	}
-@@ -4209,10 +4210,10 @@
+@@ -4274,10 +4275,10 @@
  			EXT4_I(new_dentry->d_inode)->i_projid)))
  		return -EXDEV;
  
@@ -2143,7 +2143,7 @@
  	if (retval)
  		return retval;
  
-@@ -4337,8 +4338,8 @@
+@@ -4402,8 +4403,8 @@
  	if (flags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE | RENAME_WHITEOUT))
  		return -EINVAL;
  

@@ -6,7 +6,7 @@
     "fs/ext4/balloc.c": "27653202a8741c42776791d4a4b9d99eb56e52a9b6bfc9127be39d94c9f04bd4",
     "fs/ext4/bitmap.c": "e9ba24d26fbdfa1645199fb45d1530f99f94efc29774250e7908948409ea043e",
     "fs/ext4/block_validity.c": "e91277785e1e9c99401111f7f6abb75fabda87fb46d4af72a56f5ac590ddfa3a",
-    "fs/ext4/counter_models.c": "b2143556d73a3647af38c4b91487667730fa842debe57527fd33c128577a7440",
+    "fs/ext4/counter_models.c": "5aa1aef7596f9de965b30b76a37973364753e262169bcceb7edd4ea9637dcda4",
     "fs/ext4/counter_relations.c": "e2fa3a989c38a1a653bd4183813d7ad6af8b130ac99dadcdfa9b1be23aab70e1",
     "fs/ext4/counter_trace.c": "c1d52fdc3ca0160732935f3c788353cdc3e96dd5a78127499cba9d3845e5d8bc",
     "fs/ext4/crypto.c": "75d78a6107febf3c6bf6362019d8d432a74493815d496f40a77dc7358799deed",
@@ -30,7 +30,7 @@
     "fs/ext4/migrate.c": "0cabbdfc405fc73779508f7b8df45ce1ef300b5444d2bd1ac7730c4cfbbe874b",
     "fs/ext4/mmp.c": "5697802f363e8cfe771b1849ccbcceaa77029fb9c55ff47b883e7a5aad876540",
     "fs/ext4/move_extent.c": "8b5a05ebcee0ea051c8fea3ae96adabf5914e766d2767ae322b58b2426d9370d",
-    "fs/ext4/namei.c": "d03fb5e44371df3a0b844ababab6b2c38e6f470ae48bab92e79811eeaa89a41f",
+    "fs/ext4/namei.c": "31d573b7a0cb4b851d6448742722e1956ada59a0c69bb15c79620da49164169f",
     "fs/ext4/orphan.c": "183304932280306be738581ee046f6f1010d73d22ce5a3330dc343b358ebcc63",
     "fs/ext4/page-io.c": "ff63521cac2fbed9a48879c46137a47037854ba413be34e98b3db4761f20a204",
     "fs/ext4/readpage.c": "5c345e68b4b9fb1b8852960e5bbad1b1cfafcdfb8558ffc3e205d073c9288176",
@@ -46,7 +46,7 @@
     "fs/ext4/xattr_user.c": "9edb34db46c9d60cdefdfad8908fb476246f6fe17d1a71e1070f06532788224c",
     "fs/ext4/acl.h": "ef2e000a0bb991629bab6a814ef3974712065702135b8dd30d2a0fc5f58efb58",
     "fs/ext4/counter_trace.h": "082f5bd0df988d20e38d50a29e449ebcf4955bab121c0d20917d5a912579c7b3",
-    "fs/ext4/ext4.h": "116806309ad6673e5435762b7354e0c71b8848c2b7b155b5fb04eea69dde479f",
+    "fs/ext4/ext4.h": "72a8731520b78dbd22606a21825e7ccc73ff9bf8f2ff01256ec8af5479892d34",
     "fs/ext4/ext4_extents.h": "673cde1c12fe4d3f8cfbc1e879f6fec165cdb50bc8d595b9414ed24c24d3e48c",
     "fs/ext4/ext4_jbd2.h": "dccec89191d6e327c028261926e18f31c2b957608a77cf0cf1e67eb89bf4fae4",
     "fs/ext4/extents_status.h": "262d58c0deb81d8deee6483759fd16be36ba90e00eb35a679a6338fb29b4a6d4",
@@ -587,55 +587,55 @@
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3267,
+      "line": 3275,
       "kind": "nlink",
       "source": "clear_nlink(inode);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3381,
+      "line": 3405,
       "kind": "nlink",
       "source": "drop_nlink(inode);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3539,
+      "line": 3566,
       "kind": "nlink",
       "source": "ext4_ct_nlink(inode, 0, \"NAMESPACE.NLINK.ROLLBACK\");"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3586,
+      "line": 3613,
       "kind": "nlink",
       "source": "drop_nlink(inode);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3725,
+      "line": 3752,
       "kind": "dirent",
       "source": "ent->parent_de->inode = cpu_to_le32(dir_ino);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3763,
+      "line": 3790,
       "kind": "dirent",
       "source": "ent->de->inode = cpu_to_le32(ino);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 3769,
+      "line": 3796,
       "kind": "dirent",
       "source": "ent->de->inode = cpu_to_le32(ino);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 4109,
+      "line": 4141,
       "kind": "nlink",
       "source": "clear_nlink(new.inode);"
     },
     {
       "file": "fs/ext4/namei.c",
-      "line": 4165,
+      "line": 4230,
       "kind": "nlink",
       "source": "drop_nlink(whiteout);"
     },

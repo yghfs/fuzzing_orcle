@@ -42,6 +42,19 @@ FC replay 中访问尚未初始化的 group-info 问题。重复 replay 的 desc
 包括上述短测的报告、trace 和实验镜像。后续需要原始证据时，须重新运行对应测试。
 早期主线恢复归档另存于本机 `baselines/`，其中保存了当时的源码与 `work/` 内容；当前回归不读取该归档。
 
+2026-11-28 把 `ext4_rmdir` / `__ext4_unlink` / `ext4_rename` 的出错出口模型
+（`ext4_checker_{rmdir,unlink,rename}_error`，判据"失败的 `ext4_mark_inode_dirty()` 不算
+已持久化"，只读内存与内存中的目录块）并入本实验的 0001 基座补丁，与
+[故障注入实验](../ext4-counter-trace-fault-injection/) 共用同一份判定逻辑；本实验仍只做
+checker，补丁中不含任何错误注入。0001 重导出后 `--write-inventory`、`build.sh --normal`
+（内核 #10）与 `--bind-build` 全部通过，`run-smoke.sh` 报 `counter_trace_smoke=passed`、
+`failures=[]`（四种文件系统、766,756 个事件）。
+
+同日清理 `results/`：删除了旧内核（md5 `172295c6…`，228 段长跑）的 `campaign-7soi4ouf`
+（约 904 MiB）。本文件上方与 `README.md` 已声明长跑原始目录不作为当前证据，需要时按
+[SECOND-CHAIN.md](SECOND-CHAIN.md) 重跑。当前 `results/` 只保留内核 #10 的
+`smoke-2wcDOtL9/`。
+
 最终漏洞结论维护在 [漏洞总表](../../BUG-INVENTORY.md)，
 fast-commit 目录计数的唯一分析见 [finding report](FAST-COMMIT-DIR-COUNT-FINDING.md)。
 

@@ -236,3 +236,82 @@ python3 -u scripts/run-campaign.py \
 
 这是确定性 fixture 的短程回归，不是 syzkaller 随机生成的长时间 campaign。
 本次没有动态触发 extent-grow 的 site 67，不能据此声称复现了该缺陷或覆盖全部静态错误点。
+
+## 运行期命名空间出口模型：2026-11-27
+
+补齐 `mkdir` / `rmdir` / `unlink` / `rename` 的出错出口在**运行期**报出不一致的能力，
+不再依赖卸载后的 `e2fsck`。原实现把"操作成功时应有的值"当预期，因此
+"内存里已减/已加、但对应 dirty 提交失败"的退出看起来是自洽的；现在改为按**这次退出
+实际提交了什么**判定，调用方传入控制流事实（`entry_removal_attempted`、`parent_committed`、
+`entry_removed`、`inode_committed`、`dest_linked`、`source_linked`），检查点只读内存
+（含内存中的目录块缓冲），不读设备：
+
+三条 model 共用一条判据：**一次失败的 `ext4_mark_inode_dirty()` 不算已持久化**，所以
+该 inode 在磁盘上留下的是变更前的值；检查器用调用方记录的"这次更新是否被 journal 接受"
+把内存值折回 durable 值再比对。这正好覆盖"内存里已经减/已经加、但那次 dirty 没成功"的退出。
+
+- `ext4_rmdir`：`rmdir_error_before_removal` / `rmdir_error_entry_removed_child_kept` /
+  `rmdir_error_child_nlink_not_committed` / `rmdir_error_parent_nlink`。
+  目录项写成功、子 inode 的 `clear_nlink` 也提交之后，删除即已生效，父目录就不许再计这个
+  子目录——与"父目录这次 dirty 成功与否"无关，后者正是本缺陷；
+- `__ext4_unlink`：`ext4_delete_entry` 返回后直接读 `de->inode` 判断名字是否已从块消失
+  （写失败时缓冲已清零，返回值不足以判断），报 `unlink_error_entry_removed_link_count`；
+- `ext4_rename`：`end_rename` 用 `ext4_find_entry` 在内存里复核源/目标两个名字，
+  报 `rename_error_dest_linked_source_kept`；若发生覆盖替代，目标 inode 的判据用它**自己**
+  的起始计数（`rename_error_target_link_count`），不借源 inode 的计数。
+
+两个实测才暴露的模型缺口（blkdebug 载具才能命中，CSV 站点 #216/#41 命中不到）：
+
+1. 失败发生在**子 inode**的 `mark_inode_dirty`（`ext4_rmdir:3288 inode #1213`）时，只跟踪
+   父目录的提交状态会让模型沉默。补上 `old_child_nlink`/`child_committed` 后报
+   `rmdir_error_child_nlink_not_committed before=2 expected=0 actual=2`；
+2. `unlink` 的 `inode_committed` 参数起初被接受却未使用，任何删除后失败都看起来自洽。
+   改为 `durable = inode_committed ? inode->i_nlink : old_nlink` 后报
+   `unlink_error_entry_removed_link_count before=1 expected=0 actual=1`。
+
+model 槽已满（`EXT4_CHECKER_MODEL_MAX 15`），三个新出口复用
+`EXT4_CHECKER_MODEL_DIRECTORY_LINK_COUNT`，以 `source=` 区分。
+
+**归属：判定逻辑在共享基座补丁里，不在注入生成器里。** 三个模型函数、原型与桩位于
+`../ext4-counter-trace/patches/0001-counter-trace-core-and-probes.patch`
+（`fs/ext4/counter_models.c` + `fs/ext4/ext4.h`），本实验把它当基线应用，所以两个实验的
+checker 判定逻辑只有一份实现。call site 不共享：基座补丁在 `ext4_delete_entry()` 之前就
+`ext4_reserve_inode_write()` 把 unlink 的 inode 缓冲钉住，恰好关掉了这些模型要找的窗口，
+`restore_upstream_semantics()` 把它改回上游顺序，缺陷才在这里存在。因此
+[configure-injection.py](scripts/configure-injection.py) 只做 EFI 门控与上游语义还原，
+`0002` 补丁里既不再定义模型，也不再添加 hook（`grep -c 'void ext4_checker_'` 为 0）。
+
+六类缺陷在两路证据上全部重跑（`scripts/repro-inventory.py`，内核 md5
+`daf954294386e7ff245b63c30a9c1076`）：
+
+| 用例 | 注入 | 运行期 violations | e2fsck | 对照 |
+| --- | --- | ---: | ---: | --- |
+| group extend | #337 EFI `kzalloc` | `block_bitmap=2` | 4 | valid / 0 |
+| group extend | blkdebug sector 194 | `block_bitmap=2` | 4 | valid / 0 |
+| group add | #316 EFI `kmem_cache_alloc` | 无模型 | 4 | valid / 0 |
+| mkdir | #216 hit=1 | `mkdir_atomicity=1` | 4 | valid / 0 |
+| mkdir | blkdebug sector 328 | `mkdir_atomicity=1` | 4 | valid / 0 |
+| rmdir | #216 hit=1 | `directory_link_count=1` (`rmdir_error_parent_nlink`) | 4 | valid / 0 |
+| rmdir | #41 hit=0 | `directory_link_count=1` (`rmdir_error_entry_removed_child_kept`) | 4 | valid / 0 |
+| rmdir | blkdebug 928（子 inode dirty 失败） | `directory_link_count=1` (`rmdir_error_child_nlink_not_committed`) | 4 | valid / 0 |
+| unlink | #216 hit=0 | `directory_link_count=1` (`unlink_error_entry_removed_link_count`) | 4 | valid / 0 |
+| unlink | #41 hit=0 | `directory_link_count=1` (同上) | 4 | valid / 0 |
+| unlink | blkdebug 928 | `directory_link_count=1` (同上) | 4 | valid / 0 |
+| rename | #216 hit=0／hit=1 | `directory_link_count=1` (`rename_error_dest_linked_source_kept`) | 4 | valid / 0 |
+| rename | #41 hit=0 | `directory_link_count=1` (同上) | 4 | valid / 0 |
+| rename | blkdebug 928 | `directory_link_count=1` (同上) | 4 | valid / 0 |
+| 负例 mkdir #216 hit=0、rmdir #216 hit=0、unlink #216 hit=1 | 同站点 | 0 | 0 | valid / 0 |
+
+负例证明新模型没有把"目录项还在、链接数未变"的干净退出误报为缺陷。逐用例命令、
+命中矩阵与未采用站点的原因见 `results/FINAL-REPRO-MAP.md`（`results/` 被 .gitignore 忽略）。
+
+上表每一行都由 `-v5*` 存档支撑（同一内核 `daf95429…`）。`-v5` 是在模型判定逻辑搬进共享基座
+补丁、`0002` 不再生成模型之后，从最终源码树重跑的一整轮（15 个故障档 + 3 个负例）；与搬迁前
+`-v4*` 存档的 (case, carrier, site, plan, 故障/对照 `e2fsck`, `violations`, `reproduced`) 逐条
+比对完全相等（18/18），随后删除了 `-v4*` 副本。负例仍全静默。
+
+21 项故障注入测试、7 项观测测试、`run-smoke.sh`（`error_site_smoke=passed`、`failures=[]`）
+及完整源码审计（86,630 个普通文件、37 个插桩差异、12 个新增文件）在改动后全部通过。
+
+证据目录命名说明：`-v5` 是模型搬迁后的整轮存档，其中 `-v5b` 是 `#41`/rename `#216 hit=1`，
+`-v5c` 是 rename `#41`，`-v5n` 是三个负例。所有批次都在同一内核 `daf95429…` 上完成。
